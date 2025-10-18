@@ -95,39 +95,39 @@ mod mock {
                 // 以 accel_no_g 为例, x, y, z 分别有 0, π/3, 2π/3 的相位差
                 // ----------------------------------------------------
 
-                let accel_no_g = Some(DVec3 {
+                let accel_no_g = DVec3 {
                     // 幅度 2.0
                     x: 2.0 * (angular_velocity * t).sin(),
                     y: 2.0 * (angular_velocity * t + PI / 3.0).sin(),
                     z: 2.0 * (angular_velocity * t + 2.0 * PI / 3.0).sin(),
-                });
+                };
 
-                let accel_with_g = Some(DVec3 {
+                let accel_with_g = DVec3 {
                     // 幅度 2.0
                     x: 2.0 * (angular_velocity * t).sin() + 10.0,
                     y: 2.0 * (angular_velocity * t + PI / 3.0).sin() + 10.0,
                     z: 2.0 * (angular_velocity * t + 2.0 * PI / 3.0).sin() + 10.0,
-                });
+                };
 
-                let gyro = Some(DVec3 {
+                let gyro = DVec3 {
                     // 幅度 50.0
                     x: 50.0 * (angular_velocity * t + PI).sin(),
                     y: 50.0 * (angular_velocity * t + PI + PI / 4.0).sin(),
                     z: 50.0 * (angular_velocity * t + PI + 2.0 * PI / 4.0).sin(),
-                });
+                };
 
-                let angle = Some(DVec3 {
+                let angle = DVec3 {
                     x: 30.0 * (angular_velocity * t + PI).sin(),
                     y: 30.0 * (angular_velocity * t + PI + PI / 4.0).sin(),
                     z: 30.0 * (angular_velocity * t + PI + 2.0 * PI / 4.0).sin(),
-                });
+                };
 
-                let quat = Some(DQuat {
+                let quat = DQuat {
                     w: 1.0,                                // 简化四元数 w 分量
                     x: (angular_velocity * t / 2.0).sin(), // 简化 x, y, z 随时间变化
                     y: (angular_velocity * t / 2.0 + PI / 6.0).sin(),
                     z: (angular_velocity * t / 2.0 + PI / 3.0).sin(),
-                });
+                };
 
                 // offset 改为螺旋线运动
                 // 螺旋线参数方程：
@@ -139,17 +139,17 @@ mod mock {
                 let radius = 5.0; // 螺旋半径
                 let pitch = 2.0; // 螺旋的竖直上升速度（每周期上升高度）
 
-                let offset = Some(DVec3 {
+                let offset = DVec3 {
                     x: radius * theta.cos(),
                     y: radius * theta.sin(),
                     z: pitch * theta / (2.0 * PI), // 或简单地用 z: pitch * t
-                });
+                };
 
-                let accel_nav = Some(DVec3 {
+                let accel_nav = DVec3 {
                     x: 5.0 * (angular_velocity * t + PI).sin(),
                     y: 5.0 * (angular_velocity * t + PI + PI / 4.0).sin(),
                     z: 5.0 * (angular_velocity * t + PI + 2.0 * PI / 4.0).sin(),
-                });
+                };
 
                 // 4. 构建 IMUData 结构体
                 let imu_data = IMUData {
