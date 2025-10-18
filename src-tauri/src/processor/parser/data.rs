@@ -1,56 +1,6 @@
 use anyhow::bail;
+use glam::{DQuat, DVec3};
 use serde::Serialize;
-
-// ===============================
-// IMU数据结构 (需要根据实际解析实现)
-// ===============================
-#[derive(Debug, Clone, Serialize)]
-pub struct Vector3 {
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct Quaternion {
-    pub w: f64,
-    pub x: f64,
-    pub y: f64,
-    pub z: f64,
-}
-
-impl Quaternion {
-    pub fn to_euler(&self) -> (f64, f64, f64) {
-        // 四元数转欧拉角 (roll, pitch, yaw)
-        let sinr_cosp = 2.0 * (self.w * self.x + self.y * self.z);
-        let cosr_cosp = 1.0 - 2.0 * (self.x * self.x + self.y * self.y);
-        let roll = sinr_cosp.atan2(cosr_cosp);
-
-        let sinp = 2.0 * (self.w * self.y - self.z * self.x);
-        let pitch = if sinp.abs() >= 1.0 {
-            std::f64::consts::FRAC_PI_2.copysign(sinp)
-        } else {
-            sinp.asin()
-        };
-
-        let siny_cosp = 2.0 * (self.w * self.z + self.x * self.y);
-        let cosy_cosp = 1.0 - 2.0 * (self.y * self.y + self.z * self.z);
-        let yaw = siny_cosp.atan2(cosy_cosp);
-
-        (roll, pitch, yaw)
-    }
-
-    pub fn print_euler(&self, prefix: &str) {
-        let (roll, pitch, yaw) = self.to_euler();
-        println!(
-            "{} (roll={:.2}°, pitch={:.2}°, yaw={:.2}°)",
-            prefix,
-            roll.to_degrees(),
-            pitch.to_degrees(),
-            yaw.to_degrees()
-        );
-    }
-}
 
 #[derive(Debug, Serialize)]
 /// 从蓝牙数据包中解析出的原始数据体
@@ -65,17 +15,18 @@ impl Quaternion {
 /// * `accel_nav`: 导航系加速度
 pub struct IMUData {
     pub timestamp_ms: u64,
-    pub accel_no_g: Option<Vector3>,
-    pub accel_with_g: Option<Vector3>,
-    pub gyro: Option<Vector3>,
-    pub quat: Option<Quaternion>,
-    pub angle: Option<Vector3>,
-    pub offset: Option<Vector3>,
-    pub accel_nav: Option<Vector3>,
+    pub accel_no_g: Option<DVec3>,
+    pub accel_with_g: Option<DVec3>,
+    pub gyro: Option<DVec3>,
+    pub quat: Option<DQuat>,
+    pub angle: Option<DVec3>,
+    pub offset: Option<DVec3>,
+    pub accel_nav: Option<DVec3>,
 }
 
 // ===============================
 // IMU解析器
+// https://www.yuque.com/cxqwork/lkw3sg/yqa3e0?#Phg5V
 // ===============================
 pub struct IMUParser;
 
@@ -88,7 +39,7 @@ impl IMUParser {
     /// 解析订阅的功能数据 (数据体第一个字节为0x11)
     ///
     /// * `buf`: 蓝牙数据包
-    pub fn parse_imu(buf: &[u8]) -> anyhow::Result<IMUData> {
+    pub fn parse(buf: &[u8]) -> anyhow::Result<IMUData> {
         // 字节[2-1] 为功能订阅标识，指示当前订阅了哪些功能
         // 字节[6-3] 为模块开机后的时间戳(单位ms)
         // 字节[7-n] 根据功能订阅标识而变化, 请看 文档表3
@@ -165,7 +116,7 @@ impl IMUParser {
             let x = Self::read_i16(&buf[l + 2..]) as f64 * Self::SCALE_QUAT;
             let y = Self::read_i16(&buf[l + 4..]) as f64 * Self::SCALE_QUAT;
             let z = Self::read_i16(&buf[l + 6..]) as f64 * Self::SCALE_QUAT;
-            imu_data.quat = Some(Quaternion { w, x, y, z });
+            imu_data.quat = Some(DQuat { w, x, y, z });
             l += 8;
         }
 
@@ -211,10 +162,10 @@ impl IMUParser {
     }
 
     /// 连续读取三个 i16，并按比例系数转换为 Vector3
-    fn read_vec3(buf: &[u8], scale: f64) -> Vector3 {
+    fn read_vec3(buf: &[u8], scale: f64) -> DVec3 {
         let x = Self::read_i16(&buf[0..2]) as f64 * scale;
         let y = Self::read_i16(&buf[2..4]) as f64 * scale;
         let z = Self::read_i16(&buf[4..6]) as f64 * scale;
-        Vector3 { x, y, z }
+        DVec3 { x, y, z }
     }
 }

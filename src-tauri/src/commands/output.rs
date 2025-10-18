@@ -1,6 +1,6 @@
 use tauri::{async_runtime::spawn, ipc::Channel, AppHandle, Manager};
 
-use crate::{app_state::AppState, processor::IMUData};
+use crate::{app_state::AppState, processor::parser::data::IMUData};
 
 #[tauri::command]
 pub fn subscribe_output(app: AppHandle, on_event: Channel<IMUData>) {
@@ -16,9 +16,5 @@ pub fn subscribe_output(app: AppHandle, on_event: Channel<IMUData>) {
                 break;
             }
         }
-
-        // 暂停一段时间，控制发送频率，例如 4ms (250Hz)
-        // 这一步很重要，能防止 CPU 100% 运行空循环
-        // tokio::time::sleep(Duration::from_millis(4)).await;
     });
 }

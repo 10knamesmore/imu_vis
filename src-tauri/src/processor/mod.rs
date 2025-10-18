@@ -1,12 +1,11 @@
 use std::thread;
 
-use flume::{Receiver, Sender};
+use parser::data::IMUData;
 
-pub use crate::processor::parser::IMUData;
+use crate::processor::parser::data::IMUParser;
 
-mod parser;
+pub mod parser;
 
-#[allow(unused)]
 pub struct Processor;
 
 impl Processor {
@@ -15,35 +14,40 @@ impl Processor {
     ///
     /// * `upstream_rx`: 接收来自imu_client的原始蓝牙二进制数据
     /// * `downstream_tx`: 发给AppState的rx, 被command里面接收
-    pub fn new(upstream_rx: Receiver<Vec<u8>>, downstream_tx: Sender<IMUData>) -> Self {
-        // 引入计数器和计时器
-        thread::spawn(move || loop {
-            match upstream_rx.recv() {
-                Ok(data) => {
-                    // TODO: 数据包第一字节 0x02 - 0x51结果可能都不同, 需要dispatch
-                    let imu_data = match parser::IMUParser::parse_imu(&data) {
-                        Ok(data) => data,
-                        Err(e) => {
-                            eprintln!("{e}");
-                            continue;
-                            // return;
-                        }
-                    };
+    pub fn new(
+        upstream_rx: flume::Receiver<Vec<u8>>,
+        downstream_tx: flume::Sender<IMUData>,
+    ) -> Self {
+        thread::Builder::new()
+            .name("DataProcessorThread".into())
+            .spawn(move || loop {
+                match upstream_rx.recv() {
+                    Ok(data) => {
+                        // TODO: 数据包第一字节 0x02 - 0x51结果可能都不同, 需要dispatch
+                        let imu_data = match IMUParser::parse(&data) {
+                            Ok(data) => data,
+                            Err(e) => {
+                                eprintln!("{e}");
+                                continue;
+                                // return;
+                            }
+                        };
 
-                    match downstream_tx.send(imu_data) {
-                        Ok(_) => {}
-                        Err(e) => {
-                            eprintln!("{}", e);
-                            continue;
+                        match downstream_tx.send(imu_data) {
+                            Ok(_) => {}
+                            Err(e) => {
+                                eprintln!("{}", e);
+                                continue;
+                            }
                         }
                     }
+                    Err(e) => {
+                        eprintln!("Error receiving: {}", e);
+                        // break;
+                    }
                 }
-                Err(e) => {
-                    eprintln!("Error receiving: {}", e);
-                    // break;
-                }
-            }
-        });
+            })
+            .unwrap_or_else(|e| panic!("error while creating data processor thread : {}", e));
         Processor {}
     }
 }

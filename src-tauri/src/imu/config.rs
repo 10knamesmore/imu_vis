@@ -84,7 +84,7 @@ impl Default for IMUConfig {
             zero_velocity_mode: 255,
             dynamic_zero_speed: 0,
             sensor_mode: SensorMode::new(false, 2),
-            report_rate: 200,
+            report_rate: 250,
             gyro_filter: FilterLevel(1),
             accel_filter: FilterLevel(3),
             mag_filter: FilterLevel(5),

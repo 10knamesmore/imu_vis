@@ -3,7 +3,7 @@ use tokio::sync::{Mutex, MutexGuard};
 
 use crate::{
     imu::IMUClient,
-    processor::{IMUData, Processor},
+    processor::{parser::data::IMUData, Processor},
 };
 
 /// 应用状态

@@ -6,7 +6,7 @@ mod test;
 pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         test::gen_sine_wave,
-        test::test,
+        test::mock_imu_data,
         imu::start_scan,
         imu::stop_scan,
         imu::list_peripherals,

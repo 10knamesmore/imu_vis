@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实时螺旋线3D展示</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            margin: 0 0 20px 0;
+            color: #333;
+            text-align: center;
+        }
+        #plot {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .controls {
+            margin-top: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 14px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+        }
+        .info {
+            padding: 10px;
+            background: #e7f3fe;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>实时螺旋线流式展示 (250Hz)</h1>
+        <div id="plot"></div>
+        <div class="controls">
+            <button id="startBtn" onclick="startStreaming()">开始</button>
+            <button id="stopBtn" onclick="stopStreaming()" disabled>停止</button>
+            <button onclick="clearPlot()">清空</button>
+            <span id="pointCount" style="margin-left: auto; color: #666;"></span>
+        </div>
+        <div class="info">
+            💡 提示: 用鼠标可以平移、旋转和缩放图表。点击并拖动旋转，滚轮缩放，右键拖动平移。
+        </div>
+    </div>
+
+    <script>
+        let streaming = false;
+        let pointCount = 0;
+        let xData = [], yData = [], zData = [];
+        let t = 0;
+        let animationId = null;
+
+        // 螺旋线生成函数
+        function generateSpiralPoints(count) {
+            const points = [];
+            const dt = 1 / 250; // 250Hz频率，每个点间隔
+            
+            for (let i = 0; i < count; i++) {
+                const angle = t + i * dt * 2 * Math.PI;
+                const x = Math.cos(angle) * (1 + angle / (4 * Math.PI));
+                const y = Math.sin(angle) * (1 + angle / (4 * Math.PI));
+                const z = angle / (4 * Math.PI);
+                
+                points.push({ x, y, z });
+            }
+            
+            t += count * dt * 2 * Math.PI;
+            return points;
+        }
+
+        // 初始化图表
+        function initPlot() {
+            const trace = {
+                x: xData,
+                y: yData,
+                z: zData,
+                mode: 'lines',
+                type: 'scatter3d',
+                line: {
+                    color: zData.length > 0 ? zData : 'blue',
+                    colorscale: 'Viridis',
+                    width: 4,
+                    showscale: true,
+                    colorbar: {
+                        title: 'Z轴'
+                    }
+                },
+                name: '螺旋线'
+            };
+
+            const layout = {
+                title: '实时螺旋线轨迹',
+                scene: {
+                    xaxis: { title: 'X' },
+                    yaxis: { title: 'Y' },
+                    zaxis: { title: 'Z' },
+                    aspectmode: 'data'
+                },
+                margin: { l: 0, r: 0, b: 0, t: 40 },
+                hovermode: 'closest'
+            };
+
+            Plotly.newPlot('plot', [trace], layout, { responsive: true });
+        }
+
+        // 更新图表
+        function updatePlot() {
+            Plotly.restyle('plot', {
+                x: [xData],
+                y: [yData],
+                z: [zData],
+                'line.color': [zData]
+            }, [0]);
+
+            document.getElementById('pointCount').textContent = `已生成点数: ${pointCount}`;
+        }
+
+        // 流式生成数据
+        function streamData() {
+            if (!streaming) return;
+
+            // 每次生成25个点 (250Hz / 10 = 25个/刷新帧)
+            const newPoints = generateSpiralPoints(25);
+            
+            newPoints.forEach(point => {
+                xData.push(point.x);
+                yData.push(point.y);
+                zData.push(point.z);
+                pointCount++;
+            });
+
+            updatePlot();
+            animationId = requestAnimationFrame(streamData);
+        }
+
+        // 开始流式传输
+        function startStreaming() {
+            if (streaming) return;
+            streaming = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            
+            if (xData.length === 0) {
+                initPlot();
+            }
+            
+            streamData();
+        }
+
+        // 停止流式传输
+        function stopStreaming() {
+            streaming = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+            }
+        }
+
+        // 清空图表
+        function clearPlot() {
+            streaming = false;
+            pointCount = 0;
+            t = 0;
+            xData = [];
+            yData = [];
+            zData = [];
+            animationId = null;
+            
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('pointCount').textContent = '已生成点数: 0';
+            
+            initPlot();
+        }
+
+        // 页面加载时初始化
+        window.addEventListener('load', initPlot);
+    </script>
+</body>
+</html>

@@ -7,6 +7,7 @@ use flume::Sender;
 use futures::StreamExt;
 use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
+use tauri::async_runtime::JoinHandle;
 use tokio::sync::OnceCell;
 
 use crate::data::bluetooth::PeripheralInfo;
@@ -22,11 +23,17 @@ struct NeededCharacteristics {
 // IMU客户端
 // URL: https://www.yuque.com/cxqwork/lkw3sg/yqa3e0?#Phg5V
 // ===============================
+/// * `central`: 蓝牙主设备(本机)
+/// * `peripheral`: 目前连接上的设备
+/// * `chars`: 蓝牙特征
+/// * `tx`: 接收蓝牙数据包发给下游
+/// * `handle`: 接收蓝牙数据包的task的handle
 pub struct IMUClient {
     central: OnceCell<Adapter>,
     peripheral: Option<Peripheral>,
     chars: Option<NeededCharacteristics>,
     tx: Sender<Vec<u8>>,
+    handle: Option<JoinHandle<()>>,
 }
 
 impl IMUClient {
@@ -36,6 +43,7 @@ impl IMUClient {
             peripheral: None,
             chars: None,
             tx,
+            handle: None,
         }
     }
 
@@ -59,7 +67,6 @@ impl IMUClient {
     /// 连接指定uuid的Periphral
     ///
     /// * `uuid`: 指定uuid
-    // HACK: 传入参数应当是unique IMUConnectOptions
     pub async fn connect(&mut self, uuid: &str) -> anyhow::Result<PeripheralInfo> {
         let peripheral = match self.find_peripheral(uuid).await {
             Ok(it) => it,
@@ -111,7 +118,7 @@ impl IMUClient {
         });
 
         match self.init_peripheral().await {
-            Ok(_) => {}
+            Ok(handle) => self.handle = Some(handle),
             Err(e) => {
                 self.peripheral = None;
                 self.chars = None;
@@ -131,12 +138,16 @@ impl IMUClient {
     /// TODO: 断开连接功能优先级低
     pub async fn disconnect(&mut self) -> anyhow::Result<PeripheralInfo> {
         self.disable_data_reporting().await?;
+        if let Some(handle) = &self.handle {
+            handle.abort();
+        }
+        self.handle = None;
         todo!()
     }
 
     /// 初始化IMU设备的连接
     /// 内部开启一个tokio线程接收蓝牙数据包
-    async fn init_peripheral(&mut self) -> anyhow::Result<()> {
+    async fn init_peripheral(&mut self) -> anyhow::Result<JoinHandle<()>> {
         // 保持蓝牙连接
         self.keep_bluetooth_connection().await?;
 
@@ -158,7 +169,7 @@ impl IMUClient {
         let mut notification_stream = peripheral.notifications().await?;
 
         let tx = self.tx.clone();
-        tokio::spawn(async move {
+        let handle = tauri::async_runtime::spawn(async move {
             let mut msg_count = 0;
             let mut last_report = Instant::now();
             while let Some(data) = notification_stream.next().await {
@@ -166,10 +177,9 @@ impl IMUClient {
                     Ok(_) => {
                         // dbg!(data.uuid);
                     }
-                    // 当且仅当所有Receiver被drop时返回error, 未知错误,应当直接结束进程
+                    // 当且仅当所有Receiver被drop时返回error
                     Err(e) => {
                         eprintln!("程序内部错误: {}", e);
-                        // std::process::exit(1);
                     }
                 }
 
@@ -192,7 +202,7 @@ impl IMUClient {
             }
         });
 
-        Ok(())
+        Ok(handle)
     }
 
     /// 从central中查找指定uuid的Peripheral
