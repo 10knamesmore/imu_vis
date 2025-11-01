@@ -1,9 +1,9 @@
 use tauri::{async_runtime::spawn, ipc::Channel, AppHandle, Manager};
 
-use crate::{app_state::AppState, processor::parser::data::IMUData};
+use crate::{app_state::AppState, types::outputs::ResponseData};
 
 #[tauri::command]
-pub fn subscribe_output(app: AppHandle, on_event: Channel<IMUData>) {
+pub fn subscribe_output(app: AppHandle, on_event: Channel<ResponseData>) {
     let app_state = app.state::<AppState>();
 
     let rx = app_state.downstream_rx.clone();

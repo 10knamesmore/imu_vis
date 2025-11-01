@@ -1,10 +1,7 @@
 use flume::Receiver;
 use tokio::sync::{Mutex, MutexGuard};
 
-use crate::{
-    imu::IMUClient,
-    processor::{parser::data::IMUData, Processor},
-};
+use crate::{imu::IMUClient, processor::Processor, types::outputs::ResponseData};
 
 /// 应用状态
 ///
@@ -17,7 +14,7 @@ pub struct AppState {
     #[allow(unused)]
     processor: Processor,
 
-    pub downstream_rx: Receiver<IMUData>,
+    pub downstream_rx: Receiver<ResponseData>,
 }
 
 impl AppState {

@@ -2,7 +2,7 @@ use anyhow::bail;
 use glam::{DQuat, DVec3};
 use serde::Serialize;
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 /// 从蓝牙数据包中解析出的原始数据体, 保证数据均为有效值
 pub struct IMUData {
     /// * `timestamp_ms`: 运行时间ms
@@ -62,16 +62,16 @@ impl IMUParser {
     fn try_parse_vec3(
         buf: &[u8],
         ctl: u16,
-        bit_pos: u8,
+        bit_mask: u16,
         start_l: usize,
         scale: f64,
     ) -> anyhow::Result<(DVec3, usize)> {
-        if (ctl & (1 << bit_pos)) != 0 {
+        if (ctl & bit_mask) != 0 {
             const LEN: usize = 6;
             if start_l + LEN > buf.len() {
                 bail!(
                     "data buffer not long enough for Vec3 field (bit {})",
-                    bit_pos
+                    bit_mask
                 )
             }
             // 解析值并推进索引
@@ -80,7 +80,7 @@ impl IMUParser {
         } else {
             // 控制位未设置，返回零值和未推进的索引
             // Ok((DVec3::ZERO, start_l))
-            bail!("数据包没有设置指定控制位, 期望控制位为 : {}", bit_pos)
+            bail!("数据包没有设置指定控制位, 期望控制位为 : {}", bit_mask)
         }
     }
 
@@ -89,13 +89,13 @@ impl IMUParser {
     fn try_parse_quat(
         buf: &[u8],
         ctl: u16,
-        bit_pos: u8,
+        bit_mask: u16,
         start_l: usize,
     ) -> anyhow::Result<(DQuat, usize)> {
-        if (ctl & (1 << bit_pos)) != 0 {
+        if (ctl & bit_mask) != 0 {
             const LEN: usize = 8;
             if start_l + LEN > buf.len() {
-                bail!("data buffer not long enough for quat (bit {})", bit_pos)
+                bail!("data buffer not long enough for quat (bit {})", bit_mask)
             }
             let w = Self::read_i16(&buf[start_l..]) as f64 * Self::SCALE_QUAT;
             let x = Self::read_i16(&buf[start_l + 2..]) as f64 * Self::SCALE_QUAT;
@@ -106,7 +106,7 @@ impl IMUParser {
         } else {
             // 控制位未设置，返回身份四元数和未推进的索引
             // Ok((DQuat::IDENTITY, start_l))
-            bail!("数据包没有设置指定控制位, 期望控制位为 : {}", bit_pos)
+            bail!("数据包没有设置指定控制位, 期望控制位为 : {}", bit_mask)
         }
     }
 
@@ -122,7 +122,8 @@ impl IMUParser {
             bail!("[error] buffer too short, expected at least 7 bytes")
         }
 
-        let ctl = ((buf[2] as u16) << 8) | (buf[1] as u16);
+        let ctl = ((buf[2] as u16) << 8) | (buf[1] as u16); // 前两个直接功能订阅标识
+
         let timestamp_ms = ((buf[6] as u64) << 24)
             | ((buf[5] as u64) << 16)
             | ((buf[4] as u64) << 8)
@@ -130,26 +131,29 @@ impl IMUParser {
 
         let initial_l = 7;
 
-        // 1. accel_noG (bit 0)
-        let (accel_no_g, l1) = Self::try_parse_vec3(buf, ctl, 0, initial_l, Self::SCALE_ACCEL)?;
+        // (bit 0)
+        let (accel_no_g, l1) =
+            Self::try_parse_vec3(buf, ctl, 0x0001, initial_l, Self::SCALE_ACCEL)?;
 
-        // 2. accel_withG (bit 1)
-        let (accel_with_g, l2) = Self::try_parse_vec3(buf, ctl, 1, l1, Self::SCALE_ACCEL)?;
+        // (bit 1)
+        let (accel_with_g, l2) = Self::try_parse_vec3(buf, ctl, 0x0002, l1, Self::SCALE_ACCEL)?;
 
-        // 3. gyro (bit 2)
-        let (gyro, l3) = Self::try_parse_vec3(buf, ctl, 2, l2, Self::SCALE_ANGLE_SPEED)?;
+        // (bit 2)
+        let (gyro, l3) = Self::try_parse_vec3(buf, ctl, 0x0004, l2, Self::SCALE_ANGLE_SPEED)?;
 
-        // 4. quat (bit 5)
-        let (quat, l4) = Self::try_parse_quat(buf, ctl, 5, l3)?;
+        // bit3 磁场, bit4 气压计不订阅
 
-        // 5. angle (欧拉角) (bit 6)
-        let (angle, l5) = Self::try_parse_vec3(buf, ctl, 6, l4, Self::SCALE_ANGLE)?;
+        // (bit 5)
+        let (quat, l4) = Self::try_parse_quat(buf, ctl, 0x0020, l3)?;
 
-        // 6. offset (bit 7)
-        let (offset, l6) = Self::try_parse_vec3(buf, ctl, 7, l5, Self::SCALE_OFFSET)?;
+        // (bit 6)
+        let (angle, l5) = Self::try_parse_vec3(buf, ctl, 0x0040, l4, Self::SCALE_ANGLE)?;
 
-        // 7. accel_nav (导航加速度) (bit 10)
-        let (accel_nav, _l_final) = Self::try_parse_vec3(buf, ctl, 10, l6, Self::SCALE_ACCEL)?;
+        // (bit 7)
+        let (offset, l6) = Self::try_parse_vec3(buf, ctl, 0x0080, l5, Self::SCALE_OFFSET)?;
+
+        // (bit 10)
+        let (accel_nav, _l_final) = Self::try_parse_vec3(buf, ctl, 0x0200, l6, Self::SCALE_ACCEL)?;
 
         Ok(IMUData {
             timestamp_ms,

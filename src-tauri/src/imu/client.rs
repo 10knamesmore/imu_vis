@@ -10,8 +10,8 @@ use std::time::{Duration, Instant};
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::OnceCell;
 
-use crate::data::bluetooth::PeripheralInfo;
 use crate::imu::config::IMUConfig;
+use crate::types::bluetooth::PeripheralInfo;
 
 struct NeededCharacteristics {
     write_char: Characteristic,

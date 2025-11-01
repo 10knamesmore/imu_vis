@@ -1,10 +1,18 @@
 use std::thread;
 
-use parser::data::IMUData;
+use glam::DQuat;
+use serde::Serialize;
 
-use crate::processor::parser::data::IMUParser;
+use crate::{
+    processor::{
+        parser::data::IMUParser,
+        state::{attitude::Attitude, position::Position, velocity::Velocity, State},
+    },
+    types::outputs::ResponseData,
+};
 
 pub mod parser;
+mod state;
 
 pub struct Processor;
 
@@ -16,38 +24,68 @@ impl Processor {
     /// * `downstream_tx`: 发给AppState的rx, 被command里面接收
     pub fn new(
         upstream_rx: flume::Receiver<Vec<u8>>,
-        downstream_tx: flume::Sender<IMUData>,
+        downstream_tx: flume::Sender<ResponseData>, // TODO: 发给前端的View换一个
     ) -> Self {
         thread::Builder::new()
             .name("DataProcessorThread".into())
-            .spawn(move || loop {
-                match upstream_rx.recv() {
-                    Ok(data) => {
-                        // TODO: 数据包第一字节 0x02 - 0x51结果可能都不同, 需要dispatch
-                        let imu_data = match IMUParser::parse(&data) {
-                            Ok(data) => data,
-                            Err(e) => {
-                                eprintln!("{e}");
-                                continue;
-                                // return;
-                            }
-                        };
+            .spawn(move || {
+                // TODO: MOCK
+                let mut state = State::new(DQuat::IDENTITY, 0);
 
-                        match downstream_tx.send(imu_data) {
-                            Ok(_) => {}
-                            Err(e) => {
-                                eprintln!("{}", e);
-                                continue;
+                loop {
+                    match upstream_rx.recv() {
+                        Ok(data) => {
+                            // TODO: 数据包第一字节 0x02 - 0x51结果可能都不同, 需要dispatch
+                            let imu_data = match IMUParser::parse(&data) {
+                                Ok(data) => data,
+                                Err(e) => {
+                                    eprintln!("{e}");
+                                    continue;
+                                    // return;
+                                }
+                            };
+                            state.update(&imu_data);
+
+                            let response_data = ResponseData::from_parts(
+                                &imu_data,
+                                &CalculatedData::from_state(&state),
+                            );
+
+                            match downstream_tx.send(response_data) {
+                                Ok(_) => {}
+                                Err(e) => {
+                                    eprintln!("{}", e);
+                                    continue;
+                                }
                             }
                         }
-                    }
-                    Err(e) => {
-                        eprintln!("Error receiving: {}", e);
-                        // break;
+                        Err(e) => {
+                            eprintln!("Error receiving: {}", e);
+                            // break;
+                        }
                     }
                 }
             })
             .unwrap_or_else(|e| panic!("error while creating data processor thread : {}", e));
         Processor {}
+    }
+}
+
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct CalculatedData {
+    attitude: Attitude,
+    velocity: Velocity,
+    position: Position,
+    timestamp_ms: u64,
+}
+
+impl CalculatedData {
+    pub fn from_state(state: &State) -> Self {
+        CalculatedData {
+            attitude: state.attitude,
+            velocity: state.velocity,
+            position: state.position,
+            timestamp_ms: state.timestamp_ms,
+        }
     }
 }

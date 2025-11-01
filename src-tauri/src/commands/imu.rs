@@ -4,7 +4,7 @@ use tauri::State;
 
 use crate::{
     app_state::AppState, commands::response::Response as IpcResponse,
-    data::bluetooth::PeripheralInfo,
+    types::bluetooth::PeripheralInfo,
 };
 
 type Response<T> = Result<IpcResponse<T>, ()>;

@@ -2,9 +2,9 @@ use tauri::Manager;
 
 mod app_state;
 mod commands;
-mod data;
 mod imu;
 mod processor;
+mod types;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
