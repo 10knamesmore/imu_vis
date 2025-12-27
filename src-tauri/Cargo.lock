@@ -1830,6 +1830,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "imu-vis"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bitflags 2.9.4",
+ "btleplug",
+ "flume",
+ "futures",
+ "glam",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-build",
+ "tauri-plugin-opener",
+ "tokio",
+]
+
+[[package]]
 name = "indexmap"
 version = "1.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3872,24 +3890,6 @@ dependencies = [
  "webview2-com",
  "window-vibrancy",
  "windows",
-]
-
-[[package]]
-name = "tauri-app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bitflags 2.9.4",
- "btleplug",
- "flume",
- "futures",
- "glam",
- "serde",
- "serde_json",
- "tauri",
- "tauri-build",
- "tauri-plugin-opener",
- "tokio",
 ]
 
 [[package]]
