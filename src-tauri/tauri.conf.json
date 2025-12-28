@@ -5,14 +5,14 @@
   "identifier": "com.wanger.tauri-app",
   "build": {
     "beforeDevCommand": "pnpm run dev",
-    "devUrl": "http://localhost:8080",
+    "devUrl": "http://localhost:3000",
     "beforeBuildCommand": "pnpm run build",
     "frontendDist": "../dist"
   },
   "app": {
     "windows": [
       {
-        "title": "tauri-app",
+        "title": "Tauri App",
         "width": 800,
         "height": 600
       }
