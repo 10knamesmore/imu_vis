@@ -1,5 +1,5 @@
 use attitude::Attitude;
-use glam::DQuat;
+use math_f64::DQuat;
 use position::Position;
 use velocity::Velocity;
 

@@ -1,6 +1,6 @@
 use std::thread;
 
-use glam::DQuat;
+use math_f64::DQuat;
 use serde::Serialize;
 
 use crate::{

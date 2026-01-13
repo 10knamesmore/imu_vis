@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use glam::DQuat;
+use math_f64::DQuat;
 use serde::Serialize;
 
 /// 姿态 四元数表示

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use glam::DVec3;
+use math_f64::DVec3;
 use serde::Serialize;
 
 use crate::processor::state::velocity::Velocity;

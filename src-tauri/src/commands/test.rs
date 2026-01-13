@@ -1,4 +1,3 @@
-use glam::f64;
 use serde::Serialize;
 use std::{f64::consts::PI, time::Duration};
 use tauri::{ipc::Channel, Emitter};
@@ -57,7 +56,7 @@ mod mock {
     use std::{f64::consts::PI, time::Duration};
 
     use flume::Receiver;
-    use glam::{DQuat, DVec3};
+    use math_f64::{DQuat, DVec3};
 
     use crate::processor::parser::data::IMUData;
 

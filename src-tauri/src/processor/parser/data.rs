@@ -1,5 +1,5 @@
 use anyhow::bail;
-use glam::{DQuat, DVec3};
+use math_f64::{DQuat, DVec3};
 use serde::Serialize;
 
 #[derive(Debug, Clone, Copy, Serialize)]

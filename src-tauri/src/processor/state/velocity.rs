@@ -1,6 +1,6 @@
 use std::ops::{Deref, Mul};
 
-use glam::{f64, DVec3};
+use math_f64::DVec3;
 use serde::Serialize;
 
 /// 速度 单位 m / s

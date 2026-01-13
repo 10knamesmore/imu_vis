@@ -1,0 +1,14 @@
+[package]
+name = "math_f64"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "math_f64"
+path = "src/lib.rs"
+
+[features]
+default = []
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }

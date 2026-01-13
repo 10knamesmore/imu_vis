@@ -1453,15 +1453,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "glam"
-version = "0.30.9"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bd47b05dddf0005d850e5644cae7f2b14ac3df487979dbfff3b56f20b1a6ae46"
-dependencies = [
- "serde_core",
-]
-
-[[package]]
 name = "glib"
 version = "0.18.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1875,7 +1866,7 @@ dependencies = [
  "bytes",
  "flume",
  "futures",
- "glam",
+ "math_f64",
  "serde",
  "serde_json",
  "tauri",
@@ -2230,6 +2221,13 @@ name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "47e1ffaa40ddd1f3ed91f717a33c8c0ee23fff369e3aa8772b9605cc1d22f4c3"
+
+[[package]]
+name = "math_f64"
+version = "0.1.0"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "memchr"
