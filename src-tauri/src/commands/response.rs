@@ -7,7 +7,7 @@ where
 {
     pub success: bool,
     pub data: Option<T>,
-    pub message: Option<String>,
+    pub message: String,
 }
 
 impl<T> Response<T>
@@ -18,7 +18,7 @@ where
     pub fn success(data: T) -> Self {
         Self {
             success: true,
-            message: Some("ok".to_string()),
+            message: "ok".to_string(),
             data: Some(data),
         }
     }
@@ -27,7 +27,7 @@ where
     pub fn error<S: Into<String>>(message: S) -> Self {
         Self {
             success: false,
-            message: Some(message.into()),
+            message: message.into(),
             data: None,
         }
     }
@@ -40,7 +40,8 @@ where
     fn from(result: anyhow::Result<T>) -> Self {
         match result {
             Ok(data) => Response::success(data),
-            Err(e) => Response::error(e.to_string()),
+            // Use alternate Display to include the full context chain.
+            Err(e) => Response::error(format!("{:#}", e)),
         }
     }
 }
@@ -50,6 +51,7 @@ where
     T: Serialize,
 {
     fn from(e: anyhow::Error) -> Self {
-        Response::error(e.to_string())
+        // Use alternate Display to include the full context chain.
+        Response::error(format!("{:#}", e))
     }
 }

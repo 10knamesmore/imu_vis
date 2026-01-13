@@ -30,6 +30,7 @@
     "@types/react-dom": "^19.2.3",
     "@types/react-plotly.js": "^2.6.4",
     "@vitejs/plugin-react": "^4.7.0",
+    "sass": "^1.97.2",
     "typescript": "~5.8.3",
     "vite": "^7.3.0"
   }

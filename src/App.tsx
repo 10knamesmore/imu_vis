@@ -1,62 +1,91 @@
-import { HeartbeatMonitor } from "./components/HeartbeatMonitor";
-import { ConfigProvider, Result, Button, Spin } from "antd";
-import { ReloadOutlined } from "@ant-design/icons";
-import { useHeartbeat } from "./hooks/useWebSocket";
-import dayjs from 'dayjs';
-import 'dayjs/locale/zh-cn';
-import zhCN from 'antd/locale/zh_CN';
+import React, { useState } from 'react';
+import { Layout, Tabs, Modal, Button } from 'antd';
+import { SettingOutlined } from '@ant-design/icons';
+import { ConnectionPanel } from './components/ConnectionPanel';
+import { Statistics } from './components/DataStatistics';
+import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
+import './App.scss';
 
-import './index.css';
+const { Header, Content } = Layout;
 
-dayjs.locale('zh-cn');
+const AppContent: React.FC = () => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const { connectedDevice, startScan, stopScan } = useBluetooth()
 
-const App: React.FC = () => {
-  const { connected } = useHeartbeat();
+  const hasConnectedDevice = connectedDevice !== null;
+
+  const items = [
+    {
+      key: '1',
+      label: '基础数据',
+      children: <Statistics />,
+    },
+  ];
+
+  const handleModalOpen = async () => {
+    setIsModalOpen(true);
+    if (!hasConnectedDevice) {
+      await startScan();
+    }
+  }
+
+  const handleModalClose = async () => {
+    setIsModalOpen(false);
+    await stopScan();
+  }
 
   return (
-    <ConfigProvider locale={zhCN}>
-      <div style={{ padding: "20px", background: "#0a0a0a", minHeight: "100vh" }}>
-        {!connected ? (
-          // 未连接状态：显示连接提示页面
-          <div style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            minHeight: "80vh"
-          }}>
-            <Result
-              icon={<Spin size="large" />}
-              title="正在连接后端服务..."
-              subTitle="请确保后端服务运行在 http://127.0.0.1:8081"
-              extra={
-                <Button
-                  type="primary"
-                  icon={<ReloadOutlined />}
-                  onClick={() => window.location.reload()}
-                >
-                  重新加载
-                </Button>
-              }
-            />
-          </div>
-        ) : (
-          // 已连接状态：显示主界面
-          <>
-            <h2 style={{ marginBottom: "24px", color: "#fff" }}>
-              🎯 IMU 可视化仪表盘
-            </h2>
+    <Layout className="app-layout">
+      <Header style={{ display: 'flex', alignItems: 'center', color: 'white', background: '#141414', borderBottom: '1px solid #303030' }}>
+        <div className="logo" style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
+          IMU 轨迹重建可视化
+        </div>
+      </Header>
+      <Content style={{ padding: '24px', minHeight: '100vh', background: '#000' }}>
+        <Tabs
+          defaultActiveKey="1"
+          items={items}
+          tabBarExtraContent={
+            <Button
+              type="primary"
+              icon={<SettingOutlined />}
+              className={hasConnectedDevice ? 'device-button-connected' : undefined}
+              onClick={handleModalOpen}
+            >
+              Devices
+            </Button>
+          }
+        />
 
-            {/* <Space direction="vertical" size="large" style={{ display: "flex", maxWidth: "1200px" }}> */}
-            <HeartbeatMonitor />
-            {/**/}
-            {/*   <ImuDataDisplay /> */}
-            {/* </Space> */}
-          </>
-        )}
-      </div>
-    </ConfigProvider>
+        <Modal
+          title="设备管理"
+          open={isModalOpen}
+          onCancel={handleModalClose}
+          footer={null}
+          width={800}
+        >
+          <ConnectionPanel />
+        </Modal>
+      </Content>
+    </Layout>
+  );
+};
+
+// 辅助组件：将多个 Provider 合并
+const Compose = ({ providers, children }: { providers: React.FC<{ children: React.ReactNode }>[]; children: React.ReactNode }) => {
+  return (
+    <>
+      {providers.reduceRight((acc, Provider) => <Provider>{acc}</Provider>, children)}
+    </>
+  );
+};
+
+const App: React.FC = () => {
+  return (
+    <Compose providers={[BluetoothProvider]}>
+      <AppContent />
+    </Compose>
   );
 };
 
 export default App;
-

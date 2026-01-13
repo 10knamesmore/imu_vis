@@ -135,14 +135,23 @@ impl IMUClient {
     }
 
     /// 断开当前连接的Peripheral
-    /// TODO: 断开连接功能优先级低
     pub async fn disconnect(&mut self) -> anyhow::Result<PeripheralInfo> {
         self.disable_data_reporting().await?;
         if let Some(handle) = &self.handle {
             handle.abort();
         }
         self.handle = None;
-        todo!()
+        match self.peripheral.take() {
+            Some(p) => {
+                p.disconnect().await.context("断开设备连接")?;
+                Ok(PeripheralInfo::from_peripheral(&p)
+                    .await
+                    .unwrap_or_default())
+            }
+            None => {
+                anyhow::bail!("没有连接的设备可断开")
+            }
+        }
     }
 
     /// 初始化IMU设备的连接
