@@ -32,7 +32,10 @@ export const ConnectionPanel: React.FC = () => {
   }, [connectedDevice]);
 
   const handleConnectClick = async () => {
-    if (!selectedDeviceId) return;
+    if (!selectedDeviceId) {
+      message.warning('Please select a device to connect');
+      return;
+    }
     const device = devices.find(d => d.id === selectedDeviceId);
     if (!device) {
       message.warning('Device not found in scan results');

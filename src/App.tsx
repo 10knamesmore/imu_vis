@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Layout, Tabs, Modal, Button } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { ConnectionPanel } from './components/ConnectionPanel';
@@ -33,6 +33,12 @@ const AppContent: React.FC = () => {
     setIsModalOpen(false);
     await stopScan();
   }
+
+  useEffect(() => {
+    if (hasConnectedDevice && isModalOpen) {
+      setIsModalOpen(false);
+    }
+  }, [hasConnectedDevice]);
 
   return (
     <Layout className="app-layout">
