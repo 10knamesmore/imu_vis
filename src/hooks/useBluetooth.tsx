@@ -9,6 +9,7 @@ type BluetoothContextValue = {
   devices: PeripheralInfo[];
   connectedDevice: PeripheralInfo | null;
   dataHistory: ImuDataHistory;
+  plotRevision: number;
   uiRefreshMs: number;
   setUiRefreshMs: React.Dispatch<React.SetStateAction<number>>;
   lastSecondMessageCount: number;
@@ -30,7 +31,7 @@ export type ImuDataHistory = {
   accelNav: { x: number[]; y: number[]; z: number[] };
 };
 
-const emptyHistory: ImuDataHistory = {
+const createEmptyHistory = (): ImuDataHistory => ({
   time: [],
   accel: { x: [], y: [], z: [] },
   accelWithG: { x: [], y: [], z: [] },
@@ -39,21 +40,37 @@ const emptyHistory: ImuDataHistory = {
   quat: { w: [], x: [], y: [], z: [] },
   offset: { x: [], y: [], z: [] },
   accelNav: { x: [], y: [], z: [] },
-};
+});
 
 const BluetoothContext = React.createContext<BluetoothContextValue | null>(null);
+const MAX_POINTS = 1000;
+
+const pushCapped = (arr: number[], value: number, cap = MAX_POINTS) => {
+  arr.push(value);
+  if (arr.length > cap) {
+    arr.splice(0, arr.length - cap);
+  }
+};
 
 const useBluetoothInternal = (): BluetoothContextValue => {
+  // 是否在扫描中
   const [scanning, setScanning] = useState(false);
+  // 扫描到的设备列表
   const [devices, setDevices] = useState<PeripheralInfo[]>([]);
+  // 是否已连接设备
   const [connectedDevice, setConnectedDevice] = useState<PeripheralInfo | null>(null);
-  const [dataHistory, setDataHistory] = useState<ImuDataHistory>(emptyHistory);
+  // 对外提供的 IMU 数据历史
+  const [dataHistory, setDataHistory] = useState<ImuDataHistory>(createEmptyHistory);
+  // 表示图重绘的版本号，每次更新加一
+  const [plotRevision, setPlotRevision] = useState(0);
   // UI 刷新间隔（ms），只影响图表渲染频率，不影响数据接收频率
-  const [uiRefreshMs, setUiRefreshMs] = useState(200);
+  const [uiRefreshMs, setUiRefreshMs] = useState(33);
   // 上一秒收到的消息数（用于展示/监控输入频率）
   const [lastSecondMessageCount, setLastSecondMessageCount] = useState(0);
   // 高频数据缓存：onmessage 只更新这里，避免每条消息都触发 React 重渲染
-  const dataHistoryRef = useRef<ImuDataHistory>(emptyHistory);
+  const dataHistoryRef = useRef<ImuDataHistory>(createEmptyHistory());
+  // 记录数据流起始时间（ms），用于生成相对时间轴
+  const streamStartMsRef = useRef<number | null>(null);
   // 1s 内的消息计数器（由定时器每秒读取并清零）
   const messageCountRef = useRef(0);
 
@@ -137,8 +154,9 @@ const useBluetoothInternal = (): BluetoothContextValue => {
 
     const channel = new Channel<ResponseData>();
     // 连接时重置数据缓存与计数器
-    dataHistoryRef.current = emptyHistory;
+    dataHistoryRef.current = createEmptyHistory();
     messageCountRef.current = 0;
+    streamStartMsRef.current = null;
     // 每秒统计一次接收消息数
     const messageRateTimer = setInterval(() => {
       setLastSecondMessageCount(messageCountRef.current);
@@ -146,54 +164,51 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }, 1000);
     // 按 UI 刷新频率将缓存快照推入 state，触发图表重绘
     const uiRefreshTimer = setInterval(() => {
-      setDataHistory(dataHistoryRef.current);
+      const snapshot = dataHistoryRef.current;
+      setDataHistory({
+        time: snapshot.time,
+        accel: snapshot.accel,
+        accelWithG: snapshot.accelWithG,
+        gyro: snapshot.gyro,
+        angle: snapshot.angle,
+        quat: snapshot.quat,
+        offset: snapshot.offset,
+        accelNav: snapshot.accelNav,
+      });
+      setPlotRevision((rev) => (rev + 1) % 1_000_000);
     }, Math.max(16, uiRefreshMs)); // 最快 60 FPS
     channel.onmessage = (msg: ResponseData) => {
       // 每条消息只更新缓存与计数，不触发 UI 更新
       messageCountRef.current += 1;
       // console.log('Received IMU data:', msg);
       const imuData = msg.raw_data;
-      const prev = dataHistoryRef.current;
-      const newTime = [...prev.time, imuData.timestamp_ms / 1000].slice(-100);
-      dataHistoryRef.current = {
-        time: newTime,
-        accel: {
-          x: [...prev.accel.x, imuData.accel_no_g.x].slice(-1000),
-          y: [...prev.accel.y, imuData.accel_no_g.y].slice(-1000),
-          z: [...prev.accel.z, imuData.accel_no_g.z].slice(-1000),
-        },
-        accelWithG: {
-          x: [...prev.accelWithG.x, imuData.accel_with_g.x].slice(-1000),
-          y: [...prev.accelWithG.y, imuData.accel_with_g.y].slice(-1000),
-          z: [...prev.accelWithG.z, imuData.accel_with_g.z].slice(-1000),
-        },
-        gyro: {
-          x: [...prev.gyro.x, imuData.gyro.x].slice(-1000),
-          y: [...prev.gyro.y, imuData.gyro.y].slice(-1000),
-          z: [...prev.gyro.z, imuData.gyro.z].slice(-1000),
-        },
-        angle: {
-          x: [...prev.angle.x, imuData.angle.x].slice(-1000),
-          y: [...prev.angle.y, imuData.angle.y].slice(-1000),
-          z: [...prev.angle.z, imuData.angle.z].slice(-1000),
-        },
-        quat: {
-          w: [...prev.quat.w, imuData.quat.w].slice(-1000),
-          x: [...prev.quat.x, imuData.quat.x].slice(-1000),
-          y: [...prev.quat.y, imuData.quat.y].slice(-1000),
-          z: [...prev.quat.z, imuData.quat.z].slice(-1000),
-        },
-        offset: {
-          x: [...prev.offset.x, imuData.offset.x].slice(-1000),
-          y: [...prev.offset.y, imuData.offset.y].slice(-1000),
-          z: [...prev.offset.z, imuData.offset.z].slice(-1000),
-        },
-        accelNav: {
-          x: [...prev.accelNav.x, imuData.accel_nav.x].slice(-1000),
-          y: [...prev.accelNav.y, imuData.accel_nav.y].slice(-1000),
-          z: [...prev.accelNav.z, imuData.accel_nav.z].slice(-1000),
-        },
-      };
+      const history = dataHistoryRef.current;
+      if (streamStartMsRef.current === null) {
+        streamStartMsRef.current = imuData.timestamp_ms;
+      }
+      pushCapped(history.time, imuData.timestamp_ms - (streamStartMsRef.current ?? 0));
+      pushCapped(history.accel.x, imuData.accel_no_g.x);
+      pushCapped(history.accel.y, imuData.accel_no_g.y);
+      pushCapped(history.accel.z, imuData.accel_no_g.z);
+      pushCapped(history.accelWithG.x, imuData.accel_with_g.x);
+      pushCapped(history.accelWithG.y, imuData.accel_with_g.y);
+      pushCapped(history.accelWithG.z, imuData.accel_with_g.z);
+      pushCapped(history.gyro.x, imuData.gyro.x);
+      pushCapped(history.gyro.y, imuData.gyro.y);
+      pushCapped(history.gyro.z, imuData.gyro.z);
+      pushCapped(history.angle.x, imuData.angle.x);
+      pushCapped(history.angle.y, imuData.angle.y);
+      pushCapped(history.angle.z, imuData.angle.z);
+      pushCapped(history.quat.w, imuData.quat.w);
+      pushCapped(history.quat.x, imuData.quat.x);
+      pushCapped(history.quat.y, imuData.quat.y);
+      pushCapped(history.quat.z, imuData.quat.z);
+      pushCapped(history.offset.x, imuData.offset.x);
+      pushCapped(history.offset.y, imuData.offset.y);
+      pushCapped(history.offset.z, imuData.offset.z);
+      pushCapped(history.accelNav.x, imuData.accel_nav.x);
+      pushCapped(history.accelNav.y, imuData.accel_nav.y);
+      pushCapped(history.accelNav.z, imuData.accel_nav.z);
     };
 
     imuApi.subscribeOutput(channel);
@@ -211,10 +226,13 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       setDevices([]);
       setScanning(false);
       // 断开时清空 UI 数据与缓存
-      setDataHistory(emptyHistory);
-      dataHistoryRef.current = emptyHistory;
+      setDataHistory(createEmptyHistory());
+      setPlotRevision((rev) => (rev + 1) % 1_000_000);
+      dataHistoryRef.current = createEmptyHistory();
+      streamStartMsRef.current = null;
       // 断开时清空上一秒计数显示
       setLastSecondMessageCount(0);
+      message.info("Disconnected");
     } catch (e) {
       console.error(e);
       message.error('Disconnect failed');
@@ -226,6 +244,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     devices,
     connectedDevice,
     dataHistory,
+    plotRevision,
     uiRefreshMs,
     setUiRefreshMs,
     lastSecondMessageCount,

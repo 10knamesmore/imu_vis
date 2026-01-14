@@ -1,10 +1,88 @@
-import React, { useRef } from 'react';
+import React, { useMemo, useRef } from 'react';
 import Plot from 'react-plotly.js';
 import { Card, Row, Col, Statistic, InputNumber, message } from 'antd';
 import { useBluetooth } from '../hooks/useBluetooth';
 
+type Series = { name: string; values: number[] };
+
+const LinePlotCard: React.FC<{
+  title: string;
+  yTitle: string;
+  time: number[];
+  series: Series[];
+  layoutBase: Record<string, unknown>;
+  revision: number;
+}> = ({ title, yTitle, time, series, layoutBase, revision }) => {
+  const data = useMemo(() => {
+    const timeSeconds = time.map((t) => t / 1000);
+    return series.map((s) => ({
+      x: timeSeconds,
+      y: s.values.slice(),
+      type: 'scatter' as const,
+      mode: 'lines' as const,
+      name: s.name,
+    }));
+  }, [series, time]);
+
+  const latestValues = useMemo(
+    () =>
+      series.map((s) => ({
+        name: s.name,
+        value: s.values.length ? s.values[s.values.length - 1] : undefined,
+      })),
+    [series]
+  );
+
+  return (
+    <Card
+      title={title}
+      size="small"
+      variant="outlined"
+      style={{ background: '#141414', border: '1px solid #303030' }}
+      styles={{ header: { color: 'white' } }}
+    >
+      <div style={{ display: 'flex', gap: 12, alignItems: 'stretch' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Plot
+            data={data}
+            layout={{
+              ...layoutBase,
+              title: { text: yTitle },
+              xaxis: { ...(layoutBase as { xaxis?: object }).xaxis, title: { text: 'Time (s)' } },
+            }}
+            revision={revision}
+            useResizeHandler
+            style={{ width: '100%' }}
+          />
+        </div>
+        <div
+          style={{
+            width: 50,
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 6,
+            alignItems: 'stretch',
+          }}
+        >
+          {latestValues.map((item) => (
+            <Statistic
+              key={item.name}
+              title={item.name}
+              value={item.value === undefined ? '--' : item.value.toFixed(3)}
+              styles={{
+                title: { color: '#999', fontSize: 12, marginBottom: 2 },
+                content: { color: '#fff', fontSize: 14, fontVariantNumeric: 'tabular-nums' },
+              }}
+            />
+          ))}
+        </div>
+      </div>
+    </Card>
+  );
+};
+
 export const Statistics: React.FC = () => {
-  const { dataHistory, uiRefreshMs, setUiRefreshMs, lastSecondMessageCount } = useBluetooth();
+  const { dataHistory, plotRevision, uiRefreshMs, setUiRefreshMs, lastSecondMessageCount } = useBluetooth();
 
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
@@ -57,107 +135,114 @@ export const Statistics: React.FC = () => {
                   styles={{ content: { color: '#fff' } }}
                 />
               </Col>
+              <Col flex='none'>
+                <Statistic
+                  title="revision"
+                  value={plotRevision}
+                  styles={{ content: { color: '#fff' } }}
+                />
+              </Col>
             </Row>
           </Card>
         </Col>
         <Col span={24}>
-          <Card title="Acceleration (No Gravity)" size="small" variant='outlined' style={{ background: '#141414', border: '1px solid #303030' }} styles={{ header: { color: 'white' } }}>
-            <Plot
-              data={[
-                { x: dataHistory.time, y: dataHistory.accel.x, type: 'scatter', mode: 'lines', name: 'X' },
-                { x: dataHistory.time, y: dataHistory.accel.y, type: 'scatter', mode: 'lines', name: 'Y' },
-                { x: dataHistory.time, y: dataHistory.accel.z, type: 'scatter', mode: 'lines', name: 'Z' },
-              ]}
-              layout={{ ...commonLayout, title: { text: 'Acceleration (m/s²)' } }}
-              useResizeHandler
-              style={{ width: '100%' }}
-            />
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card title="Gyroscope" size="small" variant='outlined' style={{ background: '#141414', border: '1px solid #303030' }} styles={{ header: { color: 'white' } }}>
-            <Plot
-              data={[
-                { x: dataHistory.time, y: dataHistory.gyro.x, type: 'scatter', mode: 'lines', name: 'X' },
-                { x: dataHistory.time, y: dataHistory.gyro.y, type: 'scatter', mode: 'lines', name: 'Y' },
-                { x: dataHistory.time, y: dataHistory.gyro.z, type: 'scatter', mode: 'lines', name: 'Z' },
-              ]}
-              layout={{ ...commonLayout, title: { text: 'Gyroscope (deg/s)' } }}
-              useResizeHandler
-              style={{ width: '100%' }}
-            />
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card title="Angle" size="small" variant='outlined' style={{ background: '#141414', border: '1px solid #303030' }} styles={{ header: { color: 'white' } }}>
-            <Plot
-              data={[
-                { x: dataHistory.time, y: dataHistory.angle.x, type: 'scatter', mode: 'lines', name: 'X' },
-                { x: dataHistory.time, y: dataHistory.angle.y, type: 'scatter', mode: 'lines', name: 'Y' },
-                { x: dataHistory.time, y: dataHistory.angle.z, type: 'scatter', mode: 'lines', name: 'Z' },
-              ]}
-              layout={{ ...commonLayout, title: { text: 'Angle (deg)' } }}
-              useResizeHandler
-              style={{ width: '100%' }}
-            />
-          </Card>
+          <LinePlotCard
+            title="Acceleration (No Gravity)"
+            yTitle="Acceleration (m/s²)"
+            time={dataHistory.time}
+            series={[
+              { name: 'X', values: dataHistory.accel.x },
+              { name: 'Y', values: dataHistory.accel.y },
+              { name: 'Z', values: dataHistory.accel.z },
+            ]}
+            layoutBase={commonLayout}
+            revision={plotRevision}
+          />
         </Col>
         <Col span={24}>
-          <Card title="Acceleration (With Gravity)" size="small" variant='outlined' style={{ background: '#141414', border: '1px solid #303030' }} styles={{ header: { color: 'white' } }}>
-            <Plot
-              data={[
-                { x: dataHistory.time, y: dataHistory.accelWithG.x, type: 'scatter', mode: 'lines', name: 'X' },
-                { x: dataHistory.time, y: dataHistory.accelWithG.y, type: 'scatter', mode: 'lines', name: 'Y' },
-                { x: dataHistory.time, y: dataHistory.accelWithG.z, type: 'scatter', mode: 'lines', name: 'Z' },
-              ]}
-              layout={{ ...commonLayout, title: { text: 'Acceleration (m/s²)' } }}
-              useResizeHandler
-              style={{ width: '100%' }}
-            />
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card title="Quaternion" size="small" variant='outlined' style={{ background: '#141414', border: '1px solid #303030' }} styles={{ header: { color: 'white' } }}>
-            <Plot
-              data={[
-                { x: dataHistory.time, y: dataHistory.quat.w, type: 'scatter', mode: 'lines', name: 'W' },
-                { x: dataHistory.time, y: dataHistory.quat.x, type: 'scatter', mode: 'lines', name: 'X' },
-                { x: dataHistory.time, y: dataHistory.quat.y, type: 'scatter', mode: 'lines', name: 'Y' },
-                { x: dataHistory.time, y: dataHistory.quat.z, type: 'scatter', mode: 'lines', name: 'Z' },
-              ]}
-              layout={{ ...commonLayout, title: { text: 'Quaternion' } }}
-              useResizeHandler
-              style={{ width: '100%' }}
-            />
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card title="Offset" size="small" variant='outlined' style={{ background: '#141414', border: '1px solid #303030' }} styles={{ header: { color: 'white' } }}>
-            <Plot
-              data={[
-                { x: dataHistory.time, y: dataHistory.offset.x, type: 'scatter', mode: 'lines', name: 'X' },
-                { x: dataHistory.time, y: dataHistory.offset.y, type: 'scatter', mode: 'lines', name: 'Y' },
-                { x: dataHistory.time, y: dataHistory.offset.z, type: 'scatter', mode: 'lines', name: 'Z' },
-              ]}
-              layout={{ ...commonLayout, title: { text: 'Offset' } }}
-              useResizeHandler
-              style={{ width: '100%' }}
-            />
-          </Card>
+          <LinePlotCard
+            title="Gyroscope"
+            yTitle="Gyroscope (deg/s)"
+            time={dataHistory.time}
+            series={[
+              { name: 'X', values: dataHistory.gyro.x },
+              { name: 'Y', values: dataHistory.gyro.y },
+              { name: 'Z', values: dataHistory.gyro.z },
+            ]}
+            layoutBase={commonLayout}
+            revision={plotRevision}
+          />
         </Col>
         <Col span={24}>
-          <Card title="Acceleration (Nav)" size="small" variant='outlined' style={{ background: '#141414', border: '1px solid #303030' }} styles={{ header: { color: 'white' } }}>
-            <Plot
-              data={[
-                { x: dataHistory.time, y: dataHistory.accelNav.x, type: 'scatter', mode: 'lines', name: 'X' },
-                { x: dataHistory.time, y: dataHistory.accelNav.y, type: 'scatter', mode: 'lines', name: 'Y' },
-                { x: dataHistory.time, y: dataHistory.accelNav.z, type: 'scatter', mode: 'lines', name: 'Z' },
-              ]}
-              layout={{ ...commonLayout, title: { text: 'Acceleration (Nav)' } }}
-              useResizeHandler
-              style={{ width: '100%' }}
-            />
-          </Card>
+          <LinePlotCard
+            title="Angle"
+            yTitle="Angle (deg)"
+            time={dataHistory.time}
+            series={[
+              { name: 'X', values: dataHistory.angle.x },
+              { name: 'Y', values: dataHistory.angle.y },
+              { name: 'Z', values: dataHistory.angle.z },
+            ]}
+            layoutBase={commonLayout}
+            revision={plotRevision}
+          />
+        </Col>
+        <Col span={24}>
+          <LinePlotCard
+            title="Acceleration (With Gravity)"
+            yTitle="Acceleration (m/s²)"
+            time={dataHistory.time}
+            series={[
+              { name: 'X', values: dataHistory.accelWithG.x },
+              { name: 'Y', values: dataHistory.accelWithG.y },
+              { name: 'Z', values: dataHistory.accelWithG.z },
+            ]}
+            layoutBase={commonLayout}
+            revision={plotRevision}
+          />
+        </Col>
+        <Col span={24}>
+          <LinePlotCard
+            title="Quaternion"
+            yTitle="Quaternion"
+            time={dataHistory.time}
+            series={[
+              { name: 'W', values: dataHistory.quat.w },
+              { name: 'X', values: dataHistory.quat.x },
+              { name: 'Y', values: dataHistory.quat.y },
+              { name: 'Z', values: dataHistory.quat.z },
+            ]}
+            layoutBase={commonLayout}
+            revision={plotRevision}
+          />
+        </Col>
+        <Col span={24}>
+          <LinePlotCard
+            title="Offset"
+            yTitle="Offset"
+            time={dataHistory.time}
+            series={[
+              { name: 'X', values: dataHistory.offset.x },
+              { name: 'Y', values: dataHistory.offset.y },
+              { name: 'Z', values: dataHistory.offset.z },
+            ]}
+            layoutBase={commonLayout}
+            revision={plotRevision}
+          />
+        </Col>
+        <Col span={24}>
+          <LinePlotCard
+            title="Acceleration (Nav)"
+            yTitle="Acceleration (Nav)"
+            time={dataHistory.time}
+            series={[
+              { name: 'X', values: dataHistory.accelNav.x },
+              { name: 'Y', values: dataHistory.accelNav.y },
+              { name: 'Z', values: dataHistory.accelNav.z },
+            ]}
+            layoutBase={commonLayout}
+            revision={plotRevision}
+          />
         </Col>
       </Row>
     </div>
