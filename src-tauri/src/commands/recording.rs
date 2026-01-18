@@ -22,6 +22,7 @@ pub struct RecordingStartOptions {
 }
 
 #[tauri::command]
+#[tracing::instrument(level = "debug", skip(state))]
 pub async fn start_recording(
     _app: AppHandle,
     state: State<'_, AppState>,
@@ -54,6 +55,7 @@ pub async fn start_recording(
 }
 
 #[tauri::command]
+#[tracing::instrument(level = "debug", skip(state))]
 pub async fn stop_recording(state: State<'_, AppState>) -> Response<RecordingStatus> {
     let result: anyhow::Result<RecordingStatus> = async {
         let (reply_tx, reply_rx) = flume::bounded(1);
@@ -72,6 +74,7 @@ pub async fn stop_recording(state: State<'_, AppState>) -> Response<RecordingSta
 }
 
 #[tauri::command]
+#[tracing::instrument(level = "debug")]
 pub async fn list_recordings() -> Response<Vec<RecordingMeta>> {
     let result: anyhow::Result<Vec<RecordingMeta>> = async {
         let db_path = recording_db_path()?;
@@ -97,6 +100,7 @@ pub async fn list_recordings() -> Response<Vec<RecordingMeta>> {
 }
 
 #[tauri::command]
+#[tracing::instrument(level = "debug")]
 pub async fn update_recording_meta(
     session_id: i64,
     name: Option<String>,
@@ -131,6 +135,7 @@ pub async fn update_recording_meta(
 }
 
 #[tauri::command]
+#[tracing::instrument(level = "debug")]
 pub async fn get_recording_samples(session_id: i64) -> Response<Vec<outputs::ResponseData>> {
     let result: anyhow::Result<Vec<outputs::ResponseData>> = async {
         let db_path = recording_db_path()?;

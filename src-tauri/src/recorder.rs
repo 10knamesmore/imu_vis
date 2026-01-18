@@ -41,7 +41,7 @@ pub fn spawn_recorder(data_rx: Receiver<ResponseData>, control_rx: Receiver<Reco
                     Ok(data) => {
                         if let Some(session) = active.as_mut() {
                             if let Err(error) = insert_sample(session, &data) {
-                                eprintln!("Recorder insert failed: {error:#}");
+                                tracing::error!("Recorder insert failed: {error:#}");
                             }
                         }
                     }
@@ -64,7 +64,7 @@ fn handle_command(command: RecorderCommand, active: &mut Option<ActiveSession>) 
         } => {
             if let Some(session) = active.take() {
                 if let Err(error) = stop_session(session) {
-                    eprintln!("Recorder stop failed while restarting: {error:#}");
+                    tracing::error!("Recorder stop failed while restarting: {error:#}");
                 }
             }
             match start_session(db_path, device_id, name, tags) {
@@ -150,7 +150,11 @@ fn stop_session(session: ActiveSession) -> Result<RecordingStatus> {
             "UPDATE recording_sessions
              SET stopped_at_ms = ?1, sample_count = ?2
              WHERE id = ?3",
-            params![stopped_at_ms, session.sample_count as i64, session.session_id],
+            params![
+                stopped_at_ms,
+                session.sample_count as i64,
+                session.session_id
+            ],
         )
         .context("update recording session")?;
 

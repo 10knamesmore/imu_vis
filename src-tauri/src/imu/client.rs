@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::OnceCell;
+use tracing::info;
 
 use crate::imu::config::IMUConfig;
 use crate::types::bluetooth::PeripheralInfo;
@@ -81,7 +82,7 @@ impl IMUClient {
             .await
             .context("设备发现蓝牙服务")?;
 
-        // println!("设备发现蓝牙服务");
+        // info!("设备发现蓝牙服务");
         let characteristics = peripheral.characteristics();
 
         fn get_char(
@@ -127,7 +128,7 @@ impl IMUClient {
             }
         };
 
-        // println!("设备初始化成功!");
+        // info!("设备初始化成功!");
 
         Ok(PeripheralInfo::from_peripheral(&peripheral)
             .await
@@ -184,11 +185,11 @@ impl IMUClient {
             while let Some(data) = notification_stream.next().await {
                 match tx.send_async(data.value).await {
                     Ok(_) => {
-                        // dbg!(data.uuid);
+                        // debug!(uuid = %data.uuid, "received imu packet");
                     }
                     // 当且仅当所有Receiver被drop时返回error
                     Err(e) => {
-                        eprintln!("程序内部错误: {}", e);
+                        tracing::error!("下游通道已关闭, 停止接收IMU数据: {}", e);
                     }
                 }
 
@@ -198,11 +199,7 @@ impl IMUClient {
                     let elapsed_secs = elapsed.as_secs_f64();
                     let throughput = msg_count as f64 / elapsed_secs;
 
-                    println!("--------------------------------------");
-                    println!("处理速率报告:");
-                    println!("  接收速率: {:.2} 条/秒 ({} 帧)", throughput, msg_count);
-                    println!("  实际周期: {:.2} s", elapsed_secs);
-                    println!("--------------------------------------");
+                    tracing::info!(throughput, msg_count, elapsed_secs, "处理速率报告");
 
                     // 重置计数器和计时器
                     msg_count = 0;
@@ -248,7 +245,7 @@ impl IMUClient {
                     }
                     Err(e) => {
                         // HACK
-                        eprintln!("fail to get PeripheralInfo : {}", e);
+                        tracing::warn!("fail to get PeripheralInfo : {}", e);
                         None
                     }
                 },

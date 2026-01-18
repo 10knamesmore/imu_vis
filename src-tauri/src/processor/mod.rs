@@ -3,7 +3,9 @@ use std::thread;
 use math_f64::DQuat;
 use serde::Serialize;
 
-use crate::{processor::parser::data::IMUParser, processor::state::State, types::outputs::ResponseData};
+use crate::{
+    processor::parser::data::IMUParser, processor::state::State, types::outputs::ResponseData,
+};
 
 pub mod parser;
 mod state;
@@ -36,9 +38,8 @@ impl Processor {
                             let imu_data = match IMUParser::parse(&data) {
                                 Ok(data) => data,
                                 Err(e) => {
-                                    eprintln!("{e}");
+                                    tracing::error!("IMU 数据解析失败: {}", e);
                                     continue;
-                                    // return;
                                 }
                             };
                             state.update(&imu_data);
@@ -49,15 +50,14 @@ impl Processor {
                             );
 
                             if let Err(e) = downstream_tx.send(response_data) {
-                                eprintln!("{}", e);
+                                tracing::error!("Downstream channel send failed: {}", e);
                             }
                             if let Err(e) = record_tx.send(response_data) {
-                                eprintln!("Recorder channel send failed: {}", e);
+                                tracing::error!("Recorder channel send failed: {}", e);
                             }
                         }
                         Err(e) => {
-                            eprintln!("Error receiving: {}", e);
-                            // break;
+                            tracing::error!("Upstream channel receive failed: {}", e);
                         }
                     }
                 }
