@@ -9,7 +9,6 @@ use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::OnceCell;
-use tracing::info;
 
 use crate::imu::config::IMUConfig;
 use crate::types::bluetooth::PeripheralInfo;

@@ -3,7 +3,6 @@ use crate::{
     types::bluetooth::PeripheralInfo,
 };
 use tauri::State;
-use tracing::info;
 
 type Response<T> = Result<IpcResponse<T>, ()>;
 
@@ -39,7 +38,6 @@ pub async fn connect_peripheral(
     state: State<'_, AppState>,
     target_uuid: &str,
 ) -> Response<PeripheralInfo> {
-    info!("call connect_peripheral");
     Ok(state.client().await.connect(target_uuid).await.into())
 }
 

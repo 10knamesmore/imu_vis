@@ -92,6 +92,7 @@ pub async fn list_recordings() -> Response<Vec<RecordingMeta>> {
         for row in rows {
             list.push(row?);
         }
+        tracing::info!("found sessions: {:?}", list);
         Ok(list)
     }
     .await;
