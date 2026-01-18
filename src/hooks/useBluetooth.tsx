@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useContext, useRef } from 'rea
 import { message } from 'antd';
 import { Channel } from '@tauri-apps/api/core';
 import { imuApi } from '../services/imu';
-import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus } from '../types';
+import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus, ImuDataHistory } from '../types';
 
 type BluetoothContextValue = {
   scanning: boolean;
@@ -27,17 +27,6 @@ type BluetoothContextValue = {
   connect: (deviceId: string) => Promise<boolean>;
   disconnect: () => Promise<void>;
   toggleRecording: () => Promise<void>;
-};
-
-export type ImuDataHistory = {
-  time: number[];
-  accel: { x: number[]; y: number[]; z: number[] };
-  accelWithG: { x: number[]; y: number[]; z: number[] };
-  gyro: { x: number[]; y: number[]; z: number[] };
-  angle: { x: number[]; y: number[]; z: number[] };
-  quat: { w: number[]; x: number[]; y: number[]; z: number[] };
-  offset: { x: number[]; y: number[]; z: number[] };
-  accelNav: { x: number[]; y: number[]; z: number[] };
 };
 
 const createEmptyHistory = (): ImuDataHistory => ({
@@ -107,6 +96,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     return () => clearInterval(interval);
   }, [scanning]);
 
+  // 开始扫描蓝牙设备
   const startScan = useCallback(async () => {
     try {
       await imuApi.startScan();
@@ -117,6 +107,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, []);
 
+  // 停止扫描
   const stopScan = useCallback(async () => {
     try {
       await imuApi.stopScan();
@@ -127,6 +118,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, []);
 
+  // 切换扫描状态
   const toggleScan = useCallback(async () => {
     if (scanning) {
       await stopScan();
@@ -135,6 +127,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, [scanning, startScan, stopScan]);
 
+  // 连接到指定设备
   const connect = useCallback(async (deviceId: string) => {
     try {
       if (scanning) {
@@ -148,10 +141,10 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         message.success(`Connected to ${res.data.local_name || res.data.id}`);
         return true;
       } else {
-        // Try to find in current list if api response data is missing but success is true
+        // 如果API没有返回完整数据，尝试从已扫描列表中查找
         const deviceInList = devices.find(d => d.id === deviceId);
         if (res.success) {
-          // If we found it in the list, use that info, otherwise just use ID
+          // 优先使用列表中的信息，否则仅使用 ID
           const deviceData = deviceInList || { id: deviceId, address: deviceId };
           setConnectedDevice(deviceData);
           message.success(`Connected to ${deviceData.local_name || deviceData.id}`);
@@ -240,6 +233,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     };
   }, [connectedDevice, uiRefreshMs]);
 
+  // 断开设备连接
   const disconnect = useCallback(async () => {
     try {
       if (recording) {
@@ -265,6 +259,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, [recording]);
 
+  // 开始录制
   const startRecording = useCallback(async () => {
     try {
       const res = await imuApi.startRecording();
@@ -281,6 +276,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, []);
 
+  // 停止录制
   const stopRecording = useCallback(async () => {
     try {
       const res = await imuApi.stopRecording();
@@ -298,6 +294,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, []);
 
+  // 切换录制状态
   const toggleRecording = useCallback(async () => {
     if (recording) {
       await stopRecording();
@@ -306,6 +303,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, [recording, startRecording, stopRecording]);
 
+  // 刷新录制列表
   const refreshRecordings = useCallback(async () => {
     try {
       const res = await imuApi.listRecordings();
@@ -320,11 +318,13 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, []);
 
+  // 更新录制元数据
   const updateRecordingMeta = useCallback(async (sessionId: number, name?: string, tags?: string[]) => {
     try {
       const res = await imuApi.updateRecordingMeta(sessionId, name, tags);
       if (res.success && res.data) {
-        setRecordings((prev) => prev.map((item) => (item.id === sessionId ? res.data : item)));
+        const updatedRecording = res.data;
+        setRecordings((prev) => prev.map((item) => (item.id === sessionId ? updatedRecording : item)));
         message.success('Recording updated');
       } else {
         throw new Error(res.message || 'Unknown error');
@@ -335,6 +335,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, []);
 
+  // 加载并回放录制的数据
   const loadRecording = useCallback(async (sessionId: number) => {
     try {
       const res = await imuApi.getRecordingSamples(sessionId);
@@ -387,6 +388,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, []);
 
+  // 退出回放模式
   const exitReplay = useCallback(() => {
     setReplaying(false);
     message.info('Replay cleared');

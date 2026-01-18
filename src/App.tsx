@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Layout, Tabs, Modal, Button } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 import { ConnectionPanel } from './components/ConnectionPanel';
-import { Statistics } from './components/DataStatistics';
+import { ImuRealtimePanel } from './components/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 import './App.scss';
 
@@ -15,13 +15,19 @@ const AppContent: React.FC = () => {
   const hasConnectedDevice = connectedDevice !== null;
 
   const items = [
+    // {
+    //   key: '1',
+    //   label: '基础数据',
+    //   children: <Statistics />,
+    // },
     {
       key: '1',
-      label: '基础数据',
-      children: <Statistics />,
+      label: '实时可视化',
+      children: <ImuRealtimePanel />,
     },
   ];
 
+  // 模态框打开时：如果没有连接设备，自动开始扫描
   const handleModalOpen = async () => {
     setIsModalOpen(true);
     if (!hasConnectedDevice) {
@@ -29,11 +35,13 @@ const AppContent: React.FC = () => {
     }
   }
 
+  // 模态框关闭时：停止扫描
   const handleModalClose = async () => {
     setIsModalOpen(false);
     await stopScan();
   }
 
+  // 当设备连接成功后，自动关闭设备管理模态框
   useEffect(() => {
     if (hasConnectedDevice && isModalOpen) {
       setIsModalOpen(false);

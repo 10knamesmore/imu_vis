@@ -21,7 +21,8 @@
     "plotly.js": "^3.3.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "react-plotly.js": "^2.6.0"
+    "react-plotly.js": "^2.6.0",
+    "three": "^0.179.1"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2.9.6",
@@ -29,6 +30,7 @@
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
     "@types/react-plotly.js": "^2.6.4",
+    "@types/three": "^0.182.0",
     "@vitejs/plugin-react": "^4.7.0",
     "sass": "^1.97.2",
     "typescript": "~5.8.3",

@@ -68,14 +68,20 @@ impl Processor {
 }
 
 #[derive(Debug, Clone, Copy, Serialize)]
+/// 计算后的状态数据
 pub struct CalculatedData {
+    /// 姿态
     pub attitude: Attitude,
+    /// 速度
     pub velocity: Velocity,
+    /// 位置
     pub position: Position,
+    /// 时间戳（毫秒）
     pub timestamp_ms: u64,
 }
 
 impl CalculatedData {
+    /// 从内部状态 State 构建 CalculatedData
     pub fn from_state(state: &State) -> Self {
         CalculatedData {
             attitude: state.attitude,
