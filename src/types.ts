@@ -34,6 +34,25 @@ export interface ResponseData {
   calculated_data: CalculatedData;
 }
 
+export interface RecordingStatus {
+  recording: boolean;
+  session_id?: number | null;
+  db_path?: string | null;
+  sample_count?: number | null;
+  started_at_ms?: number | null;
+  name?: string | null;
+  tags?: string[] | null;
+}
+
+export interface RecordingMeta {
+  id: number;
+  started_at_ms: number;
+  stopped_at_ms?: number | null;
+  sample_count: number;
+  name?: string | null;
+  tags: string[];
+}
+
 export interface PeripheralInfo {
   id: string;
   address: string;

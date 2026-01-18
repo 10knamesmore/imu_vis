@@ -2,10 +2,10 @@ use serde::Serialize;
 
 use crate::processor::{parser::data::IMUData, CalculatedData};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize)]
 pub struct ResponseData {
-    raw_data: IMUData,
-    calculated_data: CalculatedData,
+    pub raw_data: IMUData,
+    pub calculated_data: CalculatedData,
 }
 
 impl ResponseData {

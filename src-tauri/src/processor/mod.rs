@@ -3,16 +3,12 @@ use std::thread;
 use math_f64::DQuat;
 use serde::Serialize;
 
-use crate::{
-    processor::{
-        parser::data::IMUParser,
-        state::{attitude::Attitude, position::Position, velocity::Velocity, State},
-    },
-    types::outputs::ResponseData,
-};
+use crate::{processor::parser::data::IMUParser, processor::state::State, types::outputs::ResponseData};
 
 pub mod parser;
 mod state;
+
+pub use state::{attitude::Attitude, position::Position, velocity::Velocity};
 
 pub struct Processor;
 
@@ -24,7 +20,8 @@ impl Processor {
     /// * `downstream_tx`: 发给AppState的rx, 被command里面接收
     pub fn new(
         upstream_rx: flume::Receiver<Vec<u8>>,
-        downstream_tx: flume::Sender<ResponseData>, // TODO: 发给前端的View换一个
+        downstream_tx: flume::Sender<ResponseData>,
+        record_tx: flume::Sender<ResponseData>,
     ) -> Self {
         thread::Builder::new()
             .name("DataProcessorThread".into())
@@ -51,12 +48,11 @@ impl Processor {
                                 &CalculatedData::from_state(&state),
                             );
 
-                            match downstream_tx.send(response_data) {
-                                Ok(_) => {}
-                                Err(e) => {
-                                    eprintln!("{}", e);
-                                    continue;
-                                }
+                            if let Err(e) = downstream_tx.send(response_data) {
+                                eprintln!("{}", e);
+                            }
+                            if let Err(e) = record_tx.send(response_data) {
+                                eprintln!("Recorder channel send failed: {}", e);
                             }
                         }
                         Err(e) => {
@@ -73,10 +69,10 @@ impl Processor {
 
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct CalculatedData {
-    attitude: Attitude,
-    velocity: Velocity,
-    position: Position,
-    timestamp_ms: u64,
+    pub attitude: Attitude,
+    pub velocity: Velocity,
+    pub position: Position,
+    pub timestamp_ms: u64,
 }
 
 impl CalculatedData {

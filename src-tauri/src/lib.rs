@@ -5,6 +5,7 @@ mod app_state;
 mod commands;
 mod imu;
 mod processor;
+mod recorder;
 mod types;
 
 // interface HeartbeatFrame {

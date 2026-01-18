@@ -1,19 +1,10 @@
-use std::time::Duration;
-
-use tauri::State;
-
 use crate::{
     app_state::AppState, commands::response::Response as IpcResponse,
     types::bluetooth::PeripheralInfo,
 };
+use tauri::State;
 
 type Response<T> = Result<IpcResponse<T>, ()>;
-
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
-pub struct IMUConnectOptions {
-    pub scan_filter: String,
-    pub timeout: Duration,
-}
 
 #[tauri::command]
 /// 开始扫描

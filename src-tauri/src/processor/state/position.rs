@@ -20,6 +20,10 @@ impl Position {
         self.0 = old_pos + velocity * (delta_time_ms as f64 / 1000.0);
         Position(old_pos)
     }
+
+    pub fn from_vec3(v: DVec3) -> Self {
+        Self(v)
+    }
 }
 
 impl Default for Position {

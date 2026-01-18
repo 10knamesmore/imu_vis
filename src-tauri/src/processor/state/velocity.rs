@@ -22,6 +22,10 @@ impl Velocity {
     pub fn set(&mut self, v: DVec3) {
         self.0 = v;
     }
+
+    pub fn from_vec3(v: DVec3) -> Self {
+        Self(v)
+    }
 }
 
 impl Default for Velocity {

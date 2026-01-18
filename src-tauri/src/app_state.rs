@@ -1,7 +1,12 @@
 use flume::Receiver;
 use tokio::sync::{Mutex, MutexGuard};
 
-use crate::{imu::IMUClient, processor::Processor, types::outputs::ResponseData};
+use crate::{
+    imu::IMUClient,
+    processor::Processor,
+    recorder::{spawn_recorder, RecorderCommand},
+    types::outputs::ResponseData,
+};
 
 /// 应用状态
 ///
@@ -15,6 +20,8 @@ pub struct AppState {
     processor: Processor,
 
     pub downstream_rx: Receiver<ResponseData>,
+
+    pub recorder_tx: flume::Sender<RecorderCommand>,
 }
 
 impl AppState {
@@ -25,10 +32,14 @@ impl AppState {
     pub fn new() -> Self {
         let (upstream_tx, upstream_rx) = flume::bounded(256);
         let (downstream_tx, downstream_rx) = flume::bounded(256);
+        let (record_tx, record_rx) = flume::bounded(2048);
+        let (recorder_tx, recorder_rx) = flume::unbounded();
+        spawn_recorder(record_rx, recorder_rx);
         AppState {
             imu_client: Mutex::new(IMUClient::new(upstream_tx)),
-            processor: Processor::new(upstream_rx, downstream_tx),
+            processor: Processor::new(upstream_rx, downstream_tx, record_tx),
             downstream_rx,
+            recorder_tx,
         }
     }
 

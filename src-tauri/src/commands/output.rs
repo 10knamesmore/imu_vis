@@ -1,12 +1,10 @@
-use tauri::{async_runtime::spawn, ipc::Channel, AppHandle, Manager};
+use tauri::{async_runtime::spawn, ipc::Channel, State};
 
 use crate::{app_state::AppState, types::outputs::ResponseData};
 
 #[tauri::command]
-pub fn subscribe_output(app: AppHandle, on_event: Channel<ResponseData>) {
-    let app_state = app.state::<AppState>();
-
-    let rx = app_state.downstream_rx.clone();
+pub fn subscribe_output(state: State<'_, AppState>, on_event: Channel<ResponseData>) {
+    let rx = state.downstream_rx.clone();
     rx.drain();
     spawn(async move {
         while let Ok(data) = rx.recv() {

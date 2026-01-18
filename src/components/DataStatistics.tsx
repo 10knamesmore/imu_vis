@@ -1,7 +1,8 @@
 import React, { useMemo, useRef } from 'react';
 import Plot from 'react-plotly.js';
-import { Card, Row, Col, Statistic, InputNumber, message } from 'antd';
+import { Button, Card, Row, Col, Statistic, InputNumber, message, Tag } from 'antd';
 import { useBluetooth } from '../hooks/useBluetooth';
+import { RecordingsPanel } from './RecordingsPanel';
 
 type Series = { name: string; values: number[] };
 
@@ -82,7 +83,17 @@ const LinePlotCard: React.FC<{
 };
 
 export const Statistics: React.FC = () => {
-  const { dataHistory, plotRevision, uiRefreshMs, setUiRefreshMs, lastSecondMessageCount } = useBluetooth();
+  const {
+    connectedDevice,
+    dataHistory,
+    plotRevision,
+    uiRefreshMs,
+    setUiRefreshMs,
+    lastSecondMessageCount,
+    recording,
+    recordingStatus,
+    toggleRecording,
+  } = useBluetooth();
 
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
@@ -142,8 +153,26 @@ export const Statistics: React.FC = () => {
                   styles={{ content: { color: '#fff' } }}
                 />
               </Col>
+              <Col flex="none">
+                <Button
+                  type={recording ? 'primary' : 'default'}
+                  danger={recording}
+                  onClick={toggleRecording}
+                  disabled={!connectedDevice}
+                >
+                  {recording ? 'Stop Recording' : 'Start Recording'}
+                </Button>
+              </Col>
+              <Col flex="none">
+                <Tag color={recording ? 'red' : 'default'}>
+                  {recording ? `Recording: ${recordingStatus?.session_id ?? '-'}` : 'Recording: Off'}
+                </Tag>
+              </Col>
             </Row>
           </Card>
+        </Col>
+        <Col span={24}>
+          <RecordingsPanel />
         </Col>
         <Col span={24}>
           <LinePlotCard

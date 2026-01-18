@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useContext, useRef } from 'rea
 import { message } from 'antd';
 import { Channel } from '@tauri-apps/api/core';
 import { imuApi } from '../services/imu';
-import { PeripheralInfo, ResponseData } from '../types';
+import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus } from '../types';
 
 type BluetoothContextValue = {
   scanning: boolean;
@@ -13,11 +13,20 @@ type BluetoothContextValue = {
   uiRefreshMs: number;
   setUiRefreshMs: React.Dispatch<React.SetStateAction<number>>;
   lastSecondMessageCount: number;
+  recording: boolean;
+  recordingStatus: RecordingStatus | null;
+  recordings: RecordingMeta[];
+  replaying: boolean;
+  refreshRecordings: () => Promise<void>;
+  updateRecordingMeta: (sessionId: number, name?: string, tags?: string[]) => Promise<void>;
+  loadRecording: (sessionId: number) => Promise<void>;
+  exitReplay: () => void;
   startScan: () => Promise<void>;
   stopScan: () => Promise<void>;
   toggleScan: () => Promise<void>;
   connect: (deviceId: string) => Promise<boolean>;
   disconnect: () => Promise<void>;
+  toggleRecording: () => Promise<void>;
 };
 
 export type ImuDataHistory = {
@@ -67,12 +76,21 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const [uiRefreshMs, setUiRefreshMs] = useState(33);
   // 上一秒收到的消息数（用于展示/监控输入频率）
   const [lastSecondMessageCount, setLastSecondMessageCount] = useState(0);
+  const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
+  const [recording, setRecording] = useState(false);
   // 高频数据缓存：onmessage 只更新这里，避免每条消息都触发 React 重渲染
   const dataHistoryRef = useRef<ImuDataHistory>(createEmptyHistory());
   // 记录数据流起始时间（ms），用于生成相对时间轴
   const streamStartMsRef = useRef<number | null>(null);
   // 1s 内的消息计数器（由定时器每秒读取并清零）
   const messageCountRef = useRef(0);
+  const replayingRef = useRef(false);
+  const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
+  const [replaying, setReplaying] = useState(false);
+
+  useEffect(() => {
+    replayingRef.current = replaying;
+  }, [replaying]);
 
   useEffect(() => {
     let interval: number;
@@ -178,6 +196,9 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       setPlotRevision((rev) => (rev + 1) % 1_000_000);
     }, Math.max(16, uiRefreshMs)); // 最快 60 FPS
     channel.onmessage = (msg: ResponseData) => {
+      if (replayingRef.current) {
+        return;
+      }
       // 每条消息只更新缓存与计数，不触发 UI 更新
       messageCountRef.current += 1;
       // console.log('Received IMU data:', msg);
@@ -221,6 +242,11 @@ const useBluetoothInternal = (): BluetoothContextValue => {
 
   const disconnect = useCallback(async () => {
     try {
+      if (recording) {
+        await imuApi.stopRecording();
+        setRecording(false);
+        setRecordingStatus(null);
+      }
       await imuApi.disconnect();
       setConnectedDevice(null);
       setDevices([]);
@@ -237,6 +263,133 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       console.error(e);
       message.error('Disconnect failed');
     }
+  }, [recording]);
+
+  const startRecording = useCallback(async () => {
+    try {
+      const res = await imuApi.startRecording();
+      if (res.success && res.data) {
+        setRecording(true);
+        setRecordingStatus(res.data);
+        message.success(`Recording started: ${res.data.db_path ?? 'sqlite'}`);
+      } else {
+        throw new Error(res.message || 'Unknown error');
+      }
+    } catch (e) {
+      console.error(e);
+      message.error('Failed to start recording');
+    }
+  }, []);
+
+  const stopRecording = useCallback(async () => {
+    try {
+      const res = await imuApi.stopRecording();
+      if (res.success && res.data) {
+        setRecording(false);
+        setRecordingStatus(res.data);
+        const count = res.data.sample_count ?? 0;
+        message.info(`Recording stopped (${count} samples)`);
+      } else {
+        throw new Error(res.message || 'Unknown error');
+      }
+    } catch (e) {
+      console.error(e);
+      message.error('Failed to stop recording');
+    }
+  }, []);
+
+  const toggleRecording = useCallback(async () => {
+    if (recording) {
+      await stopRecording();
+    } else {
+      await startRecording();
+    }
+  }, [recording, startRecording, stopRecording]);
+
+  const refreshRecordings = useCallback(async () => {
+    try {
+      const res = await imuApi.listRecordings();
+      if (res.success && res.data) {
+        setRecordings(res.data);
+      } else {
+        throw new Error(res.message || 'Unknown error');
+      }
+    } catch (e) {
+      console.error(e);
+      message.error('Failed to load recordings');
+    }
+  }, []);
+
+  const updateRecordingMeta = useCallback(async (sessionId: number, name?: string, tags?: string[]) => {
+    try {
+      const res = await imuApi.updateRecordingMeta(sessionId, name, tags);
+      if (res.success && res.data) {
+        setRecordings((prev) => prev.map((item) => (item.id === sessionId ? res.data : item)));
+        message.success('Recording updated');
+      } else {
+        throw new Error(res.message || 'Unknown error');
+      }
+    } catch (e) {
+      console.error(e);
+      message.error('Failed to update recording');
+    }
+  }, []);
+
+  const loadRecording = useCallback(async (sessionId: number) => {
+    try {
+      const res = await imuApi.getRecordingSamples(sessionId);
+      if (!res.success || !res.data) {
+        throw new Error(res.message || 'Unknown error');
+      }
+      const samples = res.data;
+      if (!samples.length) {
+        message.warning('No samples in this recording');
+        return;
+      }
+      const startMs = samples[0].raw_data.timestamp_ms;
+      const history = createEmptyHistory();
+      for (const sample of samples) {
+        const imuData = sample.raw_data;
+        pushCapped(history.time, imuData.timestamp_ms - startMs, samples.length + 1);
+        pushCapped(history.accel.x, imuData.accel_no_g.x, samples.length + 1);
+        pushCapped(history.accel.y, imuData.accel_no_g.y, samples.length + 1);
+        pushCapped(history.accel.z, imuData.accel_no_g.z, samples.length + 1);
+        pushCapped(history.accelWithG.x, imuData.accel_with_g.x, samples.length + 1);
+        pushCapped(history.accelWithG.y, imuData.accel_with_g.y, samples.length + 1);
+        pushCapped(history.accelWithG.z, imuData.accel_with_g.z, samples.length + 1);
+        pushCapped(history.gyro.x, imuData.gyro.x, samples.length + 1);
+        pushCapped(history.gyro.y, imuData.gyro.y, samples.length + 1);
+        pushCapped(history.gyro.z, imuData.gyro.z, samples.length + 1);
+        pushCapped(history.angle.x, imuData.angle.x, samples.length + 1);
+        pushCapped(history.angle.y, imuData.angle.y, samples.length + 1);
+        pushCapped(history.angle.z, imuData.angle.z, samples.length + 1);
+        pushCapped(history.quat.w, imuData.quat.w, samples.length + 1);
+        pushCapped(history.quat.x, imuData.quat.x, samples.length + 1);
+        pushCapped(history.quat.y, imuData.quat.y, samples.length + 1);
+        pushCapped(history.quat.z, imuData.quat.z, samples.length + 1);
+        pushCapped(history.offset.x, imuData.offset.x, samples.length + 1);
+        pushCapped(history.offset.y, imuData.offset.y, samples.length + 1);
+        pushCapped(history.offset.z, imuData.offset.z, samples.length + 1);
+        pushCapped(history.accelNav.x, imuData.accel_nav.x, samples.length + 1);
+        pushCapped(history.accelNav.y, imuData.accel_nav.y, samples.length + 1);
+        pushCapped(history.accelNav.z, imuData.accel_nav.z, samples.length + 1);
+      }
+      dataHistoryRef.current = history;
+      setDataHistory(history);
+      setPlotRevision((rev) => (rev + 1) % 1_000_000);
+      setLastSecondMessageCount(0);
+      streamStartMsRef.current = startMs;
+      setReplaying(true);
+      message.success('Recording loaded');
+    } catch (e) {
+      console.error(e);
+      message.error('Failed to load recording');
+    }
+  }, []);
+
+  const exitReplay = useCallback(() => {
+    setReplaying(false);
+    message.info('Replay cleared');
   }, []);
 
   return {
@@ -248,11 +401,20 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     uiRefreshMs,
     setUiRefreshMs,
     lastSecondMessageCount,
+    recording,
+    recordingStatus,
+    recordings,
+    replaying,
+    refreshRecordings,
+    updateRecordingMeta,
+    loadRecording,
+    exitReplay,
     startScan,
     stopScan,
     toggleScan,
     connect,
-    disconnect
+    disconnect,
+    toggleRecording
   };
 };
 
