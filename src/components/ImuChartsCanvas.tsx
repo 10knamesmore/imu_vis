@@ -17,25 +17,26 @@ type ImuChartsCanvasProps = {
   series: SeriesSpec[];
 };
 
-const MAX_DRAW_POINTS = 400;
+
 
 /**
- * 对数组进行降采样，以减少绘图点的数量。
- *
- * @param values - 原始数值数组
- * @param step - 采样步长 (例如 step=2 表示每隔一个取一个)
- * @returns 降采样后的新数组
+ * 截取 ImuDataHistory 的一部分
  */
-const downsample = (values: number[], step: number): number[] => {
-  if (step <= 1) {
-    return values;
-  }
-  const result: number[] = [];
-  for (let i = 0; i < values.length; i += step) {
-    result.push(values[i]);
-  }
-  return result;
+const sliceSnapshot = (snapshot: ImuDataHistory, start: number, end: number): ImuDataHistory => {
+  const s = (arr: number[]) => arr.slice(start, end);
+  return {
+    time: s(snapshot.time),
+    accel: { x: s(snapshot.accel.x), y: s(snapshot.accel.y), z: s(snapshot.accel.z) },
+    accelWithG: { x: s(snapshot.accelWithG.x), y: s(snapshot.accelWithG.y), z: s(snapshot.accelWithG.z) },
+    gyro: { x: s(snapshot.gyro.x), y: s(snapshot.gyro.y), z: s(snapshot.gyro.z) },
+    angle: { x: s(snapshot.angle.x), y: s(snapshot.angle.y), z: s(snapshot.angle.z) },
+    quat: { w: s(snapshot.quat.w), x: s(snapshot.quat.x), y: s(snapshot.quat.y), z: s(snapshot.quat.z) },
+    offset: { x: s(snapshot.offset.x), y: s(snapshot.offset.y), z: s(snapshot.offset.z) },
+    accelNav: { x: s(snapshot.accelNav.x), y: s(snapshot.accelNav.y), z: s(snapshot.accelNav.z) },
+  };
 };
+
+
 
 /**
  * 在 Canvas 上绘制折线图。
@@ -141,6 +142,81 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
   /** Canvas 元素的引用，用于获取绘图上下文 */
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
+  /** 视图状态：时间窗口长度和偏移量 */
+  const viewStateRef = useRef({
+    duration: windowMs || 10000,
+    offset: 0, // 距离最新数据的偏移量（毫秒），0 表示跟随最新
+    isDragging: false,
+    lastX: 0,
+  });
+
+  /**
+   * 监听滚轮事件：缩放时间窗口
+   */
+  const handleWheel = (e: WheelEvent) => {
+    e.preventDefault();
+    const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
+    viewStateRef.current.duration = Math.max(
+      1000, // 最小显示 1 秒
+      Math.min(60000, viewStateRef.current.duration * zoomFactor) // 最大显示 60 秒
+    );
+  };
+
+  /**
+   * 监听指针按下：开始拖动
+   */
+  const handlePointerDown = (e: PointerEvent) => {
+    viewStateRef.current.isDragging = true;
+    viewStateRef.current.lastX = e.clientX;
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  };
+
+  /**
+   * 监听指针移动：平移时间窗口
+   */
+  const handlePointerMove = (e: PointerEvent) => {
+    if (!viewStateRef.current.isDragging) return;
+    const dx = e.clientX - viewStateRef.current.lastX;
+    viewStateRef.current.lastX = e.clientX;
+
+    const { duration } = viewStateRef.current;
+    // 每一个像素代表的时间长度
+    const msPerPixel = duration / (canvasRef.current?.getBoundingClientRect().width || 1);
+
+    // 拖动方向与数据移动方向相反
+    viewStateRef.current.offset = Math.max(
+      0,
+      viewStateRef.current.offset - dx * msPerPixel
+    );
+  };
+
+  /**
+   * 监听指针抬起：结束拖动
+   */
+  const handlePointerUp = (e: PointerEvent) => {
+    viewStateRef.current.isDragging = false;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  };
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    canvas.addEventListener("pointerdown", handlePointerDown);
+    canvas.addEventListener("pointermove", handlePointerMove);
+    canvas.addEventListener("pointerup", handlePointerUp);
+    canvas.addEventListener("pointerleave", handlePointerUp);
+
+    return () => {
+      canvas.removeEventListener("wheel", handleWheel);
+      canvas.removeEventListener("pointerdown", handlePointerDown);
+      canvas.removeEventListener("pointermove", handlePointerMove);
+      canvas.removeEventListener("pointerup", handlePointerUp);
+      canvas.removeEventListener("pointerleave", handlePointerUp);
+    };
+  }, []);
+
   /**
    * Effect: 处理 Canvas 尺寸调整
    * 监听容器大小变化，并同步调整 Canvas 的内部分辨率和 CSS 尺寸，
@@ -206,23 +282,56 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
         return;
       }
 
-      const snapshot = source.bufferRef.current.snapshot(windowMs);
+      // 获取全部历史数据
+      const snapshot = source.bufferRef.current.snapshot();
       if (snapshot.time.length < 2) {
         ctx.fillStyle = "#6b7280";
         ctx.fillText("Waiting for IMU stream...", 16, 20);
         return;
       }
 
-      const step = Math.ceil(snapshot.time.length / MAX_DRAW_POINTS);
-      const downsampledTime = downsample(snapshot.time, step);
+      // 根据视图状态截取数据
+      const { duration, offset } = viewStateRef.current;
+      const latestTime = snapshot.time[snapshot.time.length - 1];
+      const viewEndTime = latestTime - offset;
+      const viewStartTime = viewEndTime - duration;
+
+      // 查找对应的时间范围索引
+      // 简单遍历查找边界，由于数据有序，可以优化但此处数据量不大直接遍历即可
+      let startIndex = 0;
+      let endIndex = snapshot.time.length;
+
+      // 找到第一个 >= viewStartTime 的点
+      while (startIndex < snapshot.time.length && snapshot.time[startIndex] < viewStartTime) {
+        startIndex++;
+      }
+
+      // 找到第一个 > viewEndTime 的点作为结束
+      // 注意：如果 offset 为 0，endIndex 应该是 length
+      if (offset > 0) {
+        let i = startIndex;
+        while (i < snapshot.time.length && snapshot.time[i] <= viewEndTime) {
+          i++;
+        }
+        endIndex = i;
+      }
+
+      // 如果选区内没有足够数据
+      if (endIndex - startIndex < 2) {
+        // 尝试显示最近的数据，或者保持空
+        if (startIndex > 0) startIndex = Math.max(0, startIndex - 2);
+      }
+
+      const viewData = sliceSnapshot(snapshot, startIndex, endIndex);
+
       const seriesValues = series.map((entry) => {
-        const values = downsample(entry.getValues(snapshot), step);
+        const values = entry.getValues(viewData);
         return { name: entry.name, color: entry.color, values };
       });
 
       drawChart(
         ctx,
-        { ...snapshot, time: downsampledTime },
+        viewData,
         label,
         seriesValues,
         width,
