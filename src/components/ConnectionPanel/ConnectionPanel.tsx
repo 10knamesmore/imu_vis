@@ -5,7 +5,7 @@ import Text from "antd/es/typography/Text"
 
 import { useBluetooth } from '../../hooks/useBluetooth';
 
-import styles from "./ConnectionPanel.scss";
+import styles from "./ConnectionPanel.module.scss";
 
 const DEFAULT_SEARCH_VALUE = "im";
 

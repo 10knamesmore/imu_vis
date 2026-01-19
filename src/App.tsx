@@ -6,7 +6,7 @@ import { ConnectionPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './components/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
-import styles from "./App.scss";
+import styles from "./App.module.scss";
 
 const { Header, Content } = Layout;
 

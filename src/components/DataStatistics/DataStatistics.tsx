@@ -5,7 +5,7 @@ import { Button, Card, Row, Col, Statistic, InputNumber, message, Tag } from 'an
 import { useBluetooth } from '../../hooks/useBluetooth';
 
 import { RecordingsPanel } from '../RecordingsPanel';
-import styles from "./DataStatistics.scss";
+import styles from "./DataStatistics.module.scss";
 
 type Series = { name: string; values: number[] };
 

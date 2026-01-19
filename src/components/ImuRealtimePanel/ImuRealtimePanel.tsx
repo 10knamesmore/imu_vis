@@ -6,7 +6,7 @@ import { useImuSource } from "../../hooks/useImuSource";
 
 import { ImuThreeView } from "../ImuThreeView";
 import { ImuChartsCanvas } from "../ImuChartsCanvas";
-import styles from "./ImuRealtimePanel.scss";
+import styles from "./ImuRealtimePanel.module.scss";
 
 export const ImuRealtimePanel: React.FC = () => {
   const { connectedDevice } = useBluetooth();

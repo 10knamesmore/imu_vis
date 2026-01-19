@@ -5,7 +5,7 @@ import type { ColumnsType } from 'antd/es/table';
 import { useBluetooth } from '../../hooks/useBluetooth';
 import { RecordingMeta } from '../../types';
 
-import styles from "./RecordingsPanel.scss";
+import styles from "./RecordingsPanel.module.scss";
 
 type EditState = {
   name: string;

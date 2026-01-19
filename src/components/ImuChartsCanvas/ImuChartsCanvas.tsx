@@ -3,7 +3,7 @@ import React, { useEffect, useRef } from "react";
 import { ImuSource } from "../../hooks/useImuSource";
 import { ImuDataHistory } from "../../types";
 
-import styles from "./ImuChartsCanvas.scss";
+import styles from "./ImuChartsCanvas.module.scss";
 
 type SeriesSpec = {
   name: string;

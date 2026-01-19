@@ -3,7 +3,7 @@ import * as THREE from "three";
 
 import { ImuSource } from "../../hooks/useImuSource";
 
-import styles from "./ImuThreeView.scss";
+import styles from "./ImuThreeView.module.scss";
 
 /**
  * 组件属性定义
