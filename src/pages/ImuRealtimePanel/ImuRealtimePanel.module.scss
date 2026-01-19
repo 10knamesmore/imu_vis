@@ -1,5 +1,55 @@
 .imuRealtimePanel {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 16px;
+}
+
+.mainGrid {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+}
+
+.leftColumn {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rightColumn {
+  min-height: 0;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px;
+}
+
+.panelCard {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  :global(.ant-card-body) {
+    flex: 1;
+    min-height: 0;
+  }
+}
+
+.chartTabs {
+  height: 100%;
+
+  :global(.ant-tabs-content-holder),
+  :global(.ant-tabs-content),
+  :global(.ant-tabs-tabpane) {
+    height: 100%;
+  }
+}
+
+.chartPanel {
+  height: 100%;
 }
 
 .imuToolbar {
@@ -44,5 +94,6 @@
   border: 1px solid #202a38;
   border-radius: 8px;
   overflow: hidden;
-  min-height: 300px;
+  min-height: 0;
+  height: 100%;
 }

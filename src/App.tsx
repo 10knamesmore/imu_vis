@@ -7,6 +7,7 @@ import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
 import styles from "./App.module.scss";
+import { Statistics } from './pages/Statistics/DataStatistics';
 
 const { Header, Content } = Layout;
 
@@ -20,14 +21,14 @@ const AppContent: React.FC = () => {
   const hasConnectedDevice = connectedDevice !== null;
 
   const items = [
-    // {
-    //   key: '1',
-    //   label: '基础数据',
-    //   children: <Statistics />,
-    // },
     {
       key: '1',
-      label: '实时可视化',
+      label: '基础数据',
+      children: <Statistics />,
+    },
+    {
+      key: '2',
+      label: '可视化',
       children: <ImuRealtimePanel />,
     },
   ];
@@ -60,10 +61,11 @@ const AppContent: React.FC = () => {
           IMU 轨迹重建可视化
         </div>
       </Header>
-      <Content style={{ padding: '24px', minHeight: '100vh', background: '#000' }}>
+      <Content className={styles.appContent}>
         <Tabs
           defaultActiveKey="1"
           items={items}
+          className={styles.appTabs}
           tabBarExtraContent={
             <Button
               type="primary"

@@ -135,6 +135,7 @@ export const RecordingsPanel: React.FC = () => {
         title="录制记录"
         size="small"
         variant="outlined"
+        className={styles.recordingsCard}
         style={{ background: '#141414', border: '1px solid #303030' }}
         styles={{ header: { color: 'white' } }}
         extra={
@@ -157,6 +158,8 @@ export const RecordingsPanel: React.FC = () => {
           columns={columns}
           pagination={{ pageSize: 6 }}
           size="small"
+          className={styles.recordingsTable}
+          scroll={{ y: 240 }}
         />
       </Card>
     </div>

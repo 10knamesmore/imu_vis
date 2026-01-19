@@ -12,6 +12,31 @@
   min-height: 100vh;
 }
 
+.appContent {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 24px;
+  background: #000;
+}
+
+.appTabs {
+  flex: 1;
+  min-height: 0;
+
+  :global(.ant-tabs-content-holder) {
+    height: 100%;
+  }
+
+  :global(.ant-tabs-content) {
+    height: 100%;
+  }
+
+  :global(.ant-tabs-tabpane) {
+    height: 100%;
+  }
+}
+
 .siteLayoutContent {
   max-width: 1400px;
   margin: 0 auto;
