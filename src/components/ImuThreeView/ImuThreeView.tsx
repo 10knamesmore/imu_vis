@@ -1,6 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import { ImuSource } from "../hooks/useImuSource";
+
+import { ImuSource } from "../../hooks/useImuSource";
+
+import styles from "./ImuThreeView.scss";
 
 /**
  * 组件属性定义
@@ -279,5 +282,5 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
     };
   }, []);
 
-  return <div className="imu-three-view" ref={containerRef} />;
+  return <div className={styles.imuThreeView} ref={containerRef} />;
 };

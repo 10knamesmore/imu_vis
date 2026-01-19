@@ -1,9 +1,12 @@
 import React, { useMemo, useState } from "react";
 import { Card, Col, Row, Switch, Tag } from "antd";
-import { useBluetooth } from "../hooks/useBluetooth";
-import { useImuSource } from "../hooks/useImuSource";
-import { ImuThreeView } from "./ImuThreeView";
-import { ImuChartsCanvas } from "./ImuChartsCanvas";
+
+import { useBluetooth } from "../../hooks/useBluetooth";
+import { useImuSource } from "../../hooks/useImuSource";
+
+import { ImuThreeView } from "../ImuThreeView";
+import { ImuChartsCanvas } from "../ImuChartsCanvas";
+import styles from "./ImuRealtimePanel.scss";
 
 export const ImuRealtimePanel: React.FC = () => {
   const { connectedDevice } = useBluetooth();
@@ -17,7 +20,7 @@ export const ImuRealtimePanel: React.FC = () => {
   const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
 
   return (
-    <div className="imu-realtime-panel">
+    <div className={styles.imuRealtimePanel}>
       <Row gutter={[16, 16]}>
         {/* 工具栏：显示状态和控制开关 */}
         <Col span={24}>
@@ -27,19 +30,19 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ body: { padding: "12px 16px" } }}
           >
-            <div className="imu-toolbar">
-              <div className="imu-status">
-                <span className="imu-status-label">IMU Stream</span>
+            <div className={styles.imuToolbar}>
+              <div className={styles.imuStatus}>
+                <span className={styles.imuStatusLabel}>IMU Stream</span>
                 <Tag color={sourceEnabled ? "green" : "default"}>
                   {sourceEnabled ? "Connected" : "Idle"}
                 </Tag>
               </div>
-              <div className="imu-controls">
-                <div className="imu-control">
+              <div className={styles.imuControls}>
+                <div className={styles.imuControl}>
                   <span>Trajectory</span>
                   <Switch checked={showTrajectory} onChange={setShowTrajectory} />
                 </div>
-                <div className="imu-control">
+                <div className={styles.imuControl}>
                   <span>Charts</span>
                   <Switch checked={showCharts} onChange={setShowCharts} />
                 </div>
@@ -57,7 +60,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-three-panel">
+            <div className={styles.imuThreePanel}>
               <ImuThreeView source={imuSource} showTrajectory={showTrajectory} scale={1} />
             </div>
           </Card>
@@ -72,7 +75,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-chart-panel">
+            <div className={styles.imuChartPanel}>
               <ImuChartsCanvas
                 source={imuSource}
                 enabled={showCharts}
@@ -96,7 +99,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-chart-panel">
+            <div className={styles.imuChartPanel}>
               <ImuChartsCanvas
                 source={imuSource}
                 enabled={showCharts}
@@ -120,7 +123,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-chart-panel">
+            <div className={styles.imuChartPanel}>
               <ImuChartsCanvas
                 source={imuSource}
                 enabled={showCharts}
@@ -144,7 +147,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-chart-panel">
+            <div className={styles.imuChartPanel}>
               <ImuChartsCanvas
                 source={imuSource}
                 enabled={showCharts}
@@ -168,7 +171,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-chart-panel">
+            <div className={styles.imuChartPanel}>
               <ImuChartsCanvas
                 source={imuSource}
                 enabled={showCharts}
@@ -193,7 +196,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-chart-panel">
+            <div className={styles.imuChartPanel}>
               <ImuChartsCanvas
                 source={imuSource}
                 enabled={showCharts}
@@ -217,7 +220,7 @@ export const ImuRealtimePanel: React.FC = () => {
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
-            <div className="imu-chart-panel">
+            <div className={styles.imuChartPanel}>
               <ImuChartsCanvas
                 source={imuSource}
                 enabled={showCharts}

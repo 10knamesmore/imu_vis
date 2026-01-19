@@ -1,8 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Button, Card, Input, Select, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
-import { useBluetooth } from '../hooks/useBluetooth';
-import { RecordingMeta } from '../types';
+
+import { useBluetooth } from '../../hooks/useBluetooth';
+import { RecordingMeta } from '../../types';
+
+import styles from "./RecordingsPanel.scss";
 
 type EditState = {
   name: string;
@@ -124,33 +127,35 @@ export const RecordingsPanel: React.FC = () => {
   );
 
   return (
-    <Card
-      title="录制记录"
-      size="small"
-      variant="outlined"
-      style={{ background: '#141414', border: '1px solid #303030' }}
-      styles={{ header: { color: 'white' } }}
-      extra={
-        <Space>
-          <Button onClick={refreshRecordings}>刷新</Button>
-          <Tooltip title="退出回放会恢复实时数据更新">
-            <Button disabled={!replaying} onClick={exitReplay}>
-              退出回放
-            </Button>
-          </Tooltip>
-          <Tag color={replaying ? 'orange' : 'default'}>
-            {replaying ? '回放中' : '实时模式'}
-          </Tag>
-        </Space>
-      }
-    >
-      <Table
-        rowKey="id"
-        dataSource={recordings}
-        columns={columns}
-        pagination={{ pageSize: 6 }}
+    <div className={styles.recordingsPanel}>
+      <Card
+        title="录制记录"
         size="small"
-      />
-    </Card>
+        variant="outlined"
+        style={{ background: '#141414', border: '1px solid #303030' }}
+        styles={{ header: { color: 'white' } }}
+        extra={
+          <Space>
+            <Button onClick={refreshRecordings}>刷新</Button>
+            <Tooltip title="退出回放会恢复实时数据更新">
+              <Button disabled={!replaying} onClick={exitReplay}>
+                退出回放
+              </Button>
+            </Tooltip>
+            <Tag color={replaying ? 'orange' : 'default'}>
+              {replaying ? '回放中' : '实时模式'}
+            </Tag>
+          </Space>
+        }
+      >
+        <Table
+          rowKey="id"
+          dataSource={recordings}
+          columns={columns}
+          pagination={{ pageSize: 6 }}
+          size="small"
+        />
+      </Card>
+    </div>
   );
 };

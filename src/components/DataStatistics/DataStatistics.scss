@@ -1,0 +1,11 @@
+.visualizer {
+  :global(.ant-card) {
+    background: #141414;
+    border: 1px solid #303030;
+
+    :global(.ant-card-head) {
+      color: white;
+      border-bottom: 1px solid #303030;
+    }
+  }
+}

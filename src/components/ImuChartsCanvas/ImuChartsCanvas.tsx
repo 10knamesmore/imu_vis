@@ -1,6 +1,9 @@
 import React, { useEffect, useRef } from "react";
-import { ImuSource } from "../hooks/useImuSource";
-import { ImuDataHistory } from "../types";
+
+import { ImuSource } from "../../hooks/useImuSource";
+import { ImuDataHistory } from "../../types";
+
+import styles from "./ImuChartsCanvas.scss";
 
 type SeriesSpec = {
   name: string;
@@ -348,7 +351,7 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
   }, [enabled, refreshMs, source, windowMs]);
 
   return (
-    <div className="imu-charts-canvas" ref={containerRef}>
+    <div className={styles.imuChartsCanvas} ref={containerRef}>
       <canvas ref={canvasRef} />
     </div>
   );

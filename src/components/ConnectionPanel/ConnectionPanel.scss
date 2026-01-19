@@ -1,0 +1,32 @@
+.connectionPanel {
+  margin-bottom: 24px;
+  background: #141414;
+  border: 1px solid #303030;
+
+  :global(.ant-card-head) {
+    color: white;
+    border-bottom: 1px solid #303030;
+  }
+
+  :global(.ant-card-body) {
+    background: #141414;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  :global(.ant-list-item) {
+    border-block-end: 1px solid #303030;
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  :global(.ant-list-item-meta-title) {
+    color: rgba(255, 255, 255, 0.85);
+  }
+
+  :global(.ant-list-item-meta-description) {
+    color: rgba(255, 255, 255, 0.45);
+  }
+
+  :global(.ant-empty-description) {
+    color: rgba(255, 255, 255, 0.45);
+  }
+}

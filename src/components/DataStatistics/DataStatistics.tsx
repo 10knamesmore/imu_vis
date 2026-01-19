@@ -1,8 +1,11 @@
 import React, { useMemo, useRef } from 'react';
 import Plot from 'react-plotly.js';
 import { Button, Card, Row, Col, Statistic, InputNumber, message, Tag } from 'antd';
-import { useBluetooth } from '../hooks/useBluetooth';
-import { RecordingsPanel } from './RecordingsPanel';
+
+import { useBluetooth } from '../../hooks/useBluetooth';
+
+import { RecordingsPanel } from '../RecordingsPanel';
+import styles from "./DataStatistics.scss";
 
 type Series = { name: string; values: number[] };
 
@@ -110,7 +113,7 @@ export const Statistics: React.FC = () => {
   };
 
   return (
-    <div className="visualizer">
+    <div className={styles.visualizer}>
 
       <Row gutter={[16, 16]}>
         <Col span={24}>

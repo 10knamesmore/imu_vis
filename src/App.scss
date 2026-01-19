@@ -1,4 +1,4 @@
-body {
+:global(body) {
   margin: 0;
   padding: 0;
   background-color: #000;
@@ -8,131 +8,24 @@ body {
     'Noto Color Emoji';
 }
 
-.app-layout {
+.appLayout {
   min-height: 100vh;
 }
 
-.site-layout-content {
+.siteLayoutContent {
   max-width: 1400px;
   margin: 0 auto;
 }
 
-.connection-panel {
-  margin-bottom: 24px;
-  background: #141414;
-  border: 1px solid #303030;
-  
-  .ant-card-head {
-    color: white;
-    border-bottom: 1px solid #303030;
-  }
-  
-  .ant-card-body {
-    background: #141414;
-    color: rgba(255, 255, 255, 0.85);
+.deviceButtonConnected {
+  &:global(.ant-btn-primary) {
+    background-color: #2ecc71;
+    border-color: #2ecc71;
   }
 
-  .ant-list-item {
-    border-block-end: 1px solid #303030;
-    color: rgba(255, 255, 255, 0.85);
+  &:global(.ant-btn-primary:hover),
+  &:global(.ant-btn-primary:focus) {
+    background-color: #27ae60;
+    border-color: #27ae60;
   }
-
-  .ant-list-item-meta-title {
-    color: rgba(255, 255, 255, 0.85);
-  }
-  
-  .ant-list-item-meta-description {
-    color: rgba(255, 255, 255, 0.45);
-  }
-
-  .ant-empty-description {
-    color: rgba(255, 255, 255, 0.45);
-  }
-}
-
-.visualizer {
-    .ant-card {
-        background: #141414;
-        border: 1px solid #303030;
-        .ant-card-head {
-            color: white;
-            border-bottom: 1px solid #303030;
-        }
-    }
-}
-
-.device-button-connected.ant-btn-primary {
-  background-color: #2ecc71;
-  border-color: #2ecc71;
-}
-
-.device-button-connected.ant-btn-primary:hover,
-.device-button-connected.ant-btn-primary:focus {
-  background-color: #27ae60;
-  border-color: #27ae60;
-}
-
-.imu-realtime-panel {
-  display: block;
-}
-
-.imu-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 12px 16px;
-  background: #10151d;
-  border: 1px solid #2a3342;
-  border-radius: 8px;
-}
-
-.imu-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.imu-status-label {
-  color: #c3cad5;
-}
-
-.imu-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
-}
-
-.imu-control {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #c3cad5;
-}
-
-.imu-three-panel,
-.imu-chart-panel {
-  background: #0c1119;
-  border: 1px solid #202a38;
-  border-radius: 8px;
-  overflow: hidden;
-  min-height: 300px;
-}
-
-.imu-three-view {
-  width: 100%;
-  height: 100%;
-  min-height: 320px;
-}
-
-.imu-charts-canvas {
-  width: 100%;
-  height: 100%;
-  min-height: 300px;
-}
-
-.imu-charts-canvas canvas {
-  display: block;
 }

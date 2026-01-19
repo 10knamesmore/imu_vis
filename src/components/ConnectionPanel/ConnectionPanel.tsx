@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Button, Select, Tag, Row, Col, Space, message } from 'antd';
 import { ReloadOutlined, PoweroffOutlined, CheckCircleOutlined, SignalFilled } from '@ant-design/icons';
-import { useBluetooth } from '../hooks/useBluetooth.tsx';
 import Text from "antd/es/typography/Text"
+
+import { useBluetooth } from '../../hooks/useBluetooth';
+
+import styles from "./ConnectionPanel.scss";
 
 const DEFAULT_SEARCH_VALUE = "im";
 
@@ -52,7 +55,7 @@ export const ConnectionPanel: React.FC = () => {
   const isConnected = !!connectedDevice;
 
   return (
-    <div className="connection-panel">
+    <div className={styles.connectionPanel}>
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
           <Tag color="blue" style={{ fontSize: '14px', padding: '5px 10px' }}>

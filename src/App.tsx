@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { Layout, Tabs, Modal, Button } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
+
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './components/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
-import './App.scss';
+
+import styles from "./App.scss";
 
 const { Header, Content } = Layout;
 
@@ -49,9 +51,9 @@ const AppContent: React.FC = () => {
   }, [hasConnectedDevice]);
 
   return (
-    <Layout className="app-layout">
+    <Layout className={styles.appLayout}>
       <Header style={{ display: 'flex', alignItems: 'center', color: 'white', background: '#141414', borderBottom: '1px solid #303030' }}>
-        <div className="logo" style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
+        <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
           IMU 轨迹重建可视化
         </div>
       </Header>
@@ -63,7 +65,7 @@ const AppContent: React.FC = () => {
             <Button
               type="primary"
               icon={<SettingOutlined />}
-              className={hasConnectedDevice ? 'device-button-connected' : undefined}
+              className={hasConnectedDevice ? styles.deviceButtonConnected : undefined}
               onClick={handleModalOpen}
             >
               Devices
