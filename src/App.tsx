@@ -7,7 +7,6 @@ import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
 import styles from "./App.module.scss";
-import { Statistics } from './pages/Statistics/DataStatistics';
 
 const { Header, Content } = Layout;
 
@@ -23,11 +22,6 @@ const AppContent: React.FC = () => {
   const items = [
     {
       key: '1',
-      label: '基础数据',
-      children: <Statistics />,
-    },
-    {
-      key: '2',
       label: '可视化',
       children: <ImuRealtimePanel />,
     },

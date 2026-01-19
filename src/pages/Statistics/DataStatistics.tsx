@@ -90,6 +90,7 @@ const LinePlotCard: React.FC<{
 
 /**
  * 数据统计与回放面板组件。
+ * @deprecated 使用ImuRealtimePanel
  */
 export const Statistics: React.FC = () => {
   const {

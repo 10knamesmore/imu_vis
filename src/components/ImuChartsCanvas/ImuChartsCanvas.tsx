@@ -20,8 +20,6 @@ type ImuChartsCanvasProps = {
   series: SeriesSpec[];
 };
 
-
-
 /**
  * 截取 ImuDataHistory 的一部分
  */
