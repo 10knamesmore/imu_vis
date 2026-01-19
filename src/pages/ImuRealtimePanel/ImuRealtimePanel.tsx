@@ -4,10 +4,13 @@ import { Card, Col, Row, Switch, Tag } from "antd";
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
 
-import { ImuThreeView } from "../ImuThreeView";
-import { ImuChartsCanvas } from "../ImuChartsCanvas";
+import { ImuThreeView } from "../../components/ImuThreeView";
+import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
 import styles from "./ImuRealtimePanel.module.scss";
 
+/**
+ * IMU 实时可视化面板组件。
+ */
 export const ImuRealtimePanel: React.FC = () => {
   const { connectedDevice } = useBluetooth();
   // 控制是否显示轨迹

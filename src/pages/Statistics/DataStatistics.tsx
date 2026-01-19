@@ -4,11 +4,14 @@ import { Button, Card, Row, Col, Statistic, InputNumber, message, Tag } from 'an
 
 import { useBluetooth } from '../../hooks/useBluetooth';
 
-import { RecordingsPanel } from '../RecordingsPanel';
+import { RecordingsPanel } from '../../components/RecordingsPanel';
 import styles from "./DataStatistics.module.scss";
 
 type Series = { name: string; values: number[] };
 
+/**
+ * 单条曲线图与最新值统计卡片组件。
+ */
 const LinePlotCard: React.FC<{
   title: string;
   yTitle: string;
@@ -85,6 +88,9 @@ const LinePlotCard: React.FC<{
   );
 };
 
+/**
+ * 数据统计与回放面板组件。
+ */
 export const Statistics: React.FC = () => {
   const {
     connectedDevice,

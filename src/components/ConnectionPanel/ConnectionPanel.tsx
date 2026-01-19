@@ -16,6 +16,9 @@ const getRssiColor = (rssi?: number) => {
   return '#f5222d'; // red for weak
 };
 
+/**
+ * 设备连接管理面板组件。
+ */
 export const ConnectionPanel: React.FC = () => {
   const {
     scanning,

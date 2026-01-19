@@ -20,6 +20,9 @@ const formatDuration = (start: number, end?: number | null) => {
   return `${seconds}s`;
 };
 
+/**
+ * 录制记录管理面板组件。
+ */
 export const RecordingsPanel: React.FC = () => {
   const {
     recordings,

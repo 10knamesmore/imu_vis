@@ -132,6 +132,9 @@ const drawChart = (
  * @param props.label - 图表主标题
  * @param props.series - 需要绘制的数据系列配置
  */
+/**
+ * IMU 数据曲线画布组件。
+ */
 export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
   source,
   enabled,

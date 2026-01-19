@@ -420,6 +420,9 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   };
 };
 
+/**
+ * 蓝牙状态与操作的全局 Provider 组件。
+ */
 export const BluetoothProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const value = useBluetoothInternal();
   return (

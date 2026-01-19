@@ -3,13 +3,16 @@ import { Layout, Tabs, Modal, Button } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 
 import { ConnectionPanel } from './components/ConnectionPanel';
-import { ImuRealtimePanel } from './components/ImuRealtimePanel';
+import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
 import styles from "./App.module.scss";
 
 const { Header, Content } = Layout;
 
+/**
+ * 应用主内容区域组件。
+ */
 const AppContent: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const { connectedDevice, startScan, stopScan } = useBluetooth()
@@ -88,6 +91,9 @@ const AppContent: React.FC = () => {
 };
 
 // 辅助组件：将多个 Provider 合并
+/**
+ * 组合多个 Provider 的辅助组件。
+ */
 const Compose = ({ providers, children }: { providers: React.FC<{ children: React.ReactNode }>[]; children: React.ReactNode }) => {
   return (
     <>
@@ -96,6 +102,9 @@ const Compose = ({ providers, children }: { providers: React.FC<{ children: Reac
   );
 };
 
+/**
+ * 应用根组件。
+ */
 const App: React.FC = () => {
   return (
     <Compose providers={[BluetoothProvider]}>
