@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { ImuSource } from "../../hooks/useImuSource";
 import { ImuDataHistory } from "../../types";
@@ -46,7 +46,7 @@ const sliceSnapshot = (snapshot: ImuDataHistory, start: number, end: number): Im
  *
  * @param ctx - Canvas 2D 绘图上下文
  * @param snapshot - 当前时间窗口内的 IMU 数据快照
- * @param label - 图表标题
+ * @param yAxisLabel - 纵轴单位/说明
  * @param series - 要绘制的数据系列数组 (包含值、颜色、名称)
  * @param width - 绘图区域宽度
  * @param height - 绘图区域高度
@@ -54,20 +54,24 @@ const sliceSnapshot = (snapshot: ImuDataHistory, start: number, end: number): Im
 const drawChart = (
   ctx: CanvasRenderingContext2D,
   snapshot: ImuDataHistory,
-  label: string,
+  yAxisLabel: string,
   series: Array<{ values: number[]; color: string; name: string }>,
   width: number,
   height: number
 ) => {
-  const padding = 28;
-  const plotHeight = height - padding * 1.6;
-  const plotWidth = width - padding * 2;
-  const baseY = padding;
+  const padding = {
+    left: 52,
+    right: 12,
+    top: 16,
+    bottom: 30,
+  };
+  const plotHeight = height - padding.top - padding.bottom;
+  const plotWidth = width - padding.left - padding.right;
   const time = snapshot.time;
 
   if (time.length < 2) {
     ctx.fillStyle = "#7b8591";
-    ctx.fillText(label, padding, 20);
+    ctx.fillText("Waiting for data...", padding.left, 20);
     return;
   }
 
@@ -89,18 +93,61 @@ const drawChart = (
   }
   const range = max - min;
 
+  const xTicks = 5;
+  const yTicks = 5;
+
   ctx.save();
-  ctx.translate(0, baseY);
   ctx.strokeStyle = "#1a1f29";
   ctx.lineWidth = 1;
+
+  for (let i = 0; i <= xTicks; i += 1) {
+    const x = padding.left + (i / xTicks) * plotWidth;
+    ctx.beginPath();
+    ctx.moveTo(x, padding.top);
+    ctx.lineTo(x, padding.top + plotHeight);
+    ctx.stroke();
+  }
+
+  for (let i = 0; i <= yTicks; i += 1) {
+    const y = padding.top + (i / yTicks) * plotHeight;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(padding.left + plotWidth, y);
+    ctx.stroke();
+  }
+
+  ctx.strokeStyle = "#2a3342";
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(padding, plotHeight / 2);
-  ctx.lineTo(width - padding, plotHeight / 2);
+  ctx.moveTo(padding.left, padding.top);
+  ctx.lineTo(padding.left, padding.top + plotHeight);
+  ctx.lineTo(padding.left + plotWidth, padding.top + plotHeight);
   ctx.stroke();
 
   ctx.fillStyle = "#9aa5b1";
-  ctx.fillText(label, padding, -8);
-  ctx.fillText(`${min.toFixed(2)}..${max.toFixed(2)}`, width - padding - 120, -8);
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  for (let i = 0; i <= yTicks; i += 1) {
+    const value = max - (i / yTicks) * range;
+    const y = padding.top + (i / yTicks) * plotHeight;
+    ctx.fillText(value.toFixed(2), padding.left - 6, y);
+  }
+
+  ctx.textAlign = "center";
+  ctx.textBaseline = "top";
+  for (let i = 0; i <= xTicks; i += 1) {
+    const t = (i / xTicks) * timeSpan;
+    const label = `${(t / 1000).toFixed(1)}`;
+    const x = padding.left + (i / xTicks) * plotWidth;
+    ctx.fillText(label, x, padding.top + plotHeight + 8);
+  }
+
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
+  ctx.fillText(yAxisLabel, padding.left, 2);
+
+  ctx.textAlign = "center";
+  ctx.fillText("Time (s)", padding.left + plotWidth / 2, height - 16);
 
   for (const s of series) {
     ctx.strokeStyle = s.color;
@@ -108,8 +155,8 @@ const drawChart = (
     ctx.beginPath();
     for (let i = 0; i < s.values.length; i += 1) {
       const t = time[i];
-      const x = padding + ((t - earliestTime) / timeSpan) * plotWidth;
-      const y = plotHeight - ((s.values[i] - min) / range) * plotHeight;
+      const x = padding.left + ((t - earliestTime) / timeSpan) * plotWidth;
+      const y = padding.top + plotHeight - ((s.values[i] - min) / range) * plotHeight;
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -129,7 +176,7 @@ const drawChart = (
  * @param props.enabled - 是否启用绘制 (false 时暂停更新)
  * @param props.refreshMs - 刷新间隔 (毫秒)，默认 40ms
  * @param props.windowMs - 显示的时间窗口大小 (毫秒)
- * @param props.label - 图表主标题
+ * @param props.label - 纵轴单位/说明
  * @param props.series - 需要绘制的数据系列配置
  */
 /**
@@ -147,6 +194,8 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** Canvas 元素的引用，用于获取绘图上下文 */
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [latestStats, setLatestStats] = useState<Array<{ name: string; color: string; value?: number }>>([]);
+  const lastStatsUpdateRef = useRef(0);
 
   /** 视图状态：时间窗口长度和偏移量 */
   const viewStateRef = useRef({
@@ -335,14 +384,22 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
         return { name: entry.name, color: entry.color, values };
       });
 
-      drawChart(
-        ctx,
-        viewData,
-        label,
-        seriesValues,
-        width,
-        height
-      );
+      const yAxisLabel = label.includes("(")
+        ? label.slice(label.indexOf("(") + 1, label.lastIndexOf(")"))
+        : label;
+      drawChart(ctx, viewData, yAxisLabel, seriesValues, width, height);
+
+      const now = Date.now();
+      if (now - lastStatsUpdateRef.current > 200) {
+        lastStatsUpdateRef.current = now;
+        setLatestStats(
+          seriesValues.map((entry) => ({
+            name: entry.name,
+            color: entry.color,
+            value: entry.values.length ? entry.values[entry.values.length - 1] : undefined,
+          }))
+        );
+      }
     };
 
     const timer = window.setInterval(draw, refreshMs);
@@ -351,11 +408,31 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
     return () => {
       window.clearInterval(timer);
     };
-  }, [enabled, refreshMs, source, windowMs]);
+  }, [enabled, refreshMs, source, windowMs, label, series]);
+
+  const unit = label.includes("(")
+    ? label.slice(label.indexOf("(") + 1, label.lastIndexOf(")"))
+    : label;
 
   return (
-    <div className={styles.imuChartsCanvas} ref={containerRef}>
-      <canvas ref={canvasRef} />
+    <div className={styles.imuChartsCanvas}>
+      <div className={styles.canvasArea} ref={containerRef}>
+        <canvas ref={canvasRef} aria-label={label} />
+      </div>
+      <div className={styles.statsColumn}>
+        {latestStats.map((entry) => (
+          <div key={entry.name} className={styles.statCard}>
+            <div className={styles.statHeader}>
+              <span className={styles.statLabel}>{entry.name}</span>
+              <span className={styles.colorSwatch} style={{ backgroundColor: entry.color }} />
+            </div>
+            <div className={styles.statDivider} />
+            <div className={styles.statValue}>
+              {entry.value === undefined ? "--" : `${entry.value.toFixed(3)} ${unit}`}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };

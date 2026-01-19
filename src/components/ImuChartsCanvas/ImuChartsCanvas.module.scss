@@ -1,9 +1,64 @@
 .imuChartsCanvas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 96px;
+  gap: 12px;
   width: 100%;
   height: 100%;
-  min-height: 300px;
+  min-height: 0;
 
   :global(canvas) {
     display: block;
   }
+}
+
+.canvasArea {
+  min-width: 0;
+  min-height: 0;
+}
+
+.statsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statCard {
+  background: #0b1119;
+  border: 1px solid #1f2a38;
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 56px;
+}
+
+.statHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #c9d1db;
+  font-size: 12px;
+}
+
+.statLabel {
+  color: #9aa5b1;
+}
+
+.statDivider {
+  height: 1px;
+  background: #1f2a38;
+}
+
+.statValue {
+  color: #f0f4f8;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  font-size: 12px;
+}
+
+.colorSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
 }

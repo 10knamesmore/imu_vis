@@ -48,25 +48,25 @@ export const ImuRealtimePanel: React.FC = () => {
         </div>
       ),
     },
-    {
-      key: "gyro",
-      label: "陀螺仪",
-      children: (
-        <div className={styles.imuChartPanel}>
-          <ImuChartsCanvas
-            source={imuSource}
-            enabled={showCharts}
-            refreshMs={40}
-            label="Gyroscope (deg/s)"
-            series={[
-              { name: "X", color: "#9b87ff", getValues: (s) => s.gyro.x },
-              { name: "Y", color: "#ff7aa2", getValues: (s) => s.gyro.y },
-              { name: "Z", color: "#ffd166", getValues: (s) => s.gyro.z },
-            ]}
-          />
-        </div>
-      ),
-    },
+    // {
+    //   key: "gyro",
+    //   label: "陀螺仪",
+    //   children: (
+    //     <div className={styles.imuChartPanel}>
+    //       <ImuChartsCanvas
+    //         source={imuSource}
+    //         enabled={showCharts}
+    //         refreshMs={40}
+    //         label="Gyroscope (deg/s)"
+    //         series={[
+    //           { name: "X", color: "#9b87ff", getValues: (s) => s.gyro.x },
+    //           { name: "Y", color: "#ff7aa2", getValues: (s) => s.gyro.y },
+    //           { name: "Z", color: "#ffd166", getValues: (s) => s.gyro.z },
+    //         ]}
+    //       />
+    //     </div>
+    //   ),
+    // },
     {
       key: "angle",
       label: "姿态角",
@@ -86,45 +86,45 @@ export const ImuRealtimePanel: React.FC = () => {
         </div>
       ),
     },
-    {
-      key: "accel-with-g",
-      label: "加速度（含重力）",
-      children: (
-        <div className={styles.imuChartPanel}>
-          <ImuChartsCanvas
-            source={imuSource}
-            enabled={showCharts}
-            refreshMs={40}
-            label="Acceleration (m/s^2)"
-            series={[
-              { name: "X", color: "#9ad1ff", getValues: (s) => s.accelWithG.x },
-              { name: "Y", color: "#ffda7a", getValues: (s) => s.accelWithG.y },
-              { name: "Z", color: "#8ff0c4", getValues: (s) => s.accelWithG.z },
-            ]}
-          />
-        </div>
-      ),
-    },
-    {
-      key: "quat",
-      label: "四元数",
-      children: (
-        <div className={styles.imuChartPanel}>
-          <ImuChartsCanvas
-            source={imuSource}
-            enabled={showCharts}
-            refreshMs={40}
-            label="Quaternion"
-            series={[
-              { name: "W", color: "#f07167", getValues: (s) => s.quat.w },
-              { name: "X", color: "#00afb9", getValues: (s) => s.quat.x },
-              { name: "Y", color: "#fed9b7", getValues: (s) => s.quat.y },
-              { name: "Z", color: "#fdfcdc", getValues: (s) => s.quat.z },
-            ]}
-          />
-        </div>
-      ),
-    },
+    // {
+    //   key: "accel-with-g",
+    //   label: "加速度（含重力）",
+    //   children: (
+    //     <div className={styles.imuChartPanel}>
+    //       <ImuChartsCanvas
+    //         source={imuSource}
+    //         enabled={showCharts}
+    //         refreshMs={40}
+    //         label="Acceleration (m/s^2)"
+    //         series={[
+    //           { name: "X", color: "#9ad1ff", getValues: (s) => s.accelWithG.x },
+    //           { name: "Y", color: "#ffda7a", getValues: (s) => s.accelWithG.y },
+    //           { name: "Z", color: "#8ff0c4", getValues: (s) => s.accelWithG.z },
+    //         ]}
+    //       />
+    //     </div>
+    //   ),
+    // },
+    // {
+    //   key: "quat",
+    //   label: "四元数",
+    //   children: (
+    //     <div className={styles.imuChartPanel}>
+    //       <ImuChartsCanvas
+    //         source={imuSource}
+    //         enabled={showCharts}
+    //         refreshMs={40}
+    //         label="Quaternion"
+    //         series={[
+    //           { name: "W", color: "#f07167", getValues: (s) => s.quat.w },
+    //           { name: "X", color: "#00afb9", getValues: (s) => s.quat.x },
+    //           { name: "Y", color: "#fed9b7", getValues: (s) => s.quat.y },
+    //           { name: "Z", color: "#fdfcdc", getValues: (s) => s.quat.z },
+    //         ]}
+    //       />
+    //     </div>
+    //   ),
+    // },
     {
       key: "offset",
       label: "偏移",
@@ -224,17 +224,16 @@ export const ImuRealtimePanel: React.FC = () => {
 
         <div className={styles.rightColumn}>
           <Card
-            title="数据图表"
             size="small"
             variant="outlined"
             className={styles.panelCard}
             style={{ background: "#141414", border: "1px solid #303030" }}
-            styles={{ header: { color: "white" } }}
+            styles={{ header: { color: "blue" }, body: { paddingTop: 0 } }}
           >
             <Tabs
               className={styles.chartTabs}
               items={chartItems}
-              destroyInactiveTabPane
+              destroyOnHidden
             />
           </Card>
 

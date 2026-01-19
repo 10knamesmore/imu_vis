@@ -76,6 +76,7 @@ const AppContent: React.FC = () => {
               Devices
             </Button>
           }
+          destroyOnHidden
         />
 
         <Modal
