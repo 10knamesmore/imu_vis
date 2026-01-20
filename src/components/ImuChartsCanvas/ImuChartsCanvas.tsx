@@ -1,49 +1,31 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { ImuSource } from "../../hooks/useImuSource";
-import { ImuDataHistory } from "../../types";
-
 import styles from "./ImuChartsCanvas.module.scss";
 
-type SeriesSpec = {
-  name: string;
-  color: string;
-  getValues: (snapshot: ImuDataHistory) => number[];
+type SnapshotWithTime = {
+  time: number[];
 };
 
-type ImuChartsCanvasProps = {
-  source: ImuSource;
+type SeriesSpec<TSnapshot extends SnapshotWithTime> = {
+  name: string;
+  color: string;
+  getValues: (snapshot: TSnapshot) => number[];
+};
+
+type ImuChartsCanvasProps<TSnapshot extends SnapshotWithTime> = {
+  source: { bufferRef: React.RefObject<{ snapshot: (windowMs?: number) => TSnapshot }> };
   enabled: boolean;
   refreshMs?: number;
   windowMs?: number;
   label: string;
-  series: SeriesSpec[];
+  series: SeriesSpec<TSnapshot>[];
 };
-
-/**
- * 截取 ImuDataHistory 的一部分
- */
-const sliceSnapshot = (snapshot: ImuDataHistory, start: number, end: number): ImuDataHistory => {
-  const s = (arr: number[]) => arr.slice(start, end);
-  return {
-    time: s(snapshot.time),
-    accel: { x: s(snapshot.accel.x), y: s(snapshot.accel.y), z: s(snapshot.accel.z) },
-    accelWithG: { x: s(snapshot.accelWithG.x), y: s(snapshot.accelWithG.y), z: s(snapshot.accelWithG.z) },
-    gyro: { x: s(snapshot.gyro.x), y: s(snapshot.gyro.y), z: s(snapshot.gyro.z) },
-    angle: { x: s(snapshot.angle.x), y: s(snapshot.angle.y), z: s(snapshot.angle.z) },
-    quat: { w: s(snapshot.quat.w), x: s(snapshot.quat.x), y: s(snapshot.quat.y), z: s(snapshot.quat.z) },
-    offset: { x: s(snapshot.offset.x), y: s(snapshot.offset.y), z: s(snapshot.offset.z) },
-    accelNav: { x: s(snapshot.accelNav.x), y: s(snapshot.accelNav.y), z: s(snapshot.accelNav.z) },
-  };
-};
-
-
 
 /**
  * 在 Canvas 上绘制折线图。
  *
  * @param ctx - Canvas 2D 绘图上下文
- * @param snapshot - 当前时间窗口内的 IMU 数据快照
+ * @param time - 当前时间窗口内的时间轴
  * @param yAxisLabel - 纵轴单位/说明
  * @param series - 要绘制的数据系列数组 (包含值、颜色、名称)
  * @param width - 绘图区域宽度
@@ -51,7 +33,7 @@ const sliceSnapshot = (snapshot: ImuDataHistory, start: number, end: number): Im
  */
 const drawChart = (
   ctx: CanvasRenderingContext2D,
-  snapshot: ImuDataHistory,
+  time: number[],
   yAxisLabel: string,
   series: Array<{ values: number[]; color: string; name: string }>,
   width: number,
@@ -65,8 +47,6 @@ const drawChart = (
   };
   const plotHeight = height - padding.top - padding.bottom;
   const plotWidth = width - padding.left - padding.right;
-  const time = snapshot.time;
-
   if (time.length < 2) {
     ctx.fillStyle = "#7b8591";
     ctx.fillText("Waiting for data...", padding.left, 20);
@@ -180,14 +160,14 @@ const drawChart = (
 /**
  * IMU 数据曲线画布组件。
  */
-export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
+export const ImuChartsCanvas = <TSnapshot extends SnapshotWithTime>({
   source,
   enabled,
   refreshMs = 40,
   windowMs,
   label,
   series,
-}) => {
+}: ImuChartsCanvasProps<TSnapshot>) => {
   /** 容器 div 的引用，用于监听尺寸变化 */
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** Canvas 元素的引用，用于获取绘图上下文 */
@@ -375,17 +355,16 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
         if (startIndex > 0) startIndex = Math.max(0, startIndex - 2);
       }
 
-      const viewData = sliceSnapshot(snapshot, startIndex, endIndex);
-
+      const viewTime = snapshot.time.slice(startIndex, endIndex);
       const seriesValues = series.map((entry) => {
-        const values = entry.getValues(viewData);
+        const values = entry.getValues(snapshot).slice(startIndex, endIndex);
         return { name: entry.name, color: entry.color, values };
       });
 
       const yAxisLabel = label.includes("(")
         ? label.slice(label.indexOf("(") + 1, label.lastIndexOf(")"))
         : label;
-      drawChart(ctx, viewData, yAxisLabel, seriesValues, width, height);
+      drawChart(ctx, viewTime, yAxisLabel, seriesValues, width, height);
 
       const now = Date.now();
       if (now - lastStatsUpdateRef.current > 200) {

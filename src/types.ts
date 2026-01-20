@@ -40,10 +40,20 @@ export interface ImuDataHistory {
 
 // 计算后的数据（速度、位置等）
 export interface CalculatedData {
-  attitude: any; // 姿态信息 (可能需要细化类型)
-  velocity: any; // 速度
-  position: any; // 位置
+  attitude: Quaternion; // 姿态四元数
+  velocity: Vector3; // 速度
+  position: Vector3; // 位置
   timestamp_ms: number;
+}
+
+// 用于对比原始姿态与计算姿态的数据历史
+export interface ImuComparisonHistory {
+  time: number[];
+  rawAngle: { x: number[]; y: number[]; z: number[] };
+  calculatedAngle: { x: number[]; y: number[]; z: number[] };
+  deltaAngle: { x: number[]; y: number[]; z: number[] };
+  velocity: { x: number[]; y: number[]; z: number[] };
+  position: { x: number[]; y: number[]; z: number[] };
 }
 
 // 后端返回的完整响应数据

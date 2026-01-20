@@ -50,19 +50,19 @@ impl Processor {
                             );
 
                             if let Err(e) = downstream_tx.send(response_data) {
-                                tracing::error!("Downstream channel send failed: {}", e);
+                                tracing::error!("Downstream channel send failed: {:?}", e);
                             }
                             if let Err(e) = record_tx.send(response_data) {
-                                tracing::error!("Recorder channel send failed: {}", e);
+                                tracing::error!("Recorder channel send failed: {:?}", e);
                             }
                         }
                         Err(e) => {
-                            tracing::error!("Upstream channel receive failed: {}", e);
+                            tracing::error!("Upstream channel receive failed: {:?}", e);
                         }
                     }
                 }
             })
-            .unwrap_or_else(|e| panic!("error while creating data processor thread : {}", e));
+            .unwrap_or_else(|e| panic!("error while creating data processor thread : {:?}", e));
         Processor {}
     }
 }
