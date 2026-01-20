@@ -9,6 +9,25 @@ use crate::{
     recorder::{spawn_recorder, RecorderCommand},
     types::outputs::ResponseData,
 };
+use math_f64::{DQuat, DVec3};
+
+#[derive(Debug, Clone, Copy)]
+/// IMU 姿态矫正数据：记录角度偏移与四元数偏移
+pub struct ImuCalibration {
+    /// 欧拉角偏移（用于直接减去，令当前角度归零）
+    pub angle_offset: DVec3,
+    /// 四元数偏移（用于姿态归零：实际使用其逆来校正）
+    pub quat_offset: DQuat,
+}
+
+impl Default for ImuCalibration {
+    fn default() -> Self {
+        Self {
+            angle_offset: DVec3::ZERO,
+            quat_offset: DQuat::IDENTITY,
+        }
+    }
+}
 
 /// 应用状态
 ///
@@ -25,7 +44,10 @@ pub struct AppState {
 
     pub recorder_tx: flume::Sender<RecorderCommand>,
 
-    pub z_axis_offset: Arc<StdMutex<f64>>,
+    /// 当前生效的姿态矫正值（由前端触发“校准”更新）
+    pub imu_calibration: Arc<StdMutex<ImuCalibration>>,
+    /// 最新原始姿态快照（未矫正），用于后端在校准时取“当前姿态”
+    pub imu_latest_raw: Arc<StdMutex<Option<ImuCalibration>>>,
 }
 
 impl AppState {
@@ -39,13 +61,21 @@ impl AppState {
         let (record_tx, record_rx) = flume::bounded(2048);
         let (recorder_tx, recorder_rx) = flume::unbounded();
         spawn_recorder(record_rx, recorder_rx);
-        let z_axis_offset = Arc::new(StdMutex::new(0.0));
+        let imu_calibration = Arc::new(StdMutex::new(ImuCalibration::default()));
+        let imu_latest_raw = Arc::new(StdMutex::new(None));
         AppState {
             imu_client: Mutex::new(IMUClient::new(upstream_tx)),
-            processor: Processor::new(upstream_rx, downstream_tx, record_tx, z_axis_offset.clone()),
+            processor: Processor::new(
+                upstream_rx,
+                downstream_tx,
+                record_tx,
+                imu_calibration.clone(),
+                imu_latest_raw.clone(),
+            ),
             downstream_rx,
             recorder_tx,
-            z_axis_offset,
+            imu_calibration,
+            imu_latest_raw,
         }
     }
 

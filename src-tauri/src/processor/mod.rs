@@ -24,7 +24,8 @@ impl Processor {
         upstream_rx: flume::Receiver<Vec<u8>>,
         downstream_tx: flume::Sender<ResponseData>,
         record_tx: flume::Sender<ResponseData>,
-        z_axis_offset: Arc<StdMutex<f64>>,
+        imu_calibration: Arc<StdMutex<crate::app_state::ImuCalibration>>,
+        imu_latest_raw: Arc<StdMutex<Option<crate::app_state::ImuCalibration>>>,
     ) -> Self {
         thread::Builder::new()
             .name("DataProcessorThread".into())
@@ -43,11 +44,19 @@ impl Processor {
                                     continue;
                                 }
                             };
-                            if let Ok(z_offset) = z_axis_offset.lock() {
-                                imu_data.angle.z -= *z_offset;
-                                // 同步校正四元数的 Z 轴偏航，使 3D 姿态与角度一致
-                                let correction = DQuat::from_rotation_z(-z_offset.to_radians());
-                                imu_data.quat = correction * imu_data.quat;
+                            // 保存最新原始姿态，供“校准”命令读取
+                            if let Ok(mut latest_raw) = imu_latest_raw.lock() {
+                                *latest_raw = Some(crate::app_state::ImuCalibration {
+                                    angle_offset: imu_data.angle,
+                                    quat_offset: imu_data.quat,
+                                });
+                            }
+                            // 应用校准：角度减去偏移，四元数左乘逆偏移，使当前姿态归零
+                            if let Ok(calibration) = imu_calibration.lock() {
+                                imu_data.angle.x -= calibration.angle_offset.x;
+                                imu_data.angle.y -= calibration.angle_offset.y;
+                                imu_data.angle.z -= calibration.angle_offset.z;
+                                imu_data.quat = calibration.quat_offset * imu_data.quat;
                             }
                             state.update(&imu_data);
 

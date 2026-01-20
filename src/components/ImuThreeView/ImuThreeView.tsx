@@ -25,6 +25,10 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** 3D 物体（方块）的 Mesh 引用 */
   const bodyRef = useRef<THREE.Mesh | null>(null);
+  /** 用于镜像显示坐标系的根分组（X 正方向指向屏幕内部、Y 正方向向右、Z 正方向向上） */
+  const displayGroupRef = useRef<THREE.Group | null>(null);
+  /** 坐标轴与文字标识组合的 Group 引用 */
+  const axisGroupRef = useRef<THREE.Group | null>(null);
   /** 坐标轴辅助对象的引用 */
   const axesRef = useRef<THREE.AxesHelper | null>(null);
   /** 轨迹线的引用 */
@@ -40,7 +44,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
   /** Three.js 透视相机引用 */
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   /** 鼠标/触摸拖拽交互的状态记录（旋转角度、拖拽标记等） */
-  const dragRef = useRef({ dragging: false, lastX: 0, lastY: 0, yaw: Math.PI / 4, pitch: Math.PI / 6 });
+  const dragRef = useRef({ dragging: false, lastX: 0, lastY: 0, yaw: 0, pitch: 0 });
   
   /** 本地状态：轨迹是否可见 */
   const [isTrajectoryVisible, setIsTrajectoryVisible] = useState(showTrajectory);
@@ -96,7 +100,8 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
       axisLabelsRef.current[1].position.set(0, axisLength + labelOffset, 0);
       axisLabelsRef.current[2].position.set(0, 0, axisLength + labelOffset);
       axisLabelsRef.current.forEach((label) => {
-        label.scale.set(labelScale, labelScale, labelScale);
+        // X/Y 镜像显示时，反向拉伸以保证文字不被镜像
+        label.scale.set(-labelScale, -labelScale, labelScale);
       });
     }
   }, [viewScale]);
@@ -115,7 +120,9 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
 
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 100);
     cameraRef.current = camera;
-    camera.position.set(1.6, 1.2, 1.6);
+    // 以 Z 轴为朝上，X 轴指向屏幕外侧
+    camera.up.set(0, 0, 1);
+    camera.position.set(2.4, 0, 0);
     camera.lookAt(0, 0, 0);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -128,11 +135,24 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
     dirLight.position.set(2, 3, 1.5);
     scene.add(ambient, dirLight);
 
-    const bodyGeometry = new THREE.BoxGeometry(0.8, 0.2, 0.5);
-    const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x4f9bff, metalness: 0.1, roughness: 0.5 });
+    const displayGroup = new THREE.Group();
+    // 镜像 X/Y 轴：将 IMU 坐标系映射为屏幕坐标系
+    // 目标：X 正方向指向屏幕内部，Y 正方向向右，Z 正方向向上
+    displayGroup.scale.set(-1, -1, 1);
+    scene.add(displayGroup);
+    displayGroupRef.current = displayGroup;
+
+    // 传感器外形：Y 最长，Z 最短，X 为宽度（仅用于视觉比例）
+    const bodyGeometry = new THREE.BoxGeometry(0.6, 0.9, 0.2);
+    const bodyMaterial = new THREE.MeshStandardMaterial({
+      color: 0x4f9bff,
+      metalness: 0.1,
+      roughness: 0.5,
+      side: THREE.DoubleSide,
+    });
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.scale.setScalar(scale);
-    scene.add(body);
+    displayGroup.add(body);
     bodyRef.current = body;
 
     // 坐标轴长度：用于 AxesHelper 以及文字标识的位置基准
@@ -140,7 +160,10 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
     axisLengthRef.current = axisLength;
     const axes = new THREE.AxesHelper(axisLength);
     axes.scale.setScalar(scale);
-    scene.add(axes);
+    const axisGroup = new THREE.Group();
+    axisGroup.add(axes);
+    displayGroup.add(axisGroup);
+    axisGroupRef.current = axisGroup;
     axesRef.current = axes;
 
     /**
@@ -184,7 +207,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
           return null;
         }
         labelResources.push({ material: label.material, texture: label.texture });
-        scene.add(label.sprite);
+        axisGroup.add(label.sprite);
         return label.sprite;
       })
       .filter((label): label is THREE.Sprite => label !== null);
@@ -197,7 +220,8 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
       axisLabelsRef.current[1].position.set(0, axisLength * scale + labelOffset, 0);
       axisLabelsRef.current[2].position.set(0, 0, axisLength * scale + labelOffset);
       axisLabelsRef.current.forEach((label) => {
-        label.scale.set(labelScale, labelScale, labelScale);
+        // X/Y 镜像显示时，反向拉伸以保证文字不被镜像
+        label.scale.set(-labelScale, -labelScale, labelScale);
       });
     }
 
@@ -210,7 +234,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
     const trailLine = new THREE.Line(trailGeometry, trailMaterial);
     trailLine.visible = showTrajectory;
     trailLine.frustumCulled = false;
-    scene.add(trailLine);
+    displayGroup.add(trailLine);
     trailRef.current = trailLine;
 
     const forward = new THREE.Vector3(0, 0, 1);
@@ -241,9 +265,10 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
      */
     const updateCamera = () => {
       const { yaw, pitch } = dragRef.current;
+      // 使用 Z 轴为竖直方向的球坐标映射
       const x = radius * Math.cos(pitch) * Math.cos(yaw);
-      const y = radius * Math.sin(pitch);
-      const z = radius * Math.cos(pitch) * Math.sin(yaw);
+      const y = radius * Math.cos(pitch) * Math.sin(yaw);
+      const z = radius * Math.sin(pitch);
       camera.position.set(x, y, z);
       camera.lookAt(target);
     };
@@ -319,6 +344,12 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
       if (latest) {
         tmpQuat.set(latest.quat.x, latest.quat.y, latest.quat.z, latest.quat.w);
         body.quaternion.copy(tmpQuat);
+        if (axisGroupRef.current) {
+          axisGroupRef.current.quaternion.copy(tmpQuat);
+        }
+        if (axisGroupRef.current) {
+          axisGroupRef.current.quaternion.copy(tmpQuat);
+        }
 
         if (isTrajectoryVisible) {
           tmpVec.copy(forward).applyQuaternion(tmpQuat).multiplyScalar(0.8 * viewScale);

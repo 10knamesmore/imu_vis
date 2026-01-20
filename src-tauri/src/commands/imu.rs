@@ -1,5 +1,5 @@
 use crate::{
-    app_state::AppState, commands::response::Response as IpcResponse,
+    app_state::{AppState, ImuCalibration}, commands::response::Response as IpcResponse,
     types::bluetooth::PeripheralInfo,
 };
 use tauri::State;
@@ -50,12 +50,20 @@ pub async fn disconnect_peripheral(state: State<'_, AppState>) -> Response<Perip
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip(state))]
-/// 设置 Z 轴矫正偏移量（原始数据会减去该值）
-pub async fn set_z_axis_offset(state: State<'_, AppState>, z_offset: f64) -> Response<f64> {
-    if let Ok(mut offset) = state.z_axis_offset.lock() {
-        *offset = z_offset;
-        Ok(IpcResponse::success(z_offset))
-    } else {
-        Ok(IpcResponse::error("Failed to update z axis offset"))
+/// 设置姿态矫正值（按当前姿态作为零位）
+pub async fn set_axis_calibration(state: State<'_, AppState>) -> Response<()> {
+    // 从处理线程保存的“最新原始姿态”中取当前姿态
+    let latest = state.imu_latest_raw.lock().ok().and_then(|guard| *guard);
+    if let Some(raw) = latest {
+        if let Ok(mut guard) = state.imu_calibration.lock() {
+            // 角度偏移直接使用当前角度；四元数偏移取当前四元数的逆
+            *guard = ImuCalibration {
+                angle_offset: raw.angle_offset,
+                quat_offset: raw.quat_offset.inverse(),
+            };
+            return Ok(IpcResponse::success(()));
+        }
     }
+
+    Ok(IpcResponse::error("Failed to update axis calibration"))
 }

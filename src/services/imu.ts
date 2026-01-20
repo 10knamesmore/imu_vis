@@ -20,8 +20,8 @@ export const imuApi = {
   connect: (targetUuid: string) => invoke<imuApiResponse<PeripheralInfo>>("connect_peripheral", { targetUuid }),
   // 断开当前连接
   disconnect: () => invoke<imuApiResponse<PeripheralInfo>>("disconnect_peripheral"),
-  // 设置 Z 轴矫正偏移量
-  setZAxisOffset: (zOffset: number) => invoke<imuApiResponse<number>>("set_z_axis_offset", { zOffset }),
+  // 设置姿态矫正值（按当前姿态作为零位，由后端读取最新姿态）
+  setAxisCalibration: () => invoke<imuApiResponse<void>>("set_axis_calibration"),
 
   // 订阅数据输出
   // onEvent: Tauri Channel，用于接收实时数据流

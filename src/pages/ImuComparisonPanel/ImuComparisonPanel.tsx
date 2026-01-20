@@ -29,18 +29,15 @@ export const ImuComparisonPanel: React.FC = () => {
   const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
   const comparisonSource = useImuComparisonSource({ enabled: sourceEnabled, capacity: 4096 });
 
+  /**
+   * 触发姿态校准：由后端读取“当前姿态”并归零。
+   */
   const handleCalibrateZ = async () => {
-    const latest = imuSource.latestRef.current;
-    if (!latest) {
-      message.warning("No IMU data available");
-      return;
-    }
-    const zOffset = latest.angle.z;
-    const res = await imuApi.setZAxisOffset(zOffset);
+    const res = await imuApi.setAxisCalibration();
     if (res.success) {
-      message.success(`Z axis calibrated (${zOffset.toFixed(3)})`);
+      message.success("Axis calibrated");
     } else {
-      message.error(res.message || "Failed to calibrate Z axis");
+      message.error(res.message || "Failed to calibrate axes");
     }
   };
 
@@ -143,7 +140,7 @@ export const ImuComparisonPanel: React.FC = () => {
             </div>
             <div className={styles.imuControl}>
               <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
-                Z Axis Calibrate
+                Axis Calibrate
               </Button>
             </div>
           </div>
