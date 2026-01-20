@@ -1,4 +1,4 @@
-use std::thread;
+use std::{sync::{Arc, Mutex as StdMutex}, thread};
 
 use math_f64::DQuat;
 use serde::Serialize;
@@ -24,6 +24,7 @@ impl Processor {
         upstream_rx: flume::Receiver<Vec<u8>>,
         downstream_tx: flume::Sender<ResponseData>,
         record_tx: flume::Sender<ResponseData>,
+        z_axis_offset: Arc<StdMutex<f64>>,
     ) -> Self {
         thread::Builder::new()
             .name("DataProcessorThread".into())
@@ -35,13 +36,19 @@ impl Processor {
                     match upstream_rx.recv() {
                         Ok(data) => {
                             // TODO: 数据包第一字节 0x02 - 0x51结果可能都不同, 需要dispatch
-                            let imu_data = match IMUParser::parse(&data) {
+                            let mut imu_data = match IMUParser::parse(&data) {
                                 Ok(data) => data,
                                 Err(e) => {
                                     tracing::error!("IMU 数据解析失败: {}", e);
                                     continue;
                                 }
                             };
+                            if let Ok(z_offset) = z_axis_offset.lock() {
+                                imu_data.angle.z -= *z_offset;
+                                // 同步校正四元数的 Z 轴偏航，使 3D 姿态与角度一致
+                                let correction = DQuat::from_rotation_z(-z_offset.to_radians());
+                                imu_data.quat = correction * imu_data.quat;
+                            }
                             state.update(&imu_data);
 
                             let response_data = ResponseData::from_parts(

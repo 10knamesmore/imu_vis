@@ -29,6 +29,10 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
   const axesRef = useRef<THREE.AxesHelper | null>(null);
   /** 轨迹线的引用 */
   const trailRef = useRef<THREE.Line | null>(null);
+  /** 坐标轴文字标识的引用（用 Sprite 贴图方式实现 3D 文字） */
+  const axisLabelsRef = useRef<THREE.Sprite[]>([]);
+  /** 坐标轴长度基准（用于计算文字标识的放置位置） */
+  const axisLengthRef = useRef(0.8);
   /** 数据源的 Ref，确保在闭包（如 renderLoop）中能访问最新 source 对象 */
   const sourceRef = useRef(source);
   /** 轨迹数据的状态记录：当前写入索引与总点数 */
@@ -83,6 +87,18 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
     if (axesRef.current) {
       axesRef.current.scale.setScalar(viewScale);
     }
+    if (axisLabelsRef.current.length) {
+      // 缩放时同步调整文字标识：让文字始终贴近轴末端，且大小与坐标轴比例一致
+      const axisLength = axisLengthRef.current * viewScale;
+      const labelOffset = 0.12 * viewScale;
+      const labelScale = 0.18 * viewScale;
+      axisLabelsRef.current[0].position.set(axisLength + labelOffset, 0, 0);
+      axisLabelsRef.current[1].position.set(0, axisLength + labelOffset, 0);
+      axisLabelsRef.current[2].position.set(0, 0, axisLength + labelOffset);
+      axisLabelsRef.current.forEach((label) => {
+        label.scale.set(labelScale, labelScale, labelScale);
+      });
+    }
   }, [viewScale]);
 
   /**
@@ -119,10 +135,71 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
     scene.add(body);
     bodyRef.current = body;
 
-    const axes = new THREE.AxesHelper(0.8);
+    // 坐标轴长度：用于 AxesHelper 以及文字标识的位置基准
+    const axisLength = 0.8;
+    axisLengthRef.current = axisLength;
+    const axes = new THREE.AxesHelper(axisLength);
     axes.scale.setScalar(scale);
     scene.add(axes);
     axesRef.current = axes;
+
+    /**
+     * 创建坐标轴文字标识：
+     * 1) 用 Canvas 绘制大号字母
+     * 2) 转成纹理贴到 Sprite 上
+     * 3) Sprite 在 3D 场景里始终朝向相机，便于阅读
+     */
+    const createAxisLabel = (text: string, color: string) => {
+      const canvas = document.createElement("canvas");
+      const size = 128;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        return undefined;
+      }
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = color;
+      ctx.font = "bold 72px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, size / 2, size / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      return { sprite, material, texture };
+    };
+
+    // 采用接近 Three.js 传统配色：X 红、Y 绿、Z 蓝
+    const labelDefs = [
+      { text: "X", color: "#ff6b6b" },
+      { text: "Y", color: "#6bffb8" },
+      { text: "Z", color: "#57b2ff" },
+    ];
+    const labelResources: Array<{ material: THREE.SpriteMaterial; texture: THREE.Texture }> = [];
+    axisLabelsRef.current = labelDefs
+      .map((def) => {
+        const label = createAxisLabel(def.text, def.color);
+        if (!label) {
+          return null;
+        }
+        labelResources.push({ material: label.material, texture: label.texture });
+        scene.add(label.sprite);
+        return label.sprite;
+      })
+      .filter((label): label is THREE.Sprite => label !== null);
+
+    if (axisLabelsRef.current.length) {
+      // 将文字标识放在各轴正方向末端，并做轻微外移避免与轴线重叠
+      const labelScale = 0.18 * scale;
+      const labelOffset = 0.12 * scale;
+      axisLabelsRef.current[0].position.set(axisLength * scale + labelOffset, 0, 0);
+      axisLabelsRef.current[1].position.set(0, axisLength * scale + labelOffset, 0);
+      axisLabelsRef.current[2].position.set(0, 0, axisLength * scale + labelOffset);
+      axisLabelsRef.current.forEach((label) => {
+        label.scale.set(labelScale, labelScale, labelScale);
+      });
+    }
 
     const maxTrailPoints = 300;
     const trailPositions = new Float32Array(maxTrailPoints * 3);
@@ -275,6 +352,11 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
       trailMaterial.dispose();
       bodyGeometry.dispose();
       bodyMaterial.dispose();
+      axisLabelsRef.current = [];
+      labelResources.forEach((resource) => {
+        resource.material.dispose();
+        resource.texture.dispose();
+      });
       renderer.dispose();
       if (renderer.domElement.parentElement) {
         renderer.domElement.parentElement.removeChild(renderer.domElement);

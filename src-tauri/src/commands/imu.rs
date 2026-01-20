@@ -47,3 +47,15 @@ pub async fn connect_peripheral(
 pub async fn disconnect_peripheral(state: State<'_, AppState>) -> Response<PeripheralInfo> {
     Ok(state.client().await.disconnect().await.into())
 }
+
+#[tauri::command]
+#[tracing::instrument(level = "debug", skip(state))]
+/// 设置 Z 轴矫正偏移量（原始数据会减去该值）
+pub async fn set_z_axis_offset(state: State<'_, AppState>, z_offset: f64) -> Response<f64> {
+    if let Ok(mut offset) = state.z_axis_offset.lock() {
+        *offset = z_offset;
+        Ok(IpcResponse::success(z_offset))
+    } else {
+        Ok(IpcResponse::error("Failed to update z axis offset"))
+    }
+}

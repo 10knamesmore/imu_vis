@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Button, Card, Switch, Tabs, Tag } from "antd";
+import { Button, Card, Switch, Tabs, Tag, message } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
@@ -7,6 +7,7 @@ import { useImuComparisonSource } from "../../hooks/useImuComparisonSource";
 import { ImuThreeView } from "../../components/ImuThreeView";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
 import { RecordingsPanel } from "../../components/RecordingsPanel";
+import { imuApi } from "../../services/imu";
 
 import styles from "./ImuComparisonPanel.module.scss";
 
@@ -27,6 +28,21 @@ export const ImuComparisonPanel: React.FC = () => {
 
   const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
   const comparisonSource = useImuComparisonSource({ enabled: sourceEnabled, capacity: 4096 });
+
+  const handleCalibrateZ = async () => {
+    const latest = imuSource.latestRef.current;
+    if (!latest) {
+      message.warning("No IMU data available");
+      return;
+    }
+    const zOffset = latest.angle.z;
+    const res = await imuApi.setZAxisOffset(zOffset);
+    if (res.success) {
+      message.success(`Z axis calibrated (${zOffset.toFixed(3)})`);
+    } else {
+      message.error(res.message || "Failed to calibrate Z axis");
+    }
+  };
 
   const chartItems = [
     {
@@ -124,6 +140,11 @@ export const ImuComparisonPanel: React.FC = () => {
               <Tag color={recording ? "red" : "default"}>
                 {recording ? `Recording: ${recordingStatus?.session_id ?? "-"}` : "Recording: Off"}
               </Tag>
+            </div>
+            <div className={styles.imuControl}>
+              <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
+                Z Axis Calibrate
+              </Button>
             </div>
           </div>
         </div>

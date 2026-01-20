@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex as StdMutex};
+
 use flume::Receiver;
 use tokio::sync::{Mutex, MutexGuard};
 
@@ -22,6 +24,8 @@ pub struct AppState {
     pub downstream_rx: Receiver<ResponseData>,
 
     pub recorder_tx: flume::Sender<RecorderCommand>,
+
+    pub z_axis_offset: Arc<StdMutex<f64>>,
 }
 
 impl AppState {
@@ -35,11 +39,13 @@ impl AppState {
         let (record_tx, record_rx) = flume::bounded(2048);
         let (recorder_tx, recorder_rx) = flume::unbounded();
         spawn_recorder(record_rx, recorder_rx);
+        let z_axis_offset = Arc::new(StdMutex::new(0.0));
         AppState {
             imu_client: Mutex::new(IMUClient::new(upstream_tx)),
-            processor: Processor::new(upstream_rx, downstream_tx, record_tx),
+            processor: Processor::new(upstream_rx, downstream_tx, record_tx, z_axis_offset.clone()),
             downstream_rx,
             recorder_tx,
+            z_axis_offset,
         }
     }
 

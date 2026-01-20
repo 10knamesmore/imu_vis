@@ -1,8 +1,9 @@
 import React, { useMemo, useState } from "react";
-import { Button, Card, Switch, Tabs, Tag } from "antd";
+import { Button, Card, Switch, Tabs, Tag, message } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
+import { imuApi } from "../../services/imu";
 
 import { RecordingsPanel } from "../../components/RecordingsPanel";
 import { ImuThreeView } from "../../components/ImuThreeView";
@@ -27,6 +28,21 @@ export const ImuRealtimePanel: React.FC = () => {
   const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
   // 获取 IMU 数据源，缓冲区容量 4096
   const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
+
+  const handleCalibrateZ = async () => {
+    const latest = imuSource.latestRef.current;
+    if (!latest) {
+      message.warning("No IMU data available");
+      return;
+    }
+    const zOffset = latest.angle.z;
+    const res = await imuApi.setZAxisOffset(zOffset);
+    if (res.success) {
+      message.success(`Z axis calibrated (${zOffset.toFixed(3)})`);
+    } else {
+      message.error(res.message || "Failed to calibrate Z axis");
+    }
+  };
 
   const chartItems = [
     {
@@ -201,6 +217,11 @@ export const ImuRealtimePanel: React.FC = () => {
               <Tag color={recording ? "red" : "default"}>
                 {recording ? `Recording: ${recordingStatus?.session_id ?? "-"}` : "Recording: Off"}
               </Tag>
+            </div>
+            <div className={styles.imuControl}>
+              <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
+                Z Axis Calibrate
+              </Button>
             </div>
           </div>
         </div>
