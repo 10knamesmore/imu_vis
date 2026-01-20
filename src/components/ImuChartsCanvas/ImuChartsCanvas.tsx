@@ -49,7 +49,7 @@ const drawChart = (
   const plotWidth = width - padding.left - padding.right;
   if (time.length < 2) {
     ctx.fillStyle = "#7b8591";
-    ctx.fillText("Waiting for data...", padding.left, 20);
+    ctx.fillText("等待数据...", padding.left, 20);
     return;
   }
 
@@ -125,7 +125,7 @@ const drawChart = (
   ctx.fillText(yAxisLabel, padding.left, 2);
 
   ctx.textAlign = "center";
-  ctx.fillText("Time (s)", padding.left + plotWidth / 2, height - 16);
+  ctx.fillText("时间 (s)", padding.left + plotWidth / 2, height - 16);
 
   for (const s of series) {
     ctx.strokeStyle = s.color;
@@ -311,7 +311,7 @@ export const ImuChartsCanvas = <TSnapshot extends SnapshotWithTime>({
 
       if (!enabled) {
         ctx.fillStyle = "#6b7280";
-        ctx.fillText("Charts paused", 16, 20);
+        ctx.fillText("图表已暂停", 16, 20);
         return;
       }
 
@@ -319,7 +319,7 @@ export const ImuChartsCanvas = <TSnapshot extends SnapshotWithTime>({
       const snapshot = source.bufferRef.current.snapshot();
       if (snapshot.time.length < 2) {
         ctx.fillStyle = "#6b7280";
-        ctx.fillText("Waiting for IMU stream...", 16, 20);
+        ctx.fillText("等待 IMU 数据流...", 16, 20);
         return;
       }
 

@@ -102,7 +102,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       await imuApi.startScan();
       setScanning(true);
     } catch (e) {
-      message.error('Failed to start scan');
+      message.error('开始扫描失败');
       console.error(e);
     }
   }, []);
@@ -113,7 +113,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       await imuApi.stopScan();
       setScanning(false);
     } catch (e) {
-      message.error('Failed to stop scan');
+      message.error('停止扫描失败');
       console.error(e);
     }
   }, []);
@@ -138,7 +138,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
 
       if (res.success && res.data) {
         setConnectedDevice(res.data);
-        message.success(`Connected to ${res.data.local_name || res.data.id}`);
+        message.success(`已连接 ${res.data.local_name || res.data.id}`);
         return true;
       } else {
         // 如果API没有返回完整数据，尝试从已扫描列表中查找
@@ -147,14 +147,14 @@ const useBluetoothInternal = (): BluetoothContextValue => {
           // 优先使用列表中的信息，否则仅使用 ID
           const deviceData = deviceInList || { id: deviceId, address: deviceId };
           setConnectedDevice(deviceData);
-          message.success(`Connected to ${deviceData.local_name || deviceData.id}`);
+          message.success(`已连接 ${deviceData.local_name || deviceData.id}`);
           return true;
         }
 
-        throw new Error(res.message || "Unknown error");
+        throw new Error(res.message || "未知错误");
       }
     } catch (e) {
-      message.error('Connection failed');
+      message.error('连接失败');
       console.error(e);
       return false;
     }
@@ -252,10 +252,10 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       streamStartMsRef.current = null;
       // 断开时清空上一秒计数显示
       setLastSecondMessageCount(0);
-      message.info("Disconnected");
+      message.info("已断开连接");
     } catch (e) {
       console.error(e);
-      message.error('Disconnect failed');
+      message.error('断开连接失败');
     }
   }, [recording]);
 
@@ -266,13 +266,13 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       if (res.success && res.data) {
         setRecording(true);
         setRecordingStatus(res.data);
-        message.success(`Recording started: ${res.data.db_path ?? 'sqlite'}`);
+        message.success(`开始录制：${res.data.db_path ?? 'sqlite'}`);
       } else {
-        throw new Error(res.message || 'Unknown error');
+        throw new Error(res.message || '未知错误');
       }
     } catch (e) {
       console.error(e);
-      message.error('Failed to start recording');
+      message.error('开始录制失败');
     }
   }, []);
 
@@ -284,13 +284,13 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         setRecording(false);
         setRecordingStatus(res.data);
         const count = res.data.sample_count ?? 0;
-        message.info(`Recording stopped (${count} samples)`);
+        message.info(`录制已停止（${count} 条数据）`);
       } else {
-        throw new Error(res.message || 'Unknown error');
+        throw new Error(res.message || '未知错误');
       }
     } catch (e) {
       console.error(e);
-      message.error('Failed to stop recording');
+      message.error('停止录制失败');
     }
   }, []);
 
@@ -310,11 +310,11 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       if (res.success && res.data) {
         setRecordings(res.data);
       } else {
-        throw new Error(res.message || 'Unknown error');
+        throw new Error(res.message || '未知错误');
       }
     } catch (e) {
       console.error(e);
-      message.error('Failed to load recordings');
+      message.error('加载录制列表失败');
     }
   }, []);
 
@@ -325,13 +325,13 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       if (res.success && res.data) {
         const updatedRecording = res.data;
         setRecordings((prev) => prev.map((item) => (item.id === sessionId ? updatedRecording : item)));
-        message.success('Recording updated');
+        message.success('录制信息已更新');
       } else {
-        throw new Error(res.message || 'Unknown error');
+        throw new Error(res.message || '未知错误');
       }
     } catch (e) {
       console.error(e);
-      message.error('Failed to update recording');
+      message.error('更新录制信息失败');
     }
   }, []);
 
@@ -340,11 +340,11 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     try {
       const res = await imuApi.getRecordingSamples(sessionId);
       if (!res.success || !res.data) {
-        throw new Error(res.message || 'Unknown error');
+        throw new Error(res.message || '未知错误');
       }
       const samples = res.data;
       if (!samples.length) {
-        message.warning('No samples in this recording');
+        message.warning('该录制没有数据');
         return;
       }
       const startMs = samples[0].raw_data.timestamp_ms;
@@ -381,17 +381,17 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       setLastSecondMessageCount(0);
       streamStartMsRef.current = startMs;
       setReplaying(true);
-      message.success('Recording loaded');
+      message.success('录制数据已加载');
     } catch (e) {
       console.error(e);
-      message.error('Failed to load recording');
+      message.error('加载录制数据失败');
     }
   }, []);
 
   // 退出回放模式
   const exitReplay = useCallback(() => {
     setReplaying(false);
-    message.info('Replay cleared');
+    message.info('已退出回放');
   }, []);
 
   return {

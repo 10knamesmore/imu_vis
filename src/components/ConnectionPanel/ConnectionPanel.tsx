@@ -39,12 +39,12 @@ export const ConnectionPanel: React.FC = () => {
 
   const handleConnectClick = async () => {
     if (!selectedDeviceId) {
-      message.warning('Please select a device to connect');
+      message.warning('请选择要连接的设备');
       return;
     }
     const device = devices.find(d => d.id === selectedDeviceId);
     if (!device) {
-      message.warning('Device not found in scan results');
+      message.warning('扫描结果中未找到该设备');
       return;
     }
     await connect(selectedDeviceId);
@@ -62,7 +62,7 @@ export const ConnectionPanel: React.FC = () => {
       <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
         <Col>
           <Tag color="blue" style={{ fontSize: '14px', padding: '5px 10px' }}>
-            Found: <strong>{devices.length}</strong> Devices
+            已发现 <strong>{devices.length}</strong> 台设备
           </Tag>
         </Col>
         <Col>
@@ -73,7 +73,7 @@ export const ConnectionPanel: React.FC = () => {
             }}
             type={scanning ? "default" : "primary"}
           >
-            {scanning ? "Scanning..." : "Start Scan"}
+            {scanning ? "扫描中..." : "开始扫描"}
           </Button>
         </Col>
       </Row>
@@ -82,7 +82,7 @@ export const ConnectionPanel: React.FC = () => {
         <Col flex="auto">
           <Select
             style={{ width: '100%' }}
-            placeholder="Select a device to connect"
+            placeholder="请选择要连接的设备"
             labelRender={(props) => {
               return (
                 <Space>
@@ -137,7 +137,7 @@ export const ConnectionPanel: React.FC = () => {
               onClick={handleDisconnect}
               size="large"
             >
-              Disconnect
+              断开连接
             </Button>
           ) : (
             <Button
@@ -146,7 +146,7 @@ export const ConnectionPanel: React.FC = () => {
               disabled={!selectedDeviceId}
               size="large"
             >
-              Connect
+              连接
             </Button>
           )}
         </Col>
@@ -155,7 +155,7 @@ export const ConnectionPanel: React.FC = () => {
       {isConnected && (
         <div style={{ marginTop: 12, textAlign: 'right' }}>
           <Tag color="success" icon={<CheckCircleOutlined />}>
-            Connected to {connectedDevice?.local_name || 'Device'}
+            已连接到 {connectedDevice?.local_name || '设备'}
           </Tag>
         </div>
       )}

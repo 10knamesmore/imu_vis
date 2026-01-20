@@ -35,9 +35,9 @@ export const ImuComparisonPanel: React.FC = () => {
   const handleCalibrateZ = async () => {
     const res = await imuApi.setAxisCalibration();
     if (res.success) {
-      message.success("Axis calibrated");
+      message.success("姿态已校准");
     } else {
-      message.error(res.message || "Failed to calibrate axes");
+      message.error(res.message || "姿态校准失败");
     }
   };
 
@@ -51,11 +51,11 @@ export const ImuComparisonPanel: React.FC = () => {
             source={comparisonSource}
             enabled={showCharts}
             refreshMs={40}
-            label="Angle Delta (deg)"
+            label="角度差值 (deg)"
             series={[
-              { name: "Yaw Δ", color: "#57b2ff", getValues: (s) => s.deltaAngle.x },
-              { name: "Pitch Δ", color: "#ffb74d", getValues: (s) => s.deltaAngle.y },
-              { name: "Roll Δ", color: "#88e0a5", getValues: (s) => s.deltaAngle.z },
+              { name: "偏航 Δ", color: "#57b2ff", getValues: (s) => s.deltaAngle.x },
+              { name: "俯仰 Δ", color: "#ffb74d", getValues: (s) => s.deltaAngle.y },
+              { name: "横滚 Δ", color: "#88e0a5", getValues: (s) => s.deltaAngle.z },
             ]}
           />
         </div>
@@ -70,7 +70,7 @@ export const ImuComparisonPanel: React.FC = () => {
             source={comparisonSource}
             enabled={showCharts}
             refreshMs={40}
-            label="Velocity (m/s)"
+            label="速度 (m/s)"
             series={[
               { name: "X", color: "#4cc9f0", getValues: (s) => s.velocity.x },
               { name: "Y", color: "#f8961e", getValues: (s) => s.velocity.y },
@@ -89,7 +89,7 @@ export const ImuComparisonPanel: React.FC = () => {
             source={comparisonSource}
             enabled={showCharts}
             refreshMs={40}
-            label="Position (m)"
+            label="位置 (m)"
             series={[
               { name: "X", color: "#b8c0ff", getValues: (s) => s.position.x },
               { name: "Y", color: "#ffd6a5", getValues: (s) => s.position.y },
@@ -111,18 +111,18 @@ export const ImuComparisonPanel: React.FC = () => {
       >
         <div className={styles.imuToolbar}>
           <div className={styles.imuStatus}>
-            <span className={styles.imuStatusLabel}>IMU Stream</span>
+            <span className={styles.imuStatusLabel}>IMU 数据流</span>
             <Tag color={sourceEnabled ? "green" : "default"}>
-              {sourceEnabled ? "Connected" : "Idle"}
+              {sourceEnabled ? "已连接" : "未连接"}
             </Tag>
           </div>
           <div className={styles.imuControls}>
             <div className={styles.imuControl}>
-              <span>Trajectory</span>
+              <span>轨迹</span>
               <Switch checked={showTrajectory} onChange={setShowTrajectory} />
             </div>
             <div className={styles.imuControl}>
-              <span>Charts</span>
+              <span>图表</span>
               <Switch checked={showCharts} onChange={setShowCharts} />
             </div>
             <div className={styles.imuControl}>
@@ -132,15 +132,15 @@ export const ImuComparisonPanel: React.FC = () => {
                 onClick={toggleRecording}
                 disabled={!connectedDevice}
               >
-                {recording ? "Stop Recording" : "Start Recording"}
+                {recording ? "停止录制" : "开始录制"}
               </Button>
               <Tag color={recording ? "red" : "default"}>
-                {recording ? `Recording: ${recordingStatus?.session_id ?? "-"}` : "Recording: Off"}
+                {recording ? `录制中: ${recordingStatus?.session_id ?? "-"}` : "录制: 关闭"}
               </Tag>
             </div>
             <div className={styles.imuControl}>
               <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
-                Axis Calibrate
+                姿态校准
               </Button>
             </div>
           </div>

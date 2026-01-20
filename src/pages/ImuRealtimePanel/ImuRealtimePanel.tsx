@@ -35,9 +35,9 @@ export const ImuRealtimePanel: React.FC = () => {
   const handleCalibrateZ = async () => {
     const res = await imuApi.setAxisCalibration();
     if (res.success) {
-      message.success("Axis calibrated");
+      message.success("姿态已校准");
     } else {
-      message.error(res.message || "Failed to calibrate axes");
+      message.error(res.message || "姿态校准失败");
     }
   };
 
@@ -51,7 +51,7 @@ export const ImuRealtimePanel: React.FC = () => {
             source={imuSource}
             enabled={showCharts}
             refreshMs={40}
-            label="Acceleration (m/s^2)"
+            label="加速度 (m/s^2)"
             series={[
               { name: "X", color: "#57b2ff", getValues: (s) => s.accel.x },
               { name: "Y", color: "#ffb74d", getValues: (s) => s.accel.y },
@@ -89,7 +89,7 @@ export const ImuRealtimePanel: React.FC = () => {
             source={imuSource}
             enabled={showCharts}
             refreshMs={40}
-            label="Yaw / Pitch / Roll (deg)"
+            label="偏航 / 俯仰 / 横滚 (deg)"
             series={[
               { name: "X", color: "#4cc9f0", getValues: (s) => s.angle.x },
               { name: "Y", color: "#f8961e", getValues: (s) => s.angle.y },
@@ -147,7 +147,7 @@ export const ImuRealtimePanel: React.FC = () => {
             source={imuSource}
             enabled={showCharts}
             refreshMs={40}
-            label="Offset"
+            label="偏移"
             series={[
               { name: "X", color: "#4d96ff", getValues: (s) => s.offset.x },
               { name: "Y", color: "#6bffb8", getValues: (s) => s.offset.y },
@@ -166,7 +166,7 @@ export const ImuRealtimePanel: React.FC = () => {
             source={imuSource}
             enabled={showCharts}
             refreshMs={40}
-            label="Acceleration (Nav)"
+            label="导航加速度 (m/s^2)"
             series={[
               { name: "X", color: "#b8c0ff", getValues: (s) => s.accelNav.x },
               { name: "Y", color: "#ffd6a5", getValues: (s) => s.accelNav.y },
@@ -188,18 +188,18 @@ export const ImuRealtimePanel: React.FC = () => {
       >
         <div className={styles.imuToolbar}>
           <div className={styles.imuStatus}>
-            <span className={styles.imuStatusLabel}>IMU Stream</span>
+            <span className={styles.imuStatusLabel}>IMU 数据流</span>
             <Tag color={sourceEnabled ? "green" : "default"}>
-              {sourceEnabled ? "Connected" : "Idle"}
+              {sourceEnabled ? "已连接" : "未连接"}
             </Tag>
           </div>
           <div className={styles.imuControls}>
             <div className={styles.imuControl}>
-              <span>Trajectory</span>
+              <span>轨迹</span>
               <Switch checked={showTrajectory} onChange={setShowTrajectory} />
             </div>
             <div className={styles.imuControl}>
-              <span>Charts</span>
+              <span>图表</span>
               <Switch checked={showCharts} onChange={setShowCharts} />
             </div>
             <div className={styles.imuControl}>
@@ -209,15 +209,15 @@ export const ImuRealtimePanel: React.FC = () => {
                 onClick={toggleRecording}
                 disabled={!connectedDevice}
               >
-                {recording ? "Stop Recording" : "Start Recording"}
+                {recording ? "停止录制" : "开始录制"}
               </Button>
               <Tag color={recording ? "red" : "default"}>
-                {recording ? `Recording: ${recordingStatus?.session_id ?? "-"}` : "Recording: Off"}
+                {recording ? `录制中: ${recordingStatus?.session_id ?? "-"}` : "录制: 关闭"}
               </Tag>
             </div>
             <div className={styles.imuControl}>
               <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
-                Axis Calibrate
+                姿态校准
               </Button>
             </div>
           </div>

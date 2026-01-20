@@ -55,7 +55,7 @@ const LinePlotCard: React.FC<{
             layout={{
               ...layoutBase,
               title: { text: yTitle },
-              xaxis: { ...(layoutBase as { xaxis?: object }).xaxis, title: { text: 'Time (s)' } },
+              xaxis: { ...(layoutBase as { xaxis?: object }).xaxis, title: { text: '时间 (s)' } },
             }}
             revision={revision}
             useResizeHandler
@@ -170,12 +170,12 @@ export const Statistics: React.FC = () => {
                   onClick={toggleRecording}
                   disabled={!connectedDevice}
                 >
-                  {recording ? 'Stop Recording' : 'Start Recording'}
+                  {recording ? '停止录制' : '开始录制'}
                 </Button>
               </Col>
               <Col flex="none">
                 <Tag color={recording ? 'red' : 'default'}>
-                  {recording ? `Recording: ${recordingStatus?.session_id ?? '-'}` : 'Recording: Off'}
+                  {recording ? `录制中: ${recordingStatus?.session_id ?? '-'}` : '录制: 关闭'}
                 </Tag>
               </Col>
             </Row>
@@ -186,8 +186,8 @@ export const Statistics: React.FC = () => {
         </Col>
         <Col span={24}>
           <LinePlotCard
-            title="Acceleration (No Gravity)"
-            yTitle="Acceleration (m/s²)"
+            title="加速度（无重力）"
+            yTitle="加速度 (m/s²)"
             time={dataHistory.time}
             series={[
               { name: 'X', values: dataHistory.accel.x },
@@ -200,8 +200,8 @@ export const Statistics: React.FC = () => {
         </Col>
         <Col span={24}>
           <LinePlotCard
-            title="Gyroscope"
-            yTitle="Gyroscope (deg/s)"
+            title="陀螺仪"
+            yTitle="角速度 (deg/s)"
             time={dataHistory.time}
             series={[
               { name: 'X', values: dataHistory.gyro.x },
@@ -214,8 +214,8 @@ export const Statistics: React.FC = () => {
         </Col>
         <Col span={24}>
           <LinePlotCard
-            title="Angle"
-            yTitle="Angle (deg)"
+            title="姿态角"
+            yTitle="角度 (deg)"
             time={dataHistory.time}
             series={[
               { name: 'X', values: dataHistory.angle.x },
@@ -228,8 +228,8 @@ export const Statistics: React.FC = () => {
         </Col>
         <Col span={24}>
           <LinePlotCard
-            title="Acceleration (With Gravity)"
-            yTitle="Acceleration (m/s²)"
+            title="加速度（含重力）"
+            yTitle="加速度 (m/s²)"
             time={dataHistory.time}
             series={[
               { name: 'X', values: dataHistory.accelWithG.x },
@@ -242,8 +242,8 @@ export const Statistics: React.FC = () => {
         </Col>
         <Col span={24}>
           <LinePlotCard
-            title="Quaternion"
-            yTitle="Quaternion"
+            title="四元数"
+            yTitle="四元数"
             time={dataHistory.time}
             series={[
               { name: 'W', values: dataHistory.quat.w },
@@ -257,8 +257,8 @@ export const Statistics: React.FC = () => {
         </Col>
         <Col span={24}>
           <LinePlotCard
-            title="Offset"
-            yTitle="Offset"
+            title="偏移"
+            yTitle="偏移"
             time={dataHistory.time}
             series={[
               { name: 'X', values: dataHistory.offset.x },
@@ -271,8 +271,8 @@ export const Statistics: React.FC = () => {
         </Col>
         <Col span={24}>
           <LinePlotCard
-            title="Acceleration (Nav)"
-            yTitle="Acceleration (Nav)"
+            title="导航加速度"
+            yTitle="导航加速度"
             time={dataHistory.time}
             series={[
               { name: 'X', values: dataHistory.accelNav.x },
