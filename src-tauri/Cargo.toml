@@ -35,3 +35,7 @@ tracing-subscriber  = { version = "0.3", features = ["env-filter", "fmt", "json"
 rusqlite            = { version = "0.32", features = ["bundled"] }
 
 math_f64            = { path = "crates/math_f64" }
+
+[profile.dev]
+opt-level = 3
+debug = true
