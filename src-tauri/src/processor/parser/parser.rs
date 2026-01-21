@@ -1,3 +1,5 @@
+//! 原始蓝牙数据包解析逻辑。
+
 use anyhow::bail;
 use math_f64::{DQuat, DVec3};
 
@@ -7,6 +9,7 @@ use crate::processor::parser::types::ImuSampleRaw;
 // IMU解析器
 // https://www.yuque.com/cxqwork/lkw3sg/yqa3e0?#Phg5V
 // ===============================
+/// IMU 数据包解析器。
 pub struct ImuParser;
 
 impl ImuParser {
@@ -83,6 +86,7 @@ impl ImuParser {
     /// 解析订阅的功能数据 (数据体第一个字节为0x11)
     ///
     /// * `buf`: 蓝牙数据包
+    /// * 返回: 解析后的原始样本
     pub fn parse(buf: &[u8]) -> anyhow::Result<ImuSampleRaw> {
         // 头部检查
         if buf.is_empty() || buf[0] != 0x11 {

@@ -1,4 +1,6 @@
-use std::{ops::Deref, path::PathBuf, thread, time::Duration};
+//! 录制线程与 SQLite 写入逻辑。
+
+use std::{path::PathBuf, thread, time::Duration};
 
 use anyhow::{Context, Result};
 use flume::{Receiver, Sender};
@@ -6,15 +8,24 @@ use rusqlite::{params, Connection};
 
 use crate::types::{outputs::ResponseData, recording::RecordingStatus};
 
+/// 录制控制命令。
 pub enum RecorderCommand {
+    /// 开始录制。
     Start {
+        /// 数据库路径。
         db_path: PathBuf,
+        /// 设备 ID。
         device_id: Option<String>,
+        /// 录制名称。
         name: Option<String>,
+        /// 标签列表。
         tags: Option<Vec<String>>,
+        /// 返回通道。
         reply: Sender<anyhow::Result<RecordingStatus>>,
     },
+    /// 停止录制。
     Stop {
+        /// 返回通道。
         reply: Sender<anyhow::Result<RecordingStatus>>,
     },
 }
@@ -26,6 +37,7 @@ struct ActiveSession {
     sample_count: u64,
 }
 
+/// 启动录制线程。
 pub fn spawn_recorder(data_rx: Receiver<ResponseData>, control_rx: Receiver<RecorderCommand>) {
     thread::Builder::new()
         .name("IMUSqliteRecorderThread".into())
@@ -252,6 +264,7 @@ fn insert_sample(session: &mut ActiveSession, data: &ResponseData) -> Result<()>
     Ok(())
 }
 
+/// 确保数据库表结构存在。
 pub fn ensure_schema(conn: &Connection) -> Result<()> {
     conn.execute_batch(
         "PRAGMA journal_mode=WAL;

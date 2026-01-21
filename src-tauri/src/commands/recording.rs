@@ -1,3 +1,5 @@
+//! 录制相关命令。
+
 use crate::{
     app_state::AppState,
     commands::response::Response as IpcResponse,
@@ -16,13 +18,17 @@ use tauri::{AppHandle, State};
 type Response<T> = std::result::Result<IpcResponse<T>, ()>;
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
+/// 开始录制参数。
 pub struct RecordingStartOptions {
+    /// 录制名称。
     pub name: Option<String>,
+    /// 录制标签。
     pub tags: Option<Vec<String>>,
 }
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip(state))]
+/// 开始录制。
 pub async fn start_recording(
     _app: AppHandle,
     state: State<'_, AppState>,
@@ -56,6 +62,7 @@ pub async fn start_recording(
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip(state))]
+/// 停止录制。
 pub async fn stop_recording(state: State<'_, AppState>) -> Response<RecordingStatus> {
     let result: anyhow::Result<RecordingStatus> = async {
         let (reply_tx, reply_rx) = flume::bounded(1);
@@ -75,6 +82,7 @@ pub async fn stop_recording(state: State<'_, AppState>) -> Response<RecordingSta
 
 #[tauri::command]
 #[tracing::instrument(level = "debug")]
+/// 列出录制会话。
 pub async fn list_recordings() -> Response<Vec<RecordingMeta>> {
     let result: anyhow::Result<Vec<RecordingMeta>> = async {
         let db_path = recording_db_path()?;
@@ -102,6 +110,7 @@ pub async fn list_recordings() -> Response<Vec<RecordingMeta>> {
 
 #[tauri::command]
 #[tracing::instrument(level = "debug")]
+/// 更新录制会话元信息。
 pub async fn update_recording_meta(
     session_id: i64,
     name: Option<String>,
@@ -137,6 +146,7 @@ pub async fn update_recording_meta(
 
 #[tauri::command]
 #[tracing::instrument(level = "debug")]
+/// 获取录制样本。
 pub async fn get_recording_samples(session_id: i64) -> Response<Vec<outputs::ResponseData>> {
     let result: anyhow::Result<Vec<outputs::ResponseData>> = async {
         let db_path = recording_db_path()?;

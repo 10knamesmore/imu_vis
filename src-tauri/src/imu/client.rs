@@ -1,3 +1,5 @@
+//! IMU 蓝牙客户端实现。
+
 use anyhow::{anyhow, bail, Context};
 use btleplug::api::{
     Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
@@ -37,6 +39,7 @@ pub struct IMUClient {
 }
 
 impl IMUClient {
+    /// 创建 IMU 客户端。
     pub fn new(tx: Sender<Vec<u8>>) -> Self {
         Self {
             central: OnceCell::new(),
@@ -64,7 +67,7 @@ impl IMUClient {
             .await
     }
 
-    /// 连接指定uuid的Periphral
+    /// 连接指定 uuid 的设备。
     ///
     /// * `uuid`: 指定uuid
     pub async fn connect(&mut self, uuid: &str) -> anyhow::Result<PeripheralInfo> {
@@ -134,7 +137,7 @@ impl IMUClient {
             .unwrap_or_default())
     }
 
-    /// 断开当前连接的Peripheral
+    /// 断开当前连接的设备。
     pub async fn disconnect(&mut self) -> anyhow::Result<PeripheralInfo> {
         self.disable_data_reporting().await?;
         if let Some(handle) = &self.handle {
@@ -223,6 +226,7 @@ impl IMUClient {
     }
 
     /// 列举central中的peripheral
+    /// 获取扫描到的设备列表。
     pub async fn list_peripherals(&self) -> anyhow::Result<Vec<PeripheralInfo>> {
         let peripherals = self
             .central()
@@ -271,7 +275,7 @@ impl IMUClient {
         Ok((peripheral, char))
     }
 
-    /// 开始扫描设备
+    /// 开始扫描设备。
     pub async fn start_scan(&self) -> anyhow::Result<()> {
         Ok(self
             .central()
@@ -280,7 +284,7 @@ impl IMUClient {
             .await?)
     }
 
-    /// 停止扫描设备
+    /// 停止扫描设备。
     pub async fn stop_scan(&self) -> anyhow::Result<()> {
         Ok(self.central().await?.stop_scan().await?)
     }

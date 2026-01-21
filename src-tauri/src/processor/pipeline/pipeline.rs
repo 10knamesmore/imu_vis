@@ -1,3 +1,5 @@
+//! IMU 处理管线实现。
+
 use std::path::Path;
 use std::sync::{Arc, Mutex as StdMutex};
 
@@ -13,6 +15,7 @@ use crate::processor::strapdown::Strapdown;
 use crate::processor::zupt::ZuptDetector;
 use crate::types::outputs::ResponseData;
 
+/// IMU 处理管线。
 pub struct ProcessorPipeline {
     calibration: Calibration,
     filter: LowPassFilter,
@@ -23,6 +26,7 @@ pub struct ProcessorPipeline {
 }
 
 impl ProcessorPipeline {
+    /// 创建处理管线。
     pub fn new(config: ProcessorPipelineConfig) -> Self {
         Self {
             calibration: Calibration::new(config.calibration),
@@ -34,6 +38,7 @@ impl ProcessorPipeline {
         }
     }
 
+    /// 处理单个原始数据包并输出响应。
     pub fn process_packet(
         &mut self,
         packet: &[u8],
@@ -78,6 +83,7 @@ impl ProcessorPipeline {
 }
 
 impl ProcessorPipelineConfig {
+    /// 从默认路径加载配置文件。
     pub fn load_from_default_paths() -> Self {
         // 按常见路径查找配置文件
         let candidates = ["processor.toml", "src-tauri/processor.toml", "../processor.toml"];

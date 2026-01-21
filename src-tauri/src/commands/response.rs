@@ -1,12 +1,18 @@
+//! IPC 通用响应类型。
+
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
+/// IPC 响应包装。
 pub struct Response<T>
 where
     T: Serialize,
 {
+    /// 是否成功。
     pub success: bool,
+    /// 返回数据。
     pub data: Option<T>,
+    /// 提示消息。
     pub message: String,
 }
 

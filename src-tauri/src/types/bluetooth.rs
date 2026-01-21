@@ -1,8 +1,12 @@
+//! 蓝牙外设信息类型。
+
 use btleplug::{api::Peripheral as _, platform::Peripheral};
 use serde::Serialize;
 
 #[derive(Debug, Default, Serialize)]
+/// 蓝牙外设信息。
 pub struct PeripheralInfo {
+    /// 外设 ID。
     pub id: String,
     /// The address of this peripheral
     pub address: String,
@@ -13,6 +17,7 @@ pub struct PeripheralInfo {
 }
 
 impl PeripheralInfo {
+    /// 从外设实例提取信息。
     pub async fn from_peripheral(p: &Peripheral) -> anyhow::Result<PeripheralInfo> {
         let properties = p
             .properties()

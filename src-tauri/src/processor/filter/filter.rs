@@ -1,8 +1,11 @@
+//! 低通滤波逻辑。
+
 use math_f64::DVec3;
 
 use crate::processor::calibration::ImuSampleCalibrated;
 use crate::processor::filter::types::{ImuSampleFiltered, LowPassFilterConfig};
 
+/// 一阶低通滤波器。
 pub struct LowPassFilter {
     config: LowPassFilterConfig,
     prev_accel: Option<DVec3>,
@@ -10,6 +13,7 @@ pub struct LowPassFilter {
 }
 
 impl LowPassFilter {
+    /// 创建低通滤波器。
     pub fn new(config: LowPassFilterConfig) -> Self {
         Self {
             config,
@@ -18,6 +22,7 @@ impl LowPassFilter {
         }
     }
 
+    /// 应用滤波并输出低通样本。
     pub fn apply(&mut self, sample: &ImuSampleCalibrated) -> ImuSampleFiltered {
         let alpha = self.config.alpha;
         // 一阶低通滤波

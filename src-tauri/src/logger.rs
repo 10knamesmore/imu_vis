@@ -1,3 +1,5 @@
+//! tracing 初始化与日志输出配置。
+
 use tracing::level_filters::LevelFilter;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
@@ -8,6 +10,7 @@ use tracing_subscriber::{
     Layer,
 };
 
+/// 初始化 tracing 并返回 guard。
 pub fn init_tracing() -> WorkerGuard {
     let stdout_layer = if cfg!(debug_assertions) {
         let targets = Targets::new()

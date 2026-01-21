@@ -1,3 +1,5 @@
+//! IMU 数据处理器与处理链入口。
+
 use std::{
     sync::{Arc, Mutex as StdMutex},
     thread,
@@ -6,19 +8,31 @@ use std::{
 use crate::processor::pipeline::{ProcessorPipeline, ProcessorPipelineConfig};
 use crate::types::outputs::ResponseData;
 
+/// 姿态融合模块。
 pub mod attitude_fusion;
+/// 标定模块。
 pub mod calibration;
+/// EKF 模块。
 pub mod ekf;
+/// 滤波模块。
 pub mod filter;
+/// 输出构建模块。
 pub mod output;
+/// 解析模块。
 pub mod parser;
+/// 管线模块。
 pub mod pipeline;
+/// 共享类型模块。
 pub mod shared;
+/// 捷联惯导模块。
 pub mod strapdown;
+/// ZUPT 模块。
 pub mod zupt;
 
+/// 对外暴露的计算结果数据类型。
 pub use output::CalculatedData;
 
+/// 数据处理器实例，启动独立线程消费 IMU 流。
 pub struct Processor;
 
 impl Processor {

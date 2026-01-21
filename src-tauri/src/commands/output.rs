@@ -1,9 +1,12 @@
+//! 数据输出订阅命令。
+
 use tauri::{async_runtime::spawn, ipc::Channel, State};
 
 use crate::{app_state::AppState, types::outputs::ResponseData};
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip(state, on_event))]
+/// 订阅 IMU 数据输出。
 pub fn subscribe_output(state: State<'_, AppState>, on_event: Channel<ResponseData>) {
     tracing::info!("Tauri 前端订阅 IMU 数据输出。");
     let rx = state.downstream_rx.clone();

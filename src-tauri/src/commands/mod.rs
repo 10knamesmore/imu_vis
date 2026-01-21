@@ -1,8 +1,11 @@
+//! Tauri 命令路由。
+
 mod imu;
 mod output;
 mod recording;
 mod response;
 
+/// 注册所有命令处理器。
 pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static {
     tauri::generate_handler![
         imu::start_scan,

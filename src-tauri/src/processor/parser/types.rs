@@ -1,3 +1,5 @@
+//! IMU 原始样本类型定义。
+
 use math_f64::{DQuat, DVec3};
 use serde::Serialize;
 
@@ -22,4 +24,5 @@ pub struct ImuSampleRaw {
     pub accel_nav: DVec3,
 }
 
+/// 与历史接口兼容的原始样本别名。
 pub type IMUData = ImuSampleRaw;

@@ -1,3 +1,5 @@
+//! 标定逻辑实现。
+
 use math_f64::DVec3;
 
 use crate::processor::{
@@ -7,17 +9,20 @@ use crate::processor::{
 
 const DEG_TO_RAD: f64 = std::f64::consts::PI / 180.0;
 
+/// 标定处理器。
 pub struct Calibration {
     config: ImuCalibrationConfig,
     state: CalibrationState,
 }
 
 impl Calibration {
+    /// 创建标定处理器。
     pub fn new(config: ImuCalibrationConfig) -> Self {
         let state = CalibrationState::new(&config);
         Self { config, state }
     }
 
+    /// 将原始样本转换为标定后的样本。
     pub fn update(&mut self, raw: &ImuSampleRaw) -> ImuSampleCalibrated {
         // 先去偏置再做矩阵标定，并将角速度转为 rad/s
         let accel = apply_matrix(self.config.accel_matrix, raw.accel_with_g - self.state.bias_a);

@@ -1,3 +1,5 @@
+//! 输出数据类型。
+
 use serde::Serialize;
 
 use crate::processor::{output::CalculatedData, parser::IMUData};

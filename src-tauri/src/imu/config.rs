@@ -1,3 +1,6 @@
+//! IMU 设备配置与协议构建。
+
+/// IMU 配置参数集合。
 pub struct IMUConfig {
     /// 惯导静止状态加速度阈值 (单位 dm/s²)
     ///
@@ -94,6 +97,7 @@ impl Default for IMUConfig {
 }
 
 impl IMUConfig {
+    /// 序列化为设备配置字节。
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut buf = vec![0u8; 11];
         buf[0] = 0x12;
@@ -175,15 +179,20 @@ impl Subscription {
 }
 
 #[derive(Debug, Clone, Copy)]
+/// 传感器滤波等级封装。
 pub struct FilterLevel(u8);
 
 #[derive(Debug, Clone, Copy)]
+/// 传感器模式配置。
 pub struct SensorMode {
+    /// 是否启用磁力计融合。
     pub magnetometer_enabled: bool,
+    /// 气压计滤波等级（0~3）。
     pub barometer_filter_level: u8, // 0~3
 }
 
 impl SensorMode {
+    /// 创建传感器模式配置。
     pub fn new(magnetometer_enabled: bool, barometer_filter_level: u8) -> Self {
         Self {
             magnetometer_enabled,
@@ -191,6 +200,7 @@ impl SensorMode {
         }
     }
 
+    /// 将模式转换为设备协议字节。
     pub fn byte(&self) -> u8 {
         (self.magnetometer_enabled as u8) | ((self.barometer_filter_level & 0x03) << 1)
     }

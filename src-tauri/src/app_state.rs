@@ -1,3 +1,5 @@
+//! 应用全局状态与资源管理。
+
 use std::sync::{Arc, Mutex as StdMutex};
 
 use flume::Receiver;
@@ -12,7 +14,7 @@ use crate::{
 use math_f64::{DQuat, DVec3};
 
 #[derive(Debug, Clone, Copy)]
-/// IMU 姿态矫正数据：记录角度偏移与四元数偏移
+/// IMU 姿态矫正数据：记录角度偏移与四元数偏移。
 pub struct ImuCalibration {
     /// 欧拉角偏移（用于直接减去，令当前角度归零）
     pub angle_offset: DVec3,
@@ -29,7 +31,7 @@ impl Default for ImuCalibration {
     }
 }
 
-/// 应用状态
+/// 应用状态。
 ///
 /// * `imu_client`: 与IMU连接相关的客户端 上游
 /// * `processor`: 数据处理器
@@ -40,8 +42,10 @@ pub struct AppState {
     #[allow(unused)]
     processor: Processor,
 
+    /// 下游订阅通道。
     pub downstream_rx: Receiver<ResponseData>,
 
+    /// 录制控制通道。
     pub recorder_tx: flume::Sender<RecorderCommand>,
 
     /// 当前生效的姿态矫正值（由前端触发“校准”更新）
@@ -55,6 +59,7 @@ impl AppState {
     /// imu_client -.-> |flume::bounded| processor
     /// processor -.-> |flume::bounded| sub
     /// sub -.-> |tauri ipc channel| front end
+    /// 创建应用状态。
     pub fn new() -> Self {
         let (upstream_tx, upstream_rx) = flume::bounded(256);
         let (downstream_tx, downstream_rx) = flume::bounded(256);
@@ -79,6 +84,7 @@ impl AppState {
         }
     }
 
+    /// 获取 IMU 客户端引用。
     pub async fn client(&self) -> MutexGuard<'_, IMUClient> {
         self.imu_client.lock().await
     }

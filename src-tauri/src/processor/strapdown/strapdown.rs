@@ -1,9 +1,12 @@
+//! 捷联惯导传播实现。
+
 use math_f64::DVec3;
 
 use crate::processor::attitude_fusion::AttitudeEstimate;
 use crate::processor::filter::ImuSampleFiltered;
 use crate::processor::strapdown::types::{NavState, StrapdownConfig};
 
+/// 捷联惯导传播器。
 pub struct Strapdown {
     config: StrapdownConfig,
     nav_state: NavState,
@@ -11,6 +14,7 @@ pub struct Strapdown {
 }
 
 impl Strapdown {
+    /// 创建捷联惯导传播器。
     pub fn new(config: StrapdownConfig) -> Self {
         Self {
             config,
@@ -26,6 +30,7 @@ impl Strapdown {
         }
     }
 
+    /// 传播导航状态。
     pub fn propagate(
         &mut self,
         attitude: &AttitudeEstimate,

@@ -1,8 +1,12 @@
+//! 滤波相关类型。
+
 use math_f64::DVec3;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
+/// 低通滤波配置。
 pub struct LowPassFilterConfig {
+    /// 滤波系数，越大越平滑。
     pub alpha: f64,
 }
 
@@ -13,8 +17,12 @@ impl Default for LowPassFilterConfig {
 }
 
 #[derive(Debug, Clone, Copy)]
+/// 低通滤波后的 IMU 样本。
 pub struct ImuSampleFiltered {
+    /// 时间戳（毫秒）。
     pub timestamp_ms: u64,
+    /// 低通滤波后的加速度。
     pub accel_lp: DVec3,
+    /// 低通滤波后的角速度。
     pub gyro_lp: DVec3,
 }

@@ -1,15 +1,19 @@
+//! ZUPT 静止检测与更新实现。
+
 use math_f64::DVec3;
 
 use crate::processor::filter::ImuSampleFiltered;
 use crate::processor::strapdown::NavState;
 use crate::processor::zupt::types::{ZuptConfig, ZuptObservation};
 
+/// ZUPT 静止检测器。
 pub struct ZuptDetector {
     config: ZuptConfig,
     last_is_static: Option<bool>,
 }
 
 impl ZuptDetector {
+    /// 创建 ZUPT 检测器。
     pub fn new(config: ZuptConfig) -> Self {
         Self {
             config,
@@ -17,6 +21,7 @@ impl ZuptDetector {
         }
     }
 
+    /// 应用 ZUPT 并返回观测。
     pub fn apply(&mut self, mut nav: NavState, sample: &ImuSampleFiltered) -> (NavState, ZuptObservation) {
         let gyro_norm = sample.gyro_lp.length();
         let g_world = DVec3::new(0.0, 0.0, -1.0);

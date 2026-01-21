@@ -1,3 +1,5 @@
+//! IMU 设备相关命令。
+
 use crate::{
     app_state::{AppState, ImuCalibration}, commands::response::Response as IpcResponse,
     types::bluetooth::PeripheralInfo,

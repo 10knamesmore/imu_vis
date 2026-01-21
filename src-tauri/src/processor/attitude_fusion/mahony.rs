@@ -1,3 +1,5 @@
+//! Mahony/互补滤波姿态融合实现。
+
 use math_f64::{DQuat, DVec3};
 
 use crate::processor::attitude_fusion::types::{AttitudeEstimate, AttitudeFusionConfig};
@@ -5,6 +7,7 @@ use crate::processor::filter::ImuSampleFiltered;
 
 const EPSILON: f64 = 1e-6;
 
+/// 基于 Mahony/互补策略的姿态融合器。
 pub struct MahonyFusion {
     config: AttitudeFusionConfig,
     quat: DQuat,
@@ -12,6 +15,7 @@ pub struct MahonyFusion {
 }
 
 impl MahonyFusion {
+    /// 创建姿态融合器。
     pub fn new(config: AttitudeFusionConfig) -> Self {
         Self {
             config,
@@ -20,6 +24,7 @@ impl MahonyFusion {
         }
     }
 
+    /// 根据滤波后的 IMU 样本更新姿态。
     pub fn update(&mut self, sample: &ImuSampleFiltered) -> AttitudeEstimate {
         let dt = self
             .last_timestamp_ms
