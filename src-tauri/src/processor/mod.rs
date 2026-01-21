@@ -1,4 +1,7 @@
 //! IMU 数据处理器与处理链入口。
+//!
+//! 这里负责启动处理线程，并把原始数据送入 pipeline。
+//! pipeline 内部遵循固定链路：解析 → 标定 → 滤波 → 姿态融合 → 捷联 → ZUPT → EKF → 输出。
 
 use std::{
     sync::{Arc, Mutex as StdMutex},
