@@ -25,8 +25,6 @@ pub mod output;
 pub mod parser;
 /// 管线模块。
 pub mod pipeline;
-/// 共享类型模块。
-pub mod shared;
 /// 捷联惯导模块。
 pub mod strapdown;
 /// ZUPT 模块。
