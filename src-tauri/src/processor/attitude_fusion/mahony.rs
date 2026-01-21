@@ -26,6 +26,14 @@ impl MahonyFusion {
 
     /// 根据滤波后的 IMU 样本更新姿态。
     pub fn update(&mut self, sample: &ImuSampleFiltered) -> AttitudeEstimate {
+        if self.config.passby {
+            return AttitudeEstimate {
+                timestamp_ms: sample.timestamp_ms,
+                quat: self.quat,
+                euler: DVec3::ZERO,
+            };
+        }
+
         let dt = self
             .last_timestamp_ms
             .map(|ts| (sample.timestamp_ms.saturating_sub(ts)) as f64 / 1000.0)

@@ -1,19 +1,25 @@
 //! IMU 处理管线实现。
 
-use std::path::Path;
-use std::sync::{Arc, Mutex as StdMutex};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex as StdMutex},
+};
 
-use crate::app_state::ImuCalibration;
-use crate::processor::attitude_fusion::AttitudeFusion;
-use crate::processor::calibration::Calibration;
-use crate::processor::ekf::EkfProcessor;
-use crate::processor::filter::LowPassFilter;
-use crate::processor::output::{OutputBuilder, OutputFrame};
-use crate::processor::parser::ImuParser;
-use crate::processor::pipeline::types::ProcessorPipelineConfig;
-use crate::processor::strapdown::Strapdown;
-use crate::processor::zupt::ZuptDetector;
-use crate::types::outputs::ResponseData;
+use crate::{
+    app_state::ImuCalibration,
+    processor::{
+        attitude_fusion::AttitudeFusion,
+        calibration::Calibration,
+        ekf::EkfProcessor,
+        filter::LowPassFilter,
+        output::{OutputBuilder, OutputFrame},
+        parser::ImuParser,
+        pipeline::types::ProcessorPipelineConfig,
+        strapdown::Strapdown,
+        zupt::ZuptDetector,
+    },
+    types::outputs::ResponseData,
+};
 
 /// IMU 处理管线。
 pub struct ProcessorPipeline {
@@ -72,7 +78,7 @@ impl ProcessorPipeline {
         // 处理链：标定 -> 滤波 -> 姿态融合 -> 捷联 -> ZUPT -> EKF -> 输出
         let calibrated = self.calibration.update(&raw);
         let filtered = self.filter.apply(&calibrated);
-        let attitude = self.attitude_fusion.update(&filtered);
+        let attitude = self.attitude_fusion.update(&filtered, Some(raw.quat));
         let nav = self.strapdown.propagate(&attitude, &filtered);
         let (nav, obs) = self.zupt.apply(nav, &filtered);
         let nav = self.ekf.update(nav, &obs);
@@ -86,7 +92,11 @@ impl ProcessorPipelineConfig {
     /// 从默认路径加载配置文件。
     pub fn load_from_default_paths() -> Self {
         // 按常见路径查找配置文件
-        let candidates = ["processor.toml", "src-tauri/processor.toml", "../processor.toml"];
+        let candidates = [
+            "processor.toml",
+            "src-tauri/processor.toml",
+            "../processor.toml",
+        ];
         for path in candidates {
             if let Some(config) = read_config(Path::new(path)) {
                 return config;

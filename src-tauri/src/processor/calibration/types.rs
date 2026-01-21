@@ -6,6 +6,8 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Copy, Deserialize)]
 /// IMU 标定参数配置。
 pub struct ImuCalibrationConfig {
+    /// 是否跳过标定处理。
+    pub passby: bool,
     /// 加速度计偏置。
     pub accel_bias: DVec3,
     /// 陀螺仪偏置。
@@ -19,6 +21,7 @@ pub struct ImuCalibrationConfig {
 impl Default for ImuCalibrationConfig {
     fn default() -> Self {
         Self {
+            passby: false,
             accel_bias: DVec3::ZERO,
             gyro_bias: DVec3::ZERO,
             accel_matrix: [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],

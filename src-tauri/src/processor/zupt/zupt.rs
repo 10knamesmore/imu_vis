@@ -23,6 +23,10 @@ impl ZuptDetector {
 
     /// 应用 ZUPT 并返回观测。
     pub fn apply(&mut self, mut nav: NavState, sample: &ImuSampleFiltered) -> (NavState, ZuptObservation) {
+        if self.config.passby {
+            return (nav, ZuptObservation { is_static: false });
+        }
+
         let gyro_norm = sample.gyro_lp.length();
         let g_world = DVec3::new(0.0, 0.0, -1.0);
         let accel_world = nav.attitude.rotate_vec3(sample.accel_lp);

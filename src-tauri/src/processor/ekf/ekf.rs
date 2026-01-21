@@ -17,6 +17,10 @@ impl EkfProcessor {
 
     /// 根据观测更新导航状态。
     pub fn update(&mut self, nav: NavState, _obs: &ZuptObservation) -> NavState {
+        if self.config.passby {
+            return nav;
+        }
+
         if !self.config.enabled {
             // 关闭 EKF 时直接透传
             return nav;

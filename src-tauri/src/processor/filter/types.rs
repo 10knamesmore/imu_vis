@@ -6,13 +6,18 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Copy, Deserialize)]
 /// 低通滤波配置。
 pub struct LowPassFilterConfig {
+    /// 是否跳过滤波处理。
+    pub passby: bool,
     /// 滤波系数，越大越平滑。
     pub alpha: f64,
 }
 
 impl Default for LowPassFilterConfig {
     fn default() -> Self {
-        Self { alpha: 0.9 }
+        Self {
+            passby: false,
+            alpha: 0.9,
+        }
     }
 }
 

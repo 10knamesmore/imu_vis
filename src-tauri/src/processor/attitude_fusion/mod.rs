@@ -9,10 +9,12 @@ pub mod types;
 
 use crate::processor::attitude_fusion::mahony::MahonyFusion;
 use crate::processor::filter::ImuSampleFiltered;
+use math_f64::DQuat;
 
 /// 统一姿态融合入口。
 pub struct AttitudeFusion {
     inner: MahonyFusion,
+    passby: bool,
 }
 
 impl AttitudeFusion {
@@ -20,11 +22,25 @@ impl AttitudeFusion {
     pub fn new(config: AttitudeFusionConfig) -> Self {
         Self {
             inner: MahonyFusion::new(config),
+            passby: config.passby,
         }
     }
 
     /// 更新姿态融合结果。
-    pub fn update(&mut self, sample: &ImuSampleFiltered) -> AttitudeEstimate {
+    pub fn update(
+        &mut self,
+        sample: &ImuSampleFiltered,
+        raw_quat: Option<DQuat>,
+    ) -> AttitudeEstimate {
+        if self.passby {
+            let quat = raw_quat.unwrap_or(DQuat::IDENTITY);
+            return AttitudeEstimate {
+                timestamp_ms: sample.timestamp_ms,
+                quat,
+                euler: math_f64::DVec3::ZERO,
+            };
+        }
+
         self.inner.update(sample)
     }
 }

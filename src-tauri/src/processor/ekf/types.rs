@@ -6,13 +6,18 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Copy, Deserialize)]
 /// EKF 配置。
 pub struct EkfConfig {
+    /// 是否跳过 EKF 处理。
+    pub passby: bool,
     /// 是否启用 EKF。
     pub enabled: bool,
 }
 
 impl Default for EkfConfig {
     fn default() -> Self {
-        Self { enabled: false }
+        Self {
+            passby: false,
+            enabled: false,
+        }
     }
 }
 

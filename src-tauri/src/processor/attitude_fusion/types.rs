@@ -6,13 +6,18 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Copy, Deserialize)]
 /// 姿态融合配置。
 pub struct AttitudeFusionConfig {
+    /// 是否跳过姿态融合处理。
+    pub passby: bool,
     /// 融合权重（互补滤波比例）。
     pub beta: f64,
 }
 
 impl Default for AttitudeFusionConfig {
     fn default() -> Self {
-        Self { beta: 0.02 }
+        Self {
+            passby: false,
+            beta: 0.02,
+        }
     }
 }
 

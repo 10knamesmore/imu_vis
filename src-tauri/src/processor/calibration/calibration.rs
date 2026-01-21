@@ -24,6 +24,16 @@ impl Calibration {
 
     /// 将原始样本转换为标定后的样本。
     pub fn update(&mut self, raw: &ImuSampleRaw) -> ImuSampleCalibrated {
+        if self.config.passby {
+            return ImuSampleCalibrated {
+                timestamp_ms: raw.timestamp_ms,
+                accel: raw.accel_with_g,
+                gyro: raw.gyro,
+                bias_g: self.state.bias_g,
+                bias_a: self.state.bias_a,
+            };
+        }
+
         // 先去偏置再做矩阵标定，并将角速度转为 rad/s
         let accel = apply_matrix(self.config.accel_matrix, raw.accel_with_g - self.state.bias_a);
         let gyro_rad = raw.gyro * DEG_TO_RAD;

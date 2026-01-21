@@ -6,13 +6,18 @@ use serde::Deserialize;
 #[derive(Debug, Clone, Copy, Deserialize)]
 /// 捷联惯导配置。
 pub struct StrapdownConfig {
+    /// 是否跳过捷联惯导传播。
+    pub passby: bool,
     /// 重力常量。
     pub gravity: f64,
 }
 
 impl Default for StrapdownConfig {
     fn default() -> Self {
-        Self { gravity: 9.80665 }
+        Self {
+            passby: false,
+            gravity: 9.80665,
+        }
     }
 }
 

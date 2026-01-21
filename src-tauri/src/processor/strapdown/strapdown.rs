@@ -36,6 +36,12 @@ impl Strapdown {
         attitude: &AttitudeEstimate,
         sample: &ImuSampleFiltered,
     ) -> NavState {
+        if self.config.passby {
+            self.nav_state.attitude = attitude.quat;
+            self.nav_state.timestamp_ms = sample.timestamp_ms;
+            return self.nav_state;
+        }
+
         let dt = self
             .last_timestamp_ms
             .map(|ts| (sample.timestamp_ms.saturating_sub(ts)) as f64 / 1000.0)
