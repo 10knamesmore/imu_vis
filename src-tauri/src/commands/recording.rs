@@ -200,10 +200,10 @@ fn row_to_meta(row: &Row<'_>) -> rusqlite::Result<RecordingMeta> {
 }
 
 fn row_to_response_data(row: &Row<'_>) -> rusqlite::Result<outputs::ResponseData> {
-    use crate::processor::{parser::IMUData, CalculatedData};
+    use crate::processor::{parser::ImuSampleRaw, CalculatedData};
     use math_f64::{DQuat, DVec3};
 
-    let raw = IMUData {
+    let raw = ImuSampleRaw {
         timestamp_ms: row.get::<_, i64>(0)? as u64,
         accel_no_g: DVec3::new(row.get(1)?, row.get(2)?, row.get(3)?),
         accel_with_g: DVec3::new(row.get(4)?, row.get(5)?, row.get(6)?),

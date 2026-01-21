@@ -15,6 +15,7 @@ use math_f64::{DQuat, DVec3};
 
 #[derive(Debug, Clone, Copy)]
 /// IMU 姿态矫正数据：记录角度偏移与四元数偏移。
+/// TODO: 这里的逻辑移动到 processor/calibration 里
 pub struct ImuCalibration {
     /// 欧拉角偏移（用于直接减去，令当前角度归零）
     pub angle_offset: DVec3,

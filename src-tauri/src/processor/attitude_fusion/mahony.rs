@@ -62,6 +62,7 @@ impl MahonyFusion {
         AttitudeEstimate {
             timestamp_ms: sample.timestamp_ms,
             quat: self.quat,
+            // TODO: 需要欧拉角时再补充从四元数转换的计算。
             euler: DVec3::ZERO,
         }
     }

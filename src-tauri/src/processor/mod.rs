@@ -37,11 +37,22 @@ pub use output::CalculatedData;
 pub struct Processor;
 
 impl Processor {
-    /// 数据处理器实例
-    /// 数据为时序,无法并行, 单计算线程处理
+    /// 数据处理器实例。
     ///
-    /// * `upstream_rx`: 接收来自imu_client的原始蓝牙二进制数据
-    /// * `downstream_tx`: 发给AppState的rx, 被command里面接收
+    /// 数据为时序，无法并行，单计算线程处理。
+    ///
+    /// 通道关系（上游 -> 下游）：
+    /// - `imu::client` 通过 `upstream_tx` 推送原始蓝牙包。
+    /// - 本处理器线程持有 `upstream_rx`，消费原始包并运行 pipeline。
+    /// - 处理结果通过 `downstream_tx` 发给 `AppState.downstream_rx`，
+    ///   再由 tauri command/IPC 推给前端。
+    /// - 同时通过 `record_tx` 发给 recorder 线程持久化存储。
+    ///
+    /// * `upstream_rx`: 接收来自 imu_client 的原始蓝牙二进制数据
+    /// * `downstream_tx`: 发给 AppState 的 rx（command 中接收）
+    /// * `record_tx`: 发给 recorder 线程的录制通道
+    /// * `imu_calibration`: 当前生效的姿态矫正参数
+    /// * `imu_latest_raw`: 最新原始姿态快照（供校准命令读取）
     pub fn new(
         upstream_rx: flume::Receiver<Vec<u8>>,
         downstream_tx: flume::Sender<ResponseData>,

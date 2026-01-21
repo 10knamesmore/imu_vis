@@ -23,6 +23,3 @@ pub struct ImuSampleRaw {
     /// 导航系加速度
     pub accel_nav: DVec3,
 }
-
-/// 与历史接口兼容的原始样本别名。
-pub type IMUData = ImuSampleRaw;

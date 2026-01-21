@@ -22,6 +22,7 @@ impl MadgwickFusion {
 
     /// 更新姿态（当前为占位返回）。
     pub fn update(&mut self, sample: &ImuSampleFiltered) -> AttitudeEstimate {
+        // TODO: 实现 Madgwick 融合更新（当前仅返回恒定姿态）。
         AttitudeEstimate {
             timestamp_ms: sample.timestamp_ms,
             quat: self.quat,

@@ -71,7 +71,7 @@ impl ProcessorPipeline {
         // 应用姿态矫正：角度减偏移、四元数左乘偏移
         let mut raw = raw;
         if let Ok(calibration) = imu_calibration.lock() {
-            raw.angle = raw.angle - calibration.angle_offset;
+            raw.angle -= calibration.angle_offset;
             raw.quat = calibration.quat_offset * raw.quat;
         }
 
