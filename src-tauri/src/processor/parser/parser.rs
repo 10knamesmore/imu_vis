@@ -68,6 +68,7 @@ impl ImuParser {
             if start_l + LEN > buf.len() {
                 bail!("data buffer not long enough for quat (bit {})", bit_mask)
             }
+            // 按比例系数还原四元数分量
             let w = Self::read_i16(&buf[start_l..]) as f64 * Self::SCALE_QUAT;
             let x = Self::read_i16(&buf[start_l + 2..]) as f64 * Self::SCALE_QUAT;
             let y = Self::read_i16(&buf[start_l + 4..]) as f64 * Self::SCALE_QUAT;

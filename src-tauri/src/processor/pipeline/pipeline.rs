@@ -40,6 +40,7 @@ impl ProcessorPipeline {
         imu_calibration: &Arc<StdMutex<ImuCalibration>>,
         imu_latest_raw: &Arc<StdMutex<Option<ImuCalibration>>>,
     ) -> Option<ResponseData> {
+        // 解析原始蓝牙包
         let raw = match ImuParser::parse(packet) {
             Ok(sample) => sample,
             Err(e) => {
@@ -48,6 +49,7 @@ impl ProcessorPipeline {
             }
         };
 
+        // 保存最新原始姿态，供“校准”命令读取
         if let Ok(mut latest_raw) = imu_latest_raw.lock() {
             *latest_raw = Some(ImuCalibration {
                 angle_offset: raw.angle,
@@ -55,12 +57,14 @@ impl ProcessorPipeline {
             });
         }
 
+        // 应用姿态矫正：角度减偏移、四元数左乘偏移
         let mut raw = raw;
         if let Ok(calibration) = imu_calibration.lock() {
             raw.angle = raw.angle - calibration.angle_offset;
             raw.quat = calibration.quat_offset * raw.quat;
         }
 
+        // 处理链：标定 -> 滤波 -> 姿态融合 -> 捷联 -> ZUPT -> EKF -> 输出
         let calibrated = self.calibration.update(&raw);
         let filtered = self.filter.apply(&calibrated);
         let attitude = self.attitude_fusion.update(&filtered);
@@ -75,6 +79,7 @@ impl ProcessorPipeline {
 
 impl ProcessorPipelineConfig {
     pub fn load_from_default_paths() -> Self {
+        // 按常见路径查找配置文件
         let candidates = ["processor.toml", "src-tauri/processor.toml", "../processor.toml"];
         for path in candidates {
             if let Some(config) = read_config(Path::new(path)) {

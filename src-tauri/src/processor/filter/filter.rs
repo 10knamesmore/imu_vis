@@ -20,6 +20,7 @@ impl LowPassFilter {
 
     pub fn apply(&mut self, sample: &ImuSampleCalibrated) -> ImuSampleFiltered {
         let alpha = self.config.alpha;
+        // 一阶低通滤波
         let accel_lp = match self.prev_accel {
             Some(prev) => prev * alpha + sample.accel * (1.0 - alpha),
             None => sample.accel,

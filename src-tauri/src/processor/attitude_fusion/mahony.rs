@@ -28,12 +28,14 @@ impl MahonyFusion {
         self.last_timestamp_ms = Some(sample.timestamp_ms);
 
         if dt > 0.0 {
+            // 角速度积分更新姿态
             let delta = DQuat::from_scaled_axis(sample.gyro_lp * dt);
             self.quat = (self.quat * delta).normalize();
         }
 
         let accel_norm = normalize_or_zero(sample.accel_lp);
         if accel_norm.length_squared() > EPSILON {
+            // 用加速度方向修正重力朝向
             let g_world = DVec3::new(0.0, 0.0, -1.0);
             let v = accel_norm.cross(g_world);
             let s = ((1.0 + accel_norm.dot(g_world)) * 2.0).sqrt();

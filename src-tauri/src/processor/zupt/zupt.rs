@@ -24,8 +24,10 @@ impl ZuptDetector {
         let accel_lin = accel_world - g_world * 9.80665;
         let accel_norm = accel_lin.length();
 
+        // 静止检测：角速度和线加速度同时低于阈值
         let is_static = gyro_norm < self.config.gyro_thresh && accel_norm < self.config.accel_thresh;
 
+        // 仅在状态切换时记录日志
         if self.last_is_static != Some(is_static) {
             if is_static {
                 tracing::info!("ZUPT: enter static state");
@@ -36,6 +38,7 @@ impl ZuptDetector {
         }
 
         if is_static {
+            // 静止时速度归零，并做偏置回归
             nav.velocity = DVec3::ZERO;
             nav.bias_a = nav.bias_a + accel_lin * self.config.bias_correction_gain;
         }

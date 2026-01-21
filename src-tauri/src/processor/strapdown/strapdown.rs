@@ -40,9 +40,11 @@ impl Strapdown {
         self.nav_state.attitude = attitude.quat;
 
         if dt > 0.0 {
+            // 将加速度转到世界系并去重力
             let a_world = attitude.quat.rotate_vec3(sample.accel_lp);
             let g_world = DVec3::new(0.0, 0.0, -1.0);
             let a_lin = a_world - g_world * self.config.gravity;
+            // 速度/位置积分
             self.nav_state.velocity = self.nav_state.velocity + a_lin * dt;
             self.nav_state.position = self.nav_state.position + self.nav_state.velocity * dt;
         }
