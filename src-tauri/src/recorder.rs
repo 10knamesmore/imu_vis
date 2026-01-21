@@ -173,9 +173,9 @@ fn insert_sample(session: &mut ActiveSession, data: &ResponseData) -> Result<()>
     let raw = &data.raw_data;
     let calc = &data.calculated_data;
 
-    let attitude = *calc.attitude.deref();
-    let velocity = *calc.velocity.deref();
-    let position = *calc.position.deref();
+    let attitude = calc.attitude;
+    let velocity = calc.velocity;
+    let position = calc.position;
 
     session
         .conn

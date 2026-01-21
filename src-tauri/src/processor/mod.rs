@@ -1,16 +1,23 @@
-use std::{sync::{Arc, Mutex as StdMutex}, thread};
-
-use math_f64::DQuat;
-use serde::Serialize;
-
-use crate::{
-    processor::parser::data::IMUParser, processor::state::State, types::outputs::ResponseData,
+use std::{
+    sync::{Arc, Mutex as StdMutex},
+    thread,
 };
 
-pub mod parser;
-mod state;
+use crate::processor::pipeline::{ProcessorPipeline, ProcessorPipelineConfig};
+use crate::types::outputs::ResponseData;
 
-pub use state::{attitude::Attitude, position::Position, velocity::Velocity};
+pub mod attitude_fusion;
+pub mod calibration;
+pub mod ekf;
+pub mod filter;
+pub mod output;
+pub mod parser;
+pub mod pipeline;
+pub mod shared;
+pub mod strapdown;
+pub mod zupt;
+
+pub use output::CalculatedData;
 
 pub struct Processor;
 
@@ -27,49 +34,26 @@ impl Processor {
         imu_calibration: Arc<StdMutex<crate::app_state::ImuCalibration>>,
         imu_latest_raw: Arc<StdMutex<Option<crate::app_state::ImuCalibration>>>,
     ) -> Self {
+        let config = ProcessorPipelineConfig::load_from_default_paths();
         thread::Builder::new()
             .name("DataProcessorThread".into())
             .spawn(move || {
-                // TODO: MOCK
-                let mut state = State::new(DQuat::IDENTITY, 0);
+                let mut pipeline = ProcessorPipeline::new(config);
 
                 loop {
                     match upstream_rx.recv() {
                         Ok(data) => {
-                            // TODO: 数据包第一字节 0x02 - 0x51结果可能都不同, 需要dispatch
-                            let mut imu_data = match IMUParser::parse(&data) {
-                                Ok(data) => data,
-                                Err(e) => {
-                                    tracing::error!("IMU 数据解析失败: {}", e);
-                                    continue;
+                            if let Some(response_data) = pipeline.process_packet(
+                                &data,
+                                &imu_calibration,
+                                &imu_latest_raw,
+                            ) {
+                                if let Err(e) = downstream_tx.send(response_data) {
+                                    tracing::error!("Downstream channel send failed: {:?}", e);
                                 }
-                            };
-                            // 保存最新原始姿态，供“校准”命令读取
-                            if let Ok(mut latest_raw) = imu_latest_raw.lock() {
-                                *latest_raw = Some(crate::app_state::ImuCalibration {
-                                    angle_offset: imu_data.angle,
-                                    quat_offset: imu_data.quat,
-                                });
-                            }
-                            // 应用校准：角度减去偏移，四元数左乘逆偏移，使当前姿态归零
-                            if let Ok(calibration) = imu_calibration.lock() {
-                                imu_data.angle.x -= calibration.angle_offset.x;
-                                imu_data.angle.y -= calibration.angle_offset.y;
-                                imu_data.angle.z -= calibration.angle_offset.z;
-                                imu_data.quat = calibration.quat_offset * imu_data.quat;
-                            }
-                            state.update(&imu_data);
-
-                            let response_data = ResponseData::from_parts(
-                                &imu_data,
-                                &CalculatedData::from_state(&state),
-                            );
-
-                            if let Err(e) = downstream_tx.send(response_data) {
-                                tracing::error!("Downstream channel send failed: {:?}", e);
-                            }
-                            if let Err(e) = record_tx.send(response_data) {
-                                tracing::error!("Recorder channel send failed: {:?}", e);
+                                if let Err(e) = record_tx.send(response_data) {
+                                    tracing::error!("Recorder channel send failed: {:?}", e);
+                                }
                             }
                         }
                         Err(e) => {
@@ -80,30 +64,5 @@ impl Processor {
             })
             .unwrap_or_else(|e| panic!("error while creating data processor thread : {:?}", e));
         Processor {}
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize)]
-/// 计算后的状态数据
-pub struct CalculatedData {
-    /// 姿态
-    pub attitude: Attitude,
-    /// 速度
-    pub velocity: Velocity,
-    /// 位置
-    pub position: Position,
-    /// 时间戳（毫秒）
-    pub timestamp_ms: u64,
-}
-
-impl CalculatedData {
-    /// 从内部状态 State 构建 CalculatedData
-    pub fn from_state(state: &State) -> Self {
-        CalculatedData {
-            attitude: state.attitude,
-            velocity: state.velocity,
-            position: state.position,
-            timestamp_ms: state.timestamp_ms,
-        }
     }
 }

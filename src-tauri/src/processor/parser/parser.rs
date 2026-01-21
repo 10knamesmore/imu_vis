@@ -1,42 +1,15 @@
 use anyhow::bail;
 use math_f64::{DQuat, DVec3};
-use serde::Serialize;
 
-#[derive(Debug, Clone, Copy, Serialize)]
-/// 从蓝牙数据包中解析出的原始数据体, 保证数据均为有效值
-pub struct IMUData {
-    /// * `timestamp_ms`: 运行时间ms
-    pub timestamp_ms: u64,
-
-    /// * `accel_no_g`: 没有G的重力加速度 m/s^2
-    pub accel_no_g: DVec3,
-
-    /// * `accel_with_g`: 有G的重力加速度 m/s^2
-    pub accel_with_g: DVec3,
-
-    /// * `gyro`:  角速度   度/s
-    pub gyro: DVec3,
-
-    /// * `quat`:  四元数
-    pub quat: DQuat,
-
-    /// * `angle`: 欧拉角 度
-    pub angle: DVec3,
-
-    /// * `offset`: 位置偏移 米
-    pub offset: DVec3,
-
-    /// * `accel_nav`: 导航系加速度
-    pub accel_nav: DVec3,
-}
+use crate::processor::parser::types::ImuSampleRaw;
 
 // ===============================
 // IMU解析器
 // https://www.yuque.com/cxqwork/lkw3sg/yqa3e0?#Phg5V
 // ===============================
-pub struct IMUParser;
+pub struct ImuParser;
 
-impl IMUParser {
+impl ImuParser {
     const SCALE_ACCEL: f64 = 0.00478515625; // 加速度 [-16g~+16g] 9.8*16/32768
     const SCALE_QUAT: f64 = 0.000030517578125; // 四元数 [-1~+1] 1/32768
     const SCALE_ANGLE: f64 = 0.0054931640625; // 角度 [-180~+180] 180/32768
@@ -78,8 +51,6 @@ impl IMUParser {
             let vec = Self::read_vec3(&buf[start_l..], scale);
             Ok((vec, start_l + LEN))
         } else {
-            // 控制位未设置，返回零值和未推进的索引
-            // Ok((DVec3::ZERO, start_l))
             bail!("数据包没有设置指定控制位, 期望控制位为 : {}", bit_mask)
         }
     }
@@ -104,8 +75,6 @@ impl IMUParser {
             let quat = DQuat { w, x, y, z };
             Ok((quat, start_l + LEN))
         } else {
-            // 控制位未设置，返回身份四元数和未推进的索引
-            // Ok((DQuat::IDENTITY, start_l))
             bail!("数据包没有设置指定控制位, 期望控制位为 : {}", bit_mask)
         }
     }
@@ -113,7 +82,7 @@ impl IMUParser {
     /// 解析订阅的功能数据 (数据体第一个字节为0x11)
     ///
     /// * `buf`: 蓝牙数据包
-    pub fn parse(buf: &[u8]) -> anyhow::Result<IMUData> {
+    pub fn parse(buf: &[u8]) -> anyhow::Result<ImuSampleRaw> {
         // 头部检查
         if buf.is_empty() || buf[0] != 0x11 {
             bail!("[error] data head not defined")
@@ -153,9 +122,10 @@ impl IMUParser {
         let (offset, l6) = Self::try_parse_vec3(buf, ctl, 0x0080, l5, Self::SCALE_OFFSET)?;
 
         // (bit 10)
-        let (accel_nav, _l_final) = Self::try_parse_vec3(buf, ctl, 0x0200, l6, Self::SCALE_ACCEL)?;
+        let (accel_nav, _l_final) =
+            Self::try_parse_vec3(buf, ctl, 0x0200, l6, Self::SCALE_ACCEL)?;
 
-        Ok(IMUData {
+        Ok(ImuSampleRaw {
             timestamp_ms,
             accel_no_g,
             accel_with_g,

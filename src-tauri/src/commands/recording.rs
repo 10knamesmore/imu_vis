@@ -190,8 +190,7 @@ fn row_to_meta(row: &Row<'_>) -> rusqlite::Result<RecordingMeta> {
 }
 
 fn row_to_response_data(row: &Row<'_>) -> rusqlite::Result<outputs::ResponseData> {
-    use crate::processor::{parser::data::IMUData, CalculatedData};
-    use crate::processor::{Attitude, Position, Velocity};
+    use crate::processor::{parser::IMUData, CalculatedData};
     use math_f64::{DQuat, DVec3};
 
     let raw = IMUData {
@@ -206,14 +205,9 @@ fn row_to_response_data(row: &Row<'_>) -> rusqlite::Result<outputs::ResponseData
     };
 
     let calc = CalculatedData {
-        attitude: Attitude::new(DQuat::from_xyzw(
-            row.get(24)?,
-            row.get(25)?,
-            row.get(26)?,
-            row.get(23)?,
-        )),
-        velocity: Velocity::from_vec3(DVec3::new(row.get(27)?, row.get(28)?, row.get(29)?)),
-        position: Position::from_vec3(DVec3::new(row.get(30)?, row.get(31)?, row.get(32)?)),
+        attitude: DQuat::from_xyzw(row.get(24)?, row.get(25)?, row.get(26)?, row.get(23)?),
+        velocity: DVec3::new(row.get(27)?, row.get(28)?, row.get(29)?),
+        position: DVec3::new(row.get(30)?, row.get(31)?, row.get(32)?),
         timestamp_ms: row.get::<_, i64>(33)? as u64,
     };
 

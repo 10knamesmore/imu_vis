@@ -1,6 +1,6 @@
 use serde::Serialize;
 
-use crate::processor::{parser::data::IMUData, CalculatedData};
+use crate::processor::{output::CalculatedData, parser::IMUData};
 
 #[derive(Debug, Clone, Copy, Serialize)]
 /// 响应数据结构，包含原始 IMU 数据和计算后的数据

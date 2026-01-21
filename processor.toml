@@ -1,0 +1,30 @@
+[calibration]
+accel_bias = { x = 0.0, y = 0.0, z = 0.0 }
+gyro_bias = { x = 0.0, y = 0.0, z = 0.0 }
+accel_matrix = [
+  [1.0, 0.0, 0.0],
+  [0.0, 1.0, 0.0],
+  [0.0, 0.0, 1.0],
+]
+gyro_matrix = [
+  [1.0, 0.0, 0.0],
+  [0.0, 1.0, 0.0],
+  [0.0, 0.0, 1.0],
+]
+
+[filter]
+alpha = 0.9
+
+[attitude_fusion]
+beta = 0.02
+
+[strapdown]
+gravity = 9.80665
+
+[zupt]
+gyro_thresh = 0.1
+accel_thresh = 0.2
+bias_correction_gain = 0.01
+
+[ekf]
+enabled = false
