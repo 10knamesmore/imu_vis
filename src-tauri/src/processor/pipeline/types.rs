@@ -9,7 +9,7 @@ use crate::processor::filter::LowPassFilterConfig;
 use crate::processor::strapdown::StrapdownConfig;
 use crate::processor::zupt::ZuptConfig;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Default)]
 /// 处理管线配置。
 pub struct ProcessorPipelineConfig {
     /// 标定配置。
@@ -24,17 +24,4 @@ pub struct ProcessorPipelineConfig {
     pub zupt: ZuptConfig,
     /// EKF 配置。
     pub ekf: EkfConfig,
-}
-
-impl Default for ProcessorPipelineConfig {
-    fn default() -> Self {
-        Self {
-            calibration: ImuCalibrationConfig::default(),
-            filter: LowPassFilterConfig::default(),
-            attitude_fusion: AttitudeFusionConfig::default(),
-            strapdown: StrapdownConfig::default(),
-            zupt: ZuptConfig::default(),
-            ekf: EkfConfig::default(),
-        }
-    }
 }

@@ -3,9 +3,9 @@
 /// ZUPT 类型定义。
 pub mod types;
 /// ZUPT 逻辑实现。
-pub mod zupt;
+pub mod logic;
 
 /// ZUPT 相关类型。
 pub use types::{ZuptConfig, ZuptObservation};
 /// ZUPT 检测器。
-pub use zupt::ZuptDetector;
+pub use logic::ZuptDetector;
