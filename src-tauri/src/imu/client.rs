@@ -121,7 +121,13 @@ impl IMUClient {
         });
 
         match self.init_peripheral().await {
-            Ok(handle) => self.handle = Some(handle),
+            Ok(handle) => {
+                if let Some(last_handle) = self.handle.take() {
+                    // 先中止上一个任务
+                    last_handle.abort();
+                }
+                self.handle = Some(handle)
+            }
             Err(e) => {
                 self.peripheral = None;
                 self.chars = None;
@@ -140,10 +146,9 @@ impl IMUClient {
     /// 断开当前连接的设备。
     pub async fn disconnect(&mut self) -> anyhow::Result<PeripheralInfo> {
         self.disable_data_reporting().await?;
-        if let Some(handle) = &self.handle {
+        if let Some(handle) = self.handle.take() {
             handle.abort();
         }
-        self.handle = None;
         match self.peripheral.take() {
             Some(p) => {
                 p.disconnect().await.context("断开设备连接")?;
