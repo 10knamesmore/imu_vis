@@ -19,4 +19,7 @@ pub mod types;
 /// 标定处理器。
 pub use logic::Calibration;
 /// 标定类型导出。
-pub use types::{CalibrationState, ImuCalibrationConfig, ImuSampleCalibrated};
+pub use types::{
+    AxisCalibration, AxisCalibrationRequest, CalibrationState, ImuCalibrationConfig,
+    ImuSampleCalibrated,
+};

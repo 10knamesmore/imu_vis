@@ -1,7 +1,8 @@
 //! 标定相关类型。
 
-use math_f64::DVec3;
+use math_f64::{DQuat, DVec3};
 use serde::Deserialize;
+use tokio::sync::oneshot;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
 /// IMU 标定参数配置。
@@ -62,4 +63,31 @@ pub struct ImuSampleCalibrated {
     pub bias_g: DVec3,
     /// 使用的加速度计偏置。
     pub bias_a: DVec3,
+}
+
+#[derive(Debug, Clone, Copy)]
+/// 姿态零位校准参数。
+pub struct AxisCalibration {
+    /// 欧拉角偏移（用于直接减去，令当前角度归零）。
+    pub angle_offset: DVec3,
+    /// 四元数偏移（用于姿态归零：左乘该偏移）。
+    pub quat_offset: DQuat,
+}
+
+impl Default for AxisCalibration {
+    fn default() -> Self {
+        Self {
+            angle_offset: DVec3::ZERO,
+            quat_offset: DQuat::IDENTITY,
+        }
+    }
+}
+
+/// 姿态零位校准请求。
+pub enum AxisCalibrationRequest {
+    /// 以最新原始姿态作为零位。
+    /// response tells the caller the result
+    SetAxis {
+        respond_to: oneshot::Sender<Result<(), &'static str>>,
+    },
 }

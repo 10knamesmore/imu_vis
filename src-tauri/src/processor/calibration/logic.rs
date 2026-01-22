@@ -3,7 +3,7 @@
 use math_f64::DVec3;
 
 use crate::processor::{
-    calibration::types::{CalibrationState, ImuCalibrationConfig, ImuSampleCalibrated},
+    calibration::types::{AxisCalibration, CalibrationState, ImuCalibrationConfig, ImuSampleCalibrated},
     parser::ImuSampleRaw,
 };
 
@@ -46,6 +46,25 @@ impl Calibration {
             bias_g: self.state.bias_g,
             bias_a: self.state.bias_a,
         }
+    }
+}
+
+impl AxisCalibration {
+    /// 创建姿态零位校准状态。
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// 应用姿态零位校准（角度减偏移，四元数左乘偏移）。
+    pub fn apply(&self, raw: &mut ImuSampleRaw) {
+        raw.angle -= self.angle_offset;
+        raw.quat = self.quat_offset * raw.quat;
+    }
+
+    /// 以当前原始姿态更新零位校准参数。
+    pub fn update_from_raw(&mut self, raw: &ImuSampleRaw) {
+        self.angle_offset = raw.angle;
+        self.quat_offset = raw.quat.inverse();
     }
 }
 

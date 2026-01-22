@@ -1,19 +1,15 @@
 //! IMU 处理管线实现。
 
-use std::{
-    path::Path,
-    sync::{Arc, Mutex as StdMutex},
-};
+use std::path::Path;
 
 use crate::{
-    app_state::ImuCalibration,
     processor::{
         attitude_fusion::AttitudeFusion,
-        calibration::Calibration,
+        calibration::{AxisCalibration, AxisCalibrationRequest, Calibration},
         ekf::EkfProcessor,
         filter::LowPassFilter,
         output::{OutputBuilder, OutputFrame},
-        parser::ImuParser,
+        parser::{ImuParser, ImuSampleRaw},
         pipeline::types::ProcessorPipelineConfig,
         strapdown::Strapdown,
         zupt::ZuptDetector,
@@ -23,57 +19,45 @@ use crate::{
 
 /// IMU 处理管线。
 pub struct ProcessorPipeline {
+    axis_calibration: AxisCalibration,
     calibration: Calibration,
     filter: LowPassFilter,
     attitude_fusion: AttitudeFusion,
     strapdown: Strapdown,
     zupt: ZuptDetector,
     ekf: EkfProcessor,
+    latest_raw: Option<ImuSampleRaw>,
 }
 
 impl ProcessorPipeline {
     /// 创建处理管线。
     pub fn new(config: ProcessorPipelineConfig) -> Self {
         Self {
+            axis_calibration: AxisCalibration::new(),
             calibration: Calibration::new(config.calibration),
             filter: LowPassFilter::new(config.filter),
             attitude_fusion: AttitudeFusion::new(config.attitude_fusion),
             strapdown: Strapdown::new(config.strapdown),
             zupt: ZuptDetector::new(config.zupt),
             ekf: EkfProcessor::new(config.ekf),
+            latest_raw: None,
         }
     }
 
     /// 处理单个原始数据包并输出响应。
-    pub fn process_packet(
-        &mut self,
-        packet: &[u8],
-        imu_calibration: &Arc<StdMutex<ImuCalibration>>,
-        imu_latest_raw: &Arc<StdMutex<Option<ImuCalibration>>>,
-    ) -> Option<ResponseData> {
+    pub fn process_packet(&mut self, packet: &[u8]) -> Option<ResponseData> {
         // 解析原始蓝牙包
         let raw = match ImuParser::parse(packet) {
             Ok(sample) => sample,
             Err(e) => {
-                tracing::warn!("IMU 数据解析失败: {}", e);
+                tracing::warn!("IMU 数据解析失败: {:?}", e);
                 return None;
             }
         };
 
-        // 保存最新原始姿态，供“校准”命令读取
-        if let Ok(mut latest_raw) = imu_latest_raw.lock() {
-            *latest_raw = Some(ImuCalibration {
-                angle_offset: raw.angle,
-                quat_offset: raw.quat,
-            });
-        }
-
-        // 应用姿态矫正：角度减偏移、四元数左乘偏移
         let mut raw = raw;
-        if let Ok(calibration) = imu_calibration.lock() {
-            raw.angle -= calibration.angle_offset;
-            raw.quat = calibration.quat_offset * raw.quat;
-        }
+        self.latest_raw = Some(raw);
+        self.axis_calibration.apply(&mut raw);
 
         // 处理链：标定 -> 滤波 -> 姿态融合 -> 捷联 -> ZUPT -> EKF -> 输出
         let calibrated = self.calibration.update(&raw);
@@ -85,6 +69,24 @@ impl ProcessorPipeline {
 
         let frame = OutputFrame { raw, nav };
         Some(OutputBuilder::build(&frame))
+    }
+
+    /// 响应姿态零位校准请求。
+    pub fn handle_calibration_request(&mut self, request: AxisCalibrationRequest) {
+        match request {
+            AxisCalibrationRequest::SetAxis { respond_to } => {
+                let result = match self.latest_raw {
+                    Some(raw) => {
+                        self.axis_calibration.update_from_raw(&raw);
+                        Ok(())
+                    }
+                    None => Err("在前未接收到任何原始数据包，无法进行校准"),
+                };
+                if respond_to.send(result).is_err() {
+                    tracing::error!("标定 response 接受端在发送前已被丢弃");
+                };
+            }
+        }
     }
 }
 

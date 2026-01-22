@@ -1,34 +1,37 @@
 //! 应用全局状态与资源管理。
 
-use std::sync::{Arc, Mutex as StdMutex};
-
 use flume::Receiver;
-use tokio::sync::{Mutex, MutexGuard};
+use tokio::sync::{oneshot, Mutex, MutexGuard};
 
 use crate::{
     imu::IMUClient,
-    processor::Processor,
+    processor::{calibration::AxisCalibrationRequest, Processor},
     recorder::{spawn_recorder, RecorderCommand},
     types::outputs::ResponseData,
 };
-use math_f64::{DQuat, DVec3};
 
-#[derive(Debug, Clone, Copy)]
-/// IMU 姿态矫正数据：记录角度偏移与四元数偏移。
-/// TODO: 这里的逻辑移动到 processor/calibration 里
-pub struct ImuCalibration {
-    /// 欧拉角偏移（用于直接减去，令当前角度归零）
-    pub angle_offset: DVec3,
-    /// 四元数偏移（用于姿态归零：实际使用其逆来校正）
-    pub quat_offset: DQuat,
+/// 姿态零位校准请求通道句柄。
+pub struct CalibrationHandle {
+    tx: flume::Sender<AxisCalibrationRequest>,
 }
 
-impl Default for ImuCalibration {
-    fn default() -> Self {
-        Self {
-            angle_offset: DVec3::ZERO,
-            quat_offset: DQuat::IDENTITY,
-        }
+const CALIBRATION_ERROR: &str = "Failed to update axis calibration";
+
+impl CalibrationHandle {
+    /// 创建校准通道句柄与接收端。
+    pub fn new() -> (Self, flume::Receiver<AxisCalibrationRequest>) {
+        let (tx, rx) = flume::unbounded();
+        (Self { tx }, rx)
+    }
+
+    /// 请求以当前姿态作为零位。
+    pub async fn request_axis_calibration(&self) -> Result<(), &'static str> {
+        // response tells the caller
+        let (respond_to, response_rx) = oneshot::channel();
+        self.tx
+            .send(AxisCalibrationRequest::SetAxis { respond_to })
+            .map_err(|_| CALIBRATION_ERROR)?;
+        response_rx.await.map_err(|_| CALIBRATION_ERROR)?
     }
 }
 
@@ -49,10 +52,8 @@ pub struct AppState {
     /// 录制控制通道。
     pub recorder_tx: flume::Sender<RecorderCommand>,
 
-    /// 当前生效的姿态矫正值（由前端触发“校准”更新）
-    pub imu_calibration: Arc<StdMutex<ImuCalibration>>,
-    /// 最新原始姿态快照（未矫正），用于后端在校准时取“当前姿态”
-    pub imu_latest_raw: Arc<StdMutex<Option<ImuCalibration>>>,
+    /// 姿态零位校准控制句柄。
+    pub calibration_handle: CalibrationHandle,
 }
 
 impl AppState {
@@ -67,26 +68,23 @@ impl AppState {
         let (record_tx, record_rx) = flume::bounded(2048);
         let (recorder_tx, recorder_rx) = flume::unbounded();
         spawn_recorder(record_rx, recorder_rx);
-        let imu_calibration = Arc::new(StdMutex::new(ImuCalibration::default()));
-        let imu_latest_raw = Arc::new(StdMutex::new(None));
+        let (calibration_handle, calibration_rx) = CalibrationHandle::new();
         AppState {
             imu_client: Mutex::new(IMUClient::new(upstream_tx)),
-            processor: Processor::new(
-                upstream_rx,
-                downstream_tx,
-                record_tx,
-                imu_calibration.clone(),
-                imu_latest_raw.clone(),
-            ),
+            processor: Processor::new(upstream_rx, downstream_tx, record_tx, calibration_rx),
             downstream_rx,
             recorder_tx,
-            imu_calibration,
-            imu_latest_raw,
+            calibration_handle,
         }
     }
 
     /// 获取 IMU 客户端引用。
     pub async fn client(&self) -> MutexGuard<'_, IMUClient> {
         self.imu_client.lock().await
+    }
+
+    /// 请求姿态零位校准。
+    pub async fn request_axis_calibration(&self) -> Result<(), &'static str> {
+        self.calibration_handle.request_axis_calibration().await
     }
 }
