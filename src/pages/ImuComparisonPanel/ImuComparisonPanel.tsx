@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Card, Tabs } from "antd";
+import { Card } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
 import { useImuComparisonSource } from "../../hooks/useImuComparisonSource";
 import { ImuThreeCard } from "../../components/ImuThreeCard";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
+import { ImuChartTabs } from "../../components/ImuChartTabs";
 import { ImuToolBar } from "../../components/ImuToolBar";
 
 import styles from "./ImuComparisonPanel.module.scss";
@@ -110,19 +111,7 @@ export const ImuComparisonPanel: React.FC = () => {
         </div>
 
         <div className={styles.rightColumn}>
-          <Card
-            size="small"
-            variant="outlined"
-            className={styles.panelCard}
-            style={{ background: "#141414", border: "1px solid #303030" }}
-            styles={{ header: { color: "blue" }, body: { paddingTop: 0 } }}
-          >
-            <Tabs
-              className={styles.chartTabs}
-              items={chartItems}
-              destroyOnHidden
-            />
-          </Card>
+          <ImuChartTabs items={chartItems} />
 
         </div>
       </div>
