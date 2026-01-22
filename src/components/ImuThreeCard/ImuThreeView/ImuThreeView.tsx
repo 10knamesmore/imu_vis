@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
-import { ImuSource } from "../../hooks/useImuSource";
+import { ImuSource } from "../../../hooks/useImuSource";
 
 import styles from "./ImuThreeView.module.scss";
 

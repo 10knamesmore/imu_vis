@@ -1,13 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Button, Card, Switch, Tabs, message } from "antd";
+import { Card, Tabs } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
 import { useImuComparisonSource } from "../../hooks/useImuComparisonSource";
-import { ImuThreeView } from "../../components/ImuThreeView";
+import { ImuThreeCard } from "../../components/ImuThreeCard";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
 import { ImuToolBar } from "../../components/ImuToolBar";
-import { imuApi } from "../../services/imu";
 
 import styles from "./ImuComparisonPanel.module.scss";
 
@@ -22,24 +21,11 @@ export const ImuComparisonPanel: React.FC = () => {
     toggleRecording,
   } = useBluetooth();
 
-  const [showTrajectory, setShowTrajectory] = useState(true);
   const [showCharts, _] = useState(true);
   const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
 
   const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
   const comparisonSource = useImuComparisonSource({ enabled: sourceEnabled, capacity: 4096 });
-
-  /**
-   * 触发姿态校准：由后端读取“当前姿态”并归零。
-   */
-  const handleCalibrateZ = async () => {
-    const res = await imuApi.setAxisCalibration();
-    if (res.success) {
-      message.success("姿态已校准");
-    } else {
-      message.error(res.message || "姿态校准失败");
-    }
-  };
 
   const chartItems = [
     {
@@ -120,31 +106,7 @@ export const ImuComparisonPanel: React.FC = () => {
 
       <div className={styles.mainGrid}>
         <div className={styles.leftColumn}>
-          <Card
-            title="三维姿态"
-            size="small"
-            variant="outlined"
-            className={styles.panelCard}
-            extra={
-              <div className={styles.imuControls}>
-                <div className={styles.imuControl}>
-                  <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
-                    姿态校准
-                  </Button>
-                </div>
-                <div className={styles.imuControl}>
-                  <span>轨迹</span>
-                  <Switch checked={showTrajectory} onChange={setShowTrajectory} />
-                </div>
-              </div>
-            }
-            style={{ background: "#141414", border: "1px solid #303030" }}
-            styles={{ header: { color: "white" } }}
-          >
-            <div className={styles.imuThreePanel}>
-              <ImuThreeView source={imuSource} showTrajectory={showTrajectory} scale={1} />
-            </div>
-          </Card>
+          <ImuThreeCard source={imuSource} />
         </div>
 
         <div className={styles.rightColumn}>
