@@ -23,7 +23,11 @@ const formatDuration = (start: number, end?: number | null) => {
 /**
  * 录制记录管理面板组件。
  */
-export const RecordingsPanel: React.FC = () => {
+type RecordingsPanelProps = {
+  embedded?: boolean;
+};
+
+export const RecordingsPanel: React.FC<RecordingsPanelProps> = ({ embedded }) => {
   const {
     recordings,
     refreshRecordings,
@@ -129,6 +133,41 @@ export const RecordingsPanel: React.FC = () => {
     [edits, loadRecording, updateRecordingMeta],
   );
 
+  const controls = (
+    <Space>
+      <Button onClick={refreshRecordings}>刷新</Button>
+      <Tooltip title="退出回放会恢复实时数据更新">
+        <Button disabled={!replaying} onClick={exitReplay}>
+          退出回放
+        </Button>
+      </Tooltip>
+      <Tag color={replaying ? 'orange' : 'default'}>
+        {replaying ? '回放中' : '实时模式'}
+      </Tag>
+    </Space>
+  );
+
+  const table = (
+    <Table
+      rowKey="id"
+      dataSource={recordings}
+      columns={columns}
+      pagination={{ pageSize: 6 }}
+      size="small"
+      className={styles.recordingsTable}
+      scroll={{ y: 240 }}
+    />
+  );
+
+  if (embedded) {
+    return (
+      <div className={styles.recordingsPanel}>
+        <div className={styles.recordingsHeader}>{controls}</div>
+        {table}
+      </div>
+    );
+  }
+
   return (
     <div className={styles.recordingsPanel}>
       <Card
@@ -138,29 +177,9 @@ export const RecordingsPanel: React.FC = () => {
         className={styles.recordingsCard}
         style={{ background: '#141414', border: '1px solid #303030' }}
         styles={{ header: { color: 'white' } }}
-        extra={
-          <Space>
-            <Button onClick={refreshRecordings}>刷新</Button>
-            <Tooltip title="退出回放会恢复实时数据更新">
-              <Button disabled={!replaying} onClick={exitReplay}>
-                退出回放
-              </Button>
-            </Tooltip>
-            <Tag color={replaying ? 'orange' : 'default'}>
-              {replaying ? '回放中' : '实时模式'}
-            </Tag>
-          </Space>
-        }
+        extra={controls}
       >
-        <Table
-          rowKey="id"
-          dataSource={recordings}
-          columns={columns}
-          pagination={{ pageSize: 6 }}
-          size="small"
-          className={styles.recordingsTable}
-          scroll={{ y: 240 }}
-        />
+        {table}
       </Card>
     </div>
   );

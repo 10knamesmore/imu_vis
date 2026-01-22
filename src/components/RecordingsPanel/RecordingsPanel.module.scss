@@ -4,6 +4,12 @@
   min-width: 0;
 }
 
+.recordingsHeader {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
 .recordingsCard {
   height: 100%;
   min-width: 0;

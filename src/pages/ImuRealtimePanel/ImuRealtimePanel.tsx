@@ -1,13 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { Button, Card, Switch, Tabs, Tag, message } from "antd";
+import { Button, Card, Switch, Tabs, message } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
 import { imuApi } from "../../services/imu";
 
-import { RecordingsPanel } from "../../components/RecordingsPanel";
 import { ImuThreeView } from "../../components/ImuThreeView";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
+import { ImuToolBar } from "../../components/ImuToolBar";
 import styles from "./ImuRealtimePanel.module.scss";
 
 /**
@@ -22,8 +22,8 @@ export const ImuRealtimePanel: React.FC = () => {
   } = useBluetooth();
   // 控制是否显示轨迹
   const [showTrajectory, setShowTrajectory] = useState(true);
-  // 控制是否显示图表
-  const [showCharts, setShowCharts] = useState(true);
+  // 控制是否显示图表, TODO: 由card内部决定
+  const [showCharts, _] = useState(true);
   // 检查是否已连接设备
   const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
   // 获取 IMU 数据源，缓冲区容量 4096
@@ -186,42 +186,13 @@ export const ImuRealtimePanel: React.FC = () => {
         style={{ background: "#141414", border: "1px solid #303030" }}
         styles={{ body: { padding: "12px 16px" } }}
       >
-        <div className={styles.imuToolbar}>
-          <div className={styles.imuStatus}>
-            <span className={styles.imuStatusLabel}>IMU 数据流</span>
-            <Tag color={sourceEnabled ? "green" : "default"}>
-              {sourceEnabled ? "已连接" : "未连接"}
-            </Tag>
-          </div>
-          <div className={styles.imuControls}>
-            <div className={styles.imuControl}>
-              <span>轨迹</span>
-              <Switch checked={showTrajectory} onChange={setShowTrajectory} />
-            </div>
-            <div className={styles.imuControl}>
-              <span>图表</span>
-              <Switch checked={showCharts} onChange={setShowCharts} />
-            </div>
-            <div className={styles.imuControl}>
-              <Button
-                type={recording ? "primary" : "default"}
-                danger={recording}
-                onClick={toggleRecording}
-                disabled={!connectedDevice}
-              >
-                {recording ? "停止录制" : "开始录制"}
-              </Button>
-              <Tag color={recording ? "red" : "default"}>
-                {recording ? `录制中: ${recordingStatus?.session_id ?? "-"}` : "录制: 关闭"}
-              </Tag>
-            </div>
-            <div className={styles.imuControl}>
-              <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
-                姿态校准
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ImuToolBar
+          sourceEnabled={sourceEnabled}
+          connectedDevice={connectedDevice !== null}
+          recording={recording}
+          recordingStatus={recordingStatus}
+          onToggleRecording={toggleRecording}
+        />
       </Card>
 
       <div className={styles.mainGrid}>
@@ -231,6 +202,19 @@ export const ImuRealtimePanel: React.FC = () => {
             size="small"
             variant="outlined"
             className={styles.panelCard}
+            extra={
+              <div className={styles.imuControls}>
+                <div className={styles.imuControl}>
+                  <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
+                    姿态校准
+                  </Button>
+                </div>
+                <div className={styles.imuControl}>
+                  <span>轨迹</span>
+                  <Switch checked={showTrajectory} onChange={setShowTrajectory} />
+                </div>
+              </div>
+            }
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
@@ -255,7 +239,6 @@ export const ImuRealtimePanel: React.FC = () => {
             />
           </Card>
 
-          <RecordingsPanel />
         </div>
       </div>
     </div>

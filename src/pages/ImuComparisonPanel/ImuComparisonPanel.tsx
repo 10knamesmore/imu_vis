@@ -1,12 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Button, Card, Switch, Tabs, Tag, message } from "antd";
+import { Button, Card, Switch, Tabs, message } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
 import { useImuComparisonSource } from "../../hooks/useImuComparisonSource";
 import { ImuThreeView } from "../../components/ImuThreeView";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
-import { RecordingsPanel } from "../../components/RecordingsPanel";
+import { ImuToolBar } from "../../components/ImuToolBar";
 import { imuApi } from "../../services/imu";
 
 import styles from "./ImuComparisonPanel.module.scss";
@@ -23,7 +23,7 @@ export const ImuComparisonPanel: React.FC = () => {
   } = useBluetooth();
 
   const [showTrajectory, setShowTrajectory] = useState(true);
-  const [showCharts, setShowCharts] = useState(true);
+  const [showCharts, _] = useState(true);
   const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
 
   const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
@@ -109,42 +109,13 @@ export const ImuComparisonPanel: React.FC = () => {
         style={{ background: "#141414", border: "1px solid #303030" }}
         styles={{ body: { padding: "12px 16px" } }}
       >
-        <div className={styles.imuToolbar}>
-          <div className={styles.imuStatus}>
-            <span className={styles.imuStatusLabel}>IMU 数据流</span>
-            <Tag color={sourceEnabled ? "green" : "default"}>
-              {sourceEnabled ? "已连接" : "未连接"}
-            </Tag>
-          </div>
-          <div className={styles.imuControls}>
-            <div className={styles.imuControl}>
-              <span>轨迹</span>
-              <Switch checked={showTrajectory} onChange={setShowTrajectory} />
-            </div>
-            <div className={styles.imuControl}>
-              <span>图表</span>
-              <Switch checked={showCharts} onChange={setShowCharts} />
-            </div>
-            <div className={styles.imuControl}>
-              <Button
-                type={recording ? "primary" : "default"}
-                danger={recording}
-                onClick={toggleRecording}
-                disabled={!connectedDevice}
-              >
-                {recording ? "停止录制" : "开始录制"}
-              </Button>
-              <Tag color={recording ? "red" : "default"}>
-                {recording ? `录制中: ${recordingStatus?.session_id ?? "-"}` : "录制: 关闭"}
-              </Tag>
-            </div>
-            <div className={styles.imuControl}>
-              <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
-                姿态校准
-              </Button>
-            </div>
-          </div>
-        </div>
+        <ImuToolBar
+          sourceEnabled={sourceEnabled}
+          connectedDevice={connectedDevice !== null}
+          recording={recording}
+          recordingStatus={recordingStatus}
+          onToggleRecording={toggleRecording}
+        />
       </Card>
 
       <div className={styles.mainGrid}>
@@ -154,6 +125,19 @@ export const ImuComparisonPanel: React.FC = () => {
             size="small"
             variant="outlined"
             className={styles.panelCard}
+            extra={
+              <div className={styles.imuControls}>
+                <div className={styles.imuControl}>
+                  <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
+                    姿态校准
+                  </Button>
+                </div>
+                <div className={styles.imuControl}>
+                  <span>轨迹</span>
+                  <Switch checked={showTrajectory} onChange={setShowTrajectory} />
+                </div>
+              </div>
+            }
             style={{ background: "#141414", border: "1px solid #303030" }}
             styles={{ header: { color: "white" } }}
           >
@@ -178,7 +162,6 @@ export const ImuComparisonPanel: React.FC = () => {
             />
           </Card>
 
-          <RecordingsPanel />
         </div>
       </div>
     </div>
