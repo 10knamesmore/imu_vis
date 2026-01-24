@@ -211,7 +211,7 @@ impl IMUClient {
                     let elapsed_secs = elapsed.as_secs_f64();
                     let throughput = msg_count as f64 / elapsed_secs;
 
-                    tracing::info!(throughput, msg_count, elapsed_secs, "处理速率报告");
+                    tracing::debug!(throughput, msg_count, elapsed_secs, "处理速率报告");
 
                     // 重置计数器和计时器
                     msg_count = 0;

@@ -15,6 +15,7 @@ pub fn init_tracing() -> WorkerGuard {
     let stdout_layer = if cfg!(debug_assertions) {
         let targets = Targets::new()
             .with_target("bluez_async::events", LevelFilter::INFO)
+            .with_target("sqlx", LevelFilter::WARN)
             .with_default(LevelFilter::DEBUG);
         Some(
             tracing_subscriber::fmt::layer()
