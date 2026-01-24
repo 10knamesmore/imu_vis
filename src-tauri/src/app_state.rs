@@ -19,6 +19,7 @@ const CALIBRATION_ERROR: &str = "Failed to update axis calibration";
 
 impl CalibrationHandle {
     /// 创建校准通道句柄与接收端。
+    /// rx 交给processor用于接收请求。
     pub fn new() -> (Self, flume::Receiver<AxisCalibrationRequest>) {
         let (tx, rx) = flume::unbounded();
         (Self { tx }, rx)
@@ -27,6 +28,7 @@ impl CalibrationHandle {
     /// 请求以当前姿态作为零位。
     pub async fn request_axis_calibration(&self) -> Result<(), &'static str> {
         // response tells the caller
+        // 给 Processor 发一个请求， 等待其完成后返回结果
         let (respond_to, response_rx) = oneshot::channel();
         self.tx
             .send(AxisCalibrationRequest::SetAxis { respond_to })

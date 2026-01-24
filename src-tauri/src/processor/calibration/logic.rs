@@ -3,7 +3,9 @@
 use math_f64::DVec3;
 
 use crate::processor::{
-    calibration::types::{AxisCalibration, CalibrationState, ImuCalibrationConfig, ImuSampleCalibrated},
+    calibration::types::{
+        AxisCalibration, CalibrationState, ImuCalibrationConfig, ImuSampleCalibrated,
+    },
     parser::ImuSampleRaw,
 };
 
@@ -35,7 +37,10 @@ impl Calibration {
         }
 
         // 先去偏置再做矩阵标定，并将角速度转为 rad/s
-        let accel = apply_matrix(self.config.accel_matrix, raw.accel_with_g - self.state.bias_a);
+        let accel = apply_matrix(
+            self.config.accel_matrix,
+            raw.accel_with_g - self.state.bias_a,
+        );
         let gyro_rad = raw.gyro * DEG_TO_RAD;
         let gyro = apply_matrix(self.config.gyro_matrix, gyro_rad - self.state.bias_g);
 
@@ -46,6 +51,11 @@ impl Calibration {
             bias_g: self.state.bias_g,
             bias_a: self.state.bias_a,
         }
+    }
+
+    /// 重置标定状态。
+    pub fn reset(&mut self) {
+        self.state = CalibrationState::new(&self.config);
     }
 }
 
@@ -65,6 +75,11 @@ impl AxisCalibration {
     pub fn update_from_raw(&mut self, raw: &ImuSampleRaw) {
         self.angle_offset = raw.angle;
         self.quat_offset = raw.quat.inverse();
+    }
+
+    /// 清空姿态零位校准。
+    pub fn reset(&mut self) {
+        *self = Self::default();
     }
 }
 

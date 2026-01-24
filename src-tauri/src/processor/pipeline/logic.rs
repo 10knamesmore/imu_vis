@@ -71,6 +71,18 @@ impl ProcessorPipeline {
         Some(OutputBuilder::build(&frame))
     }
 
+    /// 重置内部状态
+    pub fn reset(&mut self) {
+        self.axis_calibration.reset();
+        self.calibration.reset();
+        self.filter.reset();
+        self.attitude_fusion.reset();
+        self.strapdown.reset();
+        self.zupt.reset();
+        self.ekf.reset();
+        self.latest_raw = None;
+    }
+
     /// 响应姿态零位校准请求。
     pub fn handle_calibration_request(&mut self, request: AxisCalibrationRequest) {
         match request {

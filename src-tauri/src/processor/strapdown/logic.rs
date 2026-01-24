@@ -63,4 +63,17 @@ impl Strapdown {
         self.nav_state.timestamp_ms = sample.timestamp_ms;
         self.nav_state
     }
+
+    /// 重置惯导状态。
+    pub fn reset(&mut self) {
+        self.nav_state = NavState {
+            timestamp_ms: 0,
+            position: DVec3::ZERO,
+            velocity: DVec3::ZERO,
+            attitude: math_f64::DQuat::IDENTITY,
+            bias_g: DVec3::ZERO,
+            bias_a: DVec3::ZERO,
+        };
+        self.last_timestamp_ms = None;
+    }
 }

@@ -29,4 +29,7 @@ impl EkfProcessor {
         // TODO: 误差状态 EKF 传播与更新
         nav
     }
+
+    /// 重置 EKF 状态（当前无内部状态）。
+    pub fn reset(&mut self) {}
 }

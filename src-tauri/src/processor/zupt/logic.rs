@@ -59,4 +59,9 @@ impl ZuptDetector {
 
         (nav, ZuptObservation { is_static })
     }
+
+    /// 重置 ZUPT 状态。
+    pub fn reset(&mut self) {
+        self.last_is_static = None;
+    }
 }

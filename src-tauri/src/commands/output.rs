@@ -12,7 +12,7 @@ pub fn subscribe_output(state: State<'_, AppState>, on_event: Channel<ResponseDa
     let rx = state.downstream_rx.clone();
     rx.drain();
     spawn(async move {
-        while let Ok(data) = rx.recv() {
+        while let Ok(data) = rx.recv_async().await {
             if on_event.send(data).is_err() {
                 // 如果发送失败，说明前端已断开连接，退出循环
                 tracing::info!("Tauri 前端订阅已断开，停止发送IMU数据。");

@@ -1,19 +1,20 @@
 //! IMU 蓝牙客户端实现。
 
 use anyhow::{anyhow, bail, Context};
-use btleplug::api::{
-    Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType,
+use btleplug::{
+    api::{Central, Characteristic, Manager as _, Peripheral as _, ScanFilter, WriteType},
+    platform::{Adapter, Manager, Peripheral},
 };
-use btleplug::platform::{Adapter, Manager, Peripheral};
 use flume::Sender;
 use futures::StreamExt;
-use std::collections::BTreeSet;
-use std::time::{Duration, Instant};
+use std::{
+    collections::BTreeSet,
+    time::{Duration, Instant},
+};
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::OnceCell;
 
-use crate::imu::config::IMUConfig;
-use crate::types::bluetooth::PeripheralInfo;
+use crate::{imu::config::IMUConfig, processor::RawImuData, types::bluetooth::PeripheralInfo};
 
 struct NeededCharacteristics {
     write_char: Characteristic,
@@ -34,13 +35,13 @@ pub struct IMUClient {
     central: OnceCell<Adapter>,
     peripheral: Option<Peripheral>,
     chars: Option<NeededCharacteristics>,
-    tx: Sender<Vec<u8>>,
+    tx: Sender<RawImuData>,
     handle: Option<JoinHandle<()>>,
 }
 
 impl IMUClient {
     /// 创建 IMU 客户端。
-    pub fn new(tx: Sender<Vec<u8>>) -> Self {
+    pub fn new(tx: Sender<RawImuData>) -> Self {
         Self {
             central: OnceCell::new(),
             peripheral: None,
@@ -149,6 +150,10 @@ impl IMUClient {
         if let Some(handle) = self.handle.take() {
             handle.abort();
         }
+        if let Err(e) = self.tx.send_async(RawImuData::Reset).await {
+            tracing::error!("下游通道已关闭, 无法发送重置信号: {}", e);
+        };
+
         match self.peripheral.take() {
             Some(p) => {
                 p.disconnect().await.context("断开设备连接")?;
@@ -190,7 +195,7 @@ impl IMUClient {
             let mut msg_count = 0;
             let mut last_report = Instant::now();
             while let Some(data) = notification_stream.next().await {
-                match tx.send_async(data.value).await {
+                match tx.send_async(RawImuData::Packet(data.value)).await {
                     Ok(_) => {
                         // debug!(uuid = %data.uuid, "received imu packet");
                     }

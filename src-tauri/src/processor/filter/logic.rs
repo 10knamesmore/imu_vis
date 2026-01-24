@@ -52,4 +52,10 @@ impl LowPassFilter {
             gyro_lp,
         }
     }
+
+    /// 重置滤波状态。
+    pub fn reset(&mut self) {
+        self.prev_accel = None;
+        self.prev_gyro = None;
+    }
 }

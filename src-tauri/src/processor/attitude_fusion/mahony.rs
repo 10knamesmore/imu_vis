@@ -66,6 +66,12 @@ impl MahonyFusion {
             euler: DVec3::ZERO,
         }
     }
+
+    /// 重置融合状态。
+    pub fn reset(&mut self) {
+        self.quat = DQuat::IDENTITY;
+        self.last_timestamp_ms = None;
+    }
 }
 
 fn normalize_or_zero(v: DVec3) -> DVec3 {

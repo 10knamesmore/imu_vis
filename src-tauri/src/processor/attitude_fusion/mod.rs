@@ -56,6 +56,11 @@ impl AttitudeFusion {
 
         self.inner.update(sample)
     }
+
+    /// 重置姿态融合状态。
+    pub fn reset(&mut self) {
+        self.inner.reset();
+    }
 }
 
 /// 对外导出的姿态融合类型。

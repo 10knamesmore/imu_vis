@@ -3,11 +3,15 @@
 //! 这里负责启动处理线程，并把原始数据送入 pipeline。
 //! pipeline 内部遵循固定链路：解析 → 标定 → 滤波 → 姿态融合 → 捷联 → ZUPT → EKF → 输出。
 
-use std::thread;
+use std::thread::{self, JoinHandle};
 
-use crate::processor::calibration::AxisCalibrationRequest;
-use crate::processor::pipeline::{ProcessorPipeline, ProcessorPipelineConfig};
-use crate::types::outputs::ResponseData;
+use crate::{
+    processor::{
+        calibration::AxisCalibrationRequest,
+        pipeline::{ProcessorPipeline, ProcessorPipelineConfig},
+    },
+    types::outputs::ResponseData,
+};
 
 /// 姿态融合模块。
 pub mod attitude_fusion;
@@ -32,12 +36,21 @@ pub mod zupt;
 pub use output::CalculatedData;
 
 /// 数据处理器实例，启动独立线程消费 IMU 流。
-pub struct Processor;
+pub struct Processor {
+    _processor_thread: JoinHandle<()>,
+}
+
+/// 原始 IMU 数据包枚举。
+pub enum RawImuData {
+    Packet(Vec<u8>),
+    Reset,
+}
 
 impl Processor {
     /// 数据处理器实例。
     ///
     /// 数据为时序，无法并行，单计算线程处理。
+    /// 处理器是无状态， 只做转发的
     ///
     /// 通道关系（上游 -> 下游）：
     /// - `imu::client` 通过 `upstream_tx` 推送原始蓝牙包。
@@ -51,13 +64,13 @@ impl Processor {
     /// * `record_tx`: 发给 recorder 线程的录制通道
     /// * `calibration_rx`: 姿态零位校准请求通道
     pub fn new(
-        upstream_rx: flume::Receiver<Vec<u8>>,
+        upstream_rx: flume::Receiver<RawImuData>,
         downstream_tx: flume::Sender<ResponseData>,
         record_tx: flume::Sender<ResponseData>,
         calibration_rx: flume::Receiver<AxisCalibrationRequest>,
     ) -> Self {
         let config = ProcessorPipelineConfig::load_from_default_paths();
-        thread::Builder::new()
+        let _processor_thread = thread::Builder::new()
             .name("DataProcessorThread".into())
             .spawn(move || {
                 let mut pipeline = ProcessorPipeline::new(config);
@@ -68,13 +81,17 @@ impl Processor {
                         Calibration(AxisCalibrationRequest),
                         UpstreamClosed,
                         CalibrationClosed,
+                        Reset,
                     }
 
                     let event = flume::Selector::new()
                         .recv(&upstream_rx, |result| match result {
-                            Ok(data) => PipelineEvent::Packet(data),
+                            Ok(data) => match data {
+                                RawImuData::Packet(packet) => PipelineEvent::Packet(packet),
+                                RawImuData::Reset => PipelineEvent::Reset,
+                            },
                             Err(e) => {
-                                tracing::warn!("从上游通道接收数据失败: {:?}", e);
+                                tracing::error!("从上游通道接收数据失败: {:?}", e);
                                 PipelineEvent::UpstreamClosed
                             }
                         })
@@ -102,15 +119,22 @@ impl Processor {
                             pipeline.handle_calibration_request(request);
                         }
                         PipelineEvent::UpstreamClosed => {
+                            // imu::Client 的生命周期预期覆盖整个应用，正常情况下不应关闭。
                             tracing::error!("数据上游通道接收失败: channel closed");
+                            break;
                         }
                         PipelineEvent::CalibrationClosed => {
                             tracing::error!("标定通道接收失败: channel closed");
+                            break;
+                        }
+                        PipelineEvent::Reset => {
+                            pipeline.reset();
+                            tracing::info!("处理管线已重置");
                         }
                     }
                 }
             })
             .unwrap_or_else(|e| panic!("创建核心处理线程失败 : {:?}", e));
-        Processor {}
+        Processor { _processor_thread }
     }
 }
