@@ -297,7 +297,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
       const dy = event.clientY - dragRef.current.lastY;
       dragRef.current.lastX = event.clientX;
       dragRef.current.lastY = event.clientY;
-      dragRef.current.yaw += dx * 0.005;
+      dragRef.current.yaw -= dx * 0.005;
       dragRef.current.pitch += dy * 0.005;
       dragRef.current.pitch = Math.max(-1.2, Math.min(1.2, dragRef.current.pitch));
       updateCamera();

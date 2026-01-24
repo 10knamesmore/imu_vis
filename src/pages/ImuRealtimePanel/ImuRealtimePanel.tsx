@@ -24,7 +24,7 @@ export const ImuRealtimePanel: React.FC = () => {
   // 检查是否已连接设备
   const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
   // 获取 IMU 数据源，缓冲区容量 4096
-  const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
+  const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 250 * 200 });
 
   const chartItems = [
     {

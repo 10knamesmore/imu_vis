@@ -13,10 +13,10 @@ export type ImuSource = {
 
 type UseImuSourceOptions = {
   enabled: boolean;
-  capacity?: number;
+  capacity: number;
 };
 
-export const useImuSource = ({ enabled, capacity = 4096 }: UseImuSourceOptions): ImuSource => {
+export const useImuSource = ({ enabled, capacity }: UseImuSourceOptions): ImuSource => {
   const bufferRef = useRef(new ImuHistoryBuffer(capacity));
   const latestRef = useRef<IMUData | null>(null);
   const streamStartMsRef = useRef<number | null>(null);

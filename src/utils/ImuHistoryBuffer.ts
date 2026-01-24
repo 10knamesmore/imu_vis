@@ -28,7 +28,7 @@ export class ImuHistoryBuffer {
   private accelNavY: Float32Array;
   private accelNavZ: Float32Array;
 
-  constructor(capacity = 4096) {
+  constructor(capacity: number) {
     this.capacity = capacity;
     this.count = 0;
     this.writeIndex = 0;

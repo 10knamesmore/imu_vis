@@ -25,8 +25,8 @@ export const ImuComparisonPanel: React.FC = () => {
   const [showCharts, _] = useState(true);
   const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
 
-  const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 4096 });
-  const comparisonSource = useImuComparisonSource({ enabled: sourceEnabled, capacity: 4096 });
+  const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 250 * 200 });
+  const comparisonSource = useImuComparisonSource({ enabled: sourceEnabled, capacity: 250 * 200 });
 
   const chartItems = [
     {

@@ -14,12 +14,12 @@ export type ImuComparisonSource = {
 
 type UseImuComparisonSourceOptions = {
   enabled: boolean;
-  capacity?: number;
+  capacity: number;
 };
 
 export const useImuComparisonSource = ({
   enabled,
-  capacity = 4096,
+  capacity,
 }: UseImuComparisonSourceOptions): ImuComparisonSource => {
   const bufferRef = useRef(new ImuComparisonHistoryBuffer(capacity));
   const latestRef = useRef<ResponseData | null>(null);
@@ -58,7 +58,7 @@ export const useImuComparisonSource = ({
 
     return () => {
       activeRef.current = false;
-      channel.onmessage = () => {};
+      channel.onmessage = () => { };
     };
   }, [enabled]);
 

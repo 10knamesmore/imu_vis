@@ -43,7 +43,7 @@ export class ImuComparisonHistoryBuffer {
   private positionY: Float32Array;
   private positionZ: Float32Array;
 
-  constructor(capacity = 4096) {
+  constructor(capacity: number) {
     this.capacity = capacity;
     this.count = 0;
     this.writeIndex = 0;

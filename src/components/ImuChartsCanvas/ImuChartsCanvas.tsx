@@ -219,7 +219,7 @@ export const ImuChartsCanvas = <TSnapshot extends SnapshotWithTime>({
     // 拖动方向与数据移动方向相反
     viewStateRef.current.offset = Math.max(
       0,
-      viewStateRef.current.offset - dx * msPerPixel
+      viewStateRef.current.offset + dx * msPerPixel
     );
   };
 
@@ -300,7 +300,7 @@ export const ImuChartsCanvas = <TSnapshot extends SnapshotWithTime>({
      * 执行单帧绘制
      * 1. 清空画布
      * 2. 检查是否启用或有数据
-     * 3. 获取数据快照并降采样
+     * 3. 获取数据快照
      * 4. 调用 drawChart 进行实际绘制
      */
     const draw = () => {
