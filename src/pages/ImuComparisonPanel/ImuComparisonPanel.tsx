@@ -3,7 +3,6 @@ import { Card } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
-import { useImuComparisonSource } from "../../hooks/useImuComparisonSource";
 import { ImuThreeCard } from "../../components/ImuThreeCard";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
 import { ImuChartTabs } from "../../components/ImuChartTabs";
@@ -26,7 +25,6 @@ export const ImuComparisonPanel: React.FC = () => {
   const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
 
   const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 250 * 200 });
-  const comparisonSource = useImuComparisonSource({ enabled: sourceEnabled, capacity: 250 * 200 });
 
   const chartItems = [
     {
@@ -35,7 +33,7 @@ export const ImuComparisonPanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={comparisonSource}
+            source={imuSource}
             enabled={showCharts}
             refreshMs={40}
             label="角度差值 (deg)"
@@ -54,14 +52,14 @@ export const ImuComparisonPanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={comparisonSource}
+            source={imuSource}
             enabled={showCharts}
             refreshMs={40}
             label="速度 (m/s)"
             series={[
-              { name: "X", color: "#4cc9f0", getValues: (s) => s.velocity.x },
-              { name: "Y", color: "#f8961e", getValues: (s) => s.velocity.y },
-              { name: "Z", color: "#43aa8b", getValues: (s) => s.velocity.z },
+              { name: "X", color: "#4cc9f0", getValues: (s) => s.calculated.velocity.x },
+              { name: "Y", color: "#f8961e", getValues: (s) => s.calculated.velocity.y },
+              { name: "Z", color: "#43aa8b", getValues: (s) => s.calculated.velocity.z },
             ]}
           />
         </div>
@@ -73,14 +71,14 @@ export const ImuComparisonPanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={comparisonSource}
+            source={imuSource}
             enabled={showCharts}
             refreshMs={40}
             label="位置 (m)"
             series={[
-              { name: "X", color: "#b8c0ff", getValues: (s) => s.position.x },
-              { name: "Y", color: "#ffd6a5", getValues: (s) => s.position.y },
-              { name: "Z", color: "#caffbf", getValues: (s) => s.position.z },
+              { name: "X", color: "#b8c0ff", getValues: (s) => s.calculated.position.x },
+              { name: "Y", color: "#ffd6a5", getValues: (s) => s.calculated.position.y },
+              { name: "Z", color: "#caffbf", getValues: (s) => s.calculated.position.z },
             ]}
           />
         </div>

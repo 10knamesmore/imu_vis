@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Channel } from "@tauri-apps/api/core";
 import { imuApi } from "../services/imu";
-import { IMUData, ResponseData } from "../types";
+import { ResponseData } from "../types";
 import { ImuHistoryBuffer } from "../utils/ImuHistoryBuffer";
 
 export type ImuSource = {
   bufferRef: React.RefObject<ImuHistoryBuffer>;
-  latestRef: React.RefObject<IMUData | null>;
+  latestRef: React.RefObject<ResponseData | null>;
   streamStartMsRef: React.RefObject<number | null>;
   reset: () => void;
 };
@@ -18,7 +18,7 @@ type UseImuSourceOptions = {
 
 export const useImuSource = ({ enabled, capacity }: UseImuSourceOptions): ImuSource => {
   const bufferRef = useRef(new ImuHistoryBuffer(capacity));
-  const latestRef = useRef<IMUData | null>(null);
+  const latestRef = useRef<ResponseData | null>(null);
   const streamStartMsRef = useRef<number | null>(null);
   const activeRef = useRef(false);
 
@@ -43,12 +43,11 @@ export const useImuSource = ({ enabled, capacity }: UseImuSourceOptions): ImuSou
       if (!activeRef.current) {
         return;
       }
-      const imu = msg.raw_data;
-      latestRef.current = imu;
+      latestRef.current = msg;
       if (streamStartMsRef.current === null) {
-        streamStartMsRef.current = imu.timestamp_ms;
+        streamStartMsRef.current = msg.raw_data.timestamp_ms;
       }
-      bufferRef.current.push(imu, streamStartMsRef.current);
+      bufferRef.current.push(msg, streamStartMsRef.current);
     };
 
     imuApi.subscribeOutput(channel);

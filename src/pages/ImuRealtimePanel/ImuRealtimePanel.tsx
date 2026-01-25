@@ -38,9 +38,9 @@ export const ImuRealtimePanel: React.FC = () => {
             refreshMs={40}
             label="加速度 (m/s^2)"
             series={[
-              { name: "X", color: "#57b2ff", getValues: (s) => s.accel.x },
-              { name: "Y", color: "#ffb74d", getValues: (s) => s.accel.y },
-              { name: "Z", color: "#88e0a5", getValues: (s) => s.accel.z },
+              { name: "X", color: "#57b2ff", getValues: (s) => s.builtin.accel.x },
+              { name: "Y", color: "#ffb74d", getValues: (s) => s.builtin.accel.y },
+              { name: "Z", color: "#88e0a5", getValues: (s) => s.builtin.accel.z },
             ]}
           />
         </div>
@@ -57,9 +57,9 @@ export const ImuRealtimePanel: React.FC = () => {
     //         refreshMs={40}
     //         label="Gyroscope (deg/s)"
     //         series={[
-    //           { name: "X", color: "#9b87ff", getValues: (s) => s.gyro.x },
-    //           { name: "Y", color: "#ff7aa2", getValues: (s) => s.gyro.y },
-    //           { name: "Z", color: "#ffd166", getValues: (s) => s.gyro.z },
+    //           { name: "X", color: "#9b87ff", getValues: (s) => s.builtin.gyro.x },
+    //           { name: "Y", color: "#ff7aa2", getValues: (s) => s.builtin.gyro.y },
+    //           { name: "Z", color: "#ffd166", getValues: (s) => s.builtin.gyro.z },
     //         ]}
     //       />
     //     </div>
@@ -76,9 +76,9 @@ export const ImuRealtimePanel: React.FC = () => {
             refreshMs={40}
             label="偏航 / 俯仰 / 横滚 (deg)"
             series={[
-              { name: "X", color: "#4cc9f0", getValues: (s) => s.angle.x },
-              { name: "Y", color: "#f8961e", getValues: (s) => s.angle.y },
-              { name: "Z", color: "#43aa8b", getValues: (s) => s.angle.z },
+              { name: "X", color: "#4cc9f0", getValues: (s) => s.builtin.angle.x },
+              { name: "Y", color: "#f8961e", getValues: (s) => s.builtin.angle.y },
+              { name: "Z", color: "#43aa8b", getValues: (s) => s.builtin.angle.z },
             ]}
           />
         </div>
@@ -95,9 +95,9 @@ export const ImuRealtimePanel: React.FC = () => {
     //         refreshMs={40}
     //         label="Acceleration (m/s^2)"
     //         series={[
-    //           { name: "X", color: "#9ad1ff", getValues: (s) => s.accelWithG.x },
-    //           { name: "Y", color: "#ffda7a", getValues: (s) => s.accelWithG.y },
-    //           { name: "Z", color: "#8ff0c4", getValues: (s) => s.accelWithG.z },
+    //           { name: "X", color: "#9ad1ff", getValues: (s) => s.builtin.accelWithG.x },
+    //           { name: "Y", color: "#ffda7a", getValues: (s) => s.builtin.accelWithG.y },
+    //           { name: "Z", color: "#8ff0c4", getValues: (s) => s.builtin.accelWithG.z },
     //         ]}
     //       />
     //     </div>
@@ -114,10 +114,10 @@ export const ImuRealtimePanel: React.FC = () => {
     //         refreshMs={40}
     //         label="Quaternion"
     //         series={[
-    //           { name: "W", color: "#f07167", getValues: (s) => s.quat.w },
-    //           { name: "X", color: "#00afb9", getValues: (s) => s.quat.x },
-    //           { name: "Y", color: "#fed9b7", getValues: (s) => s.quat.y },
-    //           { name: "Z", color: "#fdfcdc", getValues: (s) => s.quat.z },
+    //           { name: "W", color: "#f07167", getValues: (s) => s.builtin.quat.w },
+    //           { name: "X", color: "#00afb9", getValues: (s) => s.builtin.quat.x },
+    //           { name: "Y", color: "#fed9b7", getValues: (s) => s.builtin.quat.y },
+    //           { name: "Z", color: "#fdfcdc", getValues: (s) => s.builtin.quat.z },
     //         ]}
     //       />
     //     </div>
@@ -134,9 +134,9 @@ export const ImuRealtimePanel: React.FC = () => {
             refreshMs={40}
             label="偏移"
             series={[
-              { name: "X", color: "#4d96ff", getValues: (s) => s.offset.x },
-              { name: "Y", color: "#6bffb8", getValues: (s) => s.offset.y },
-              { name: "Z", color: "#ff6b6b", getValues: (s) => s.offset.z },
+              { name: "X", color: "#4d96ff", getValues: (s) => s.builtin.offset.x },
+              { name: "Y", color: "#6bffb8", getValues: (s) => s.builtin.offset.y },
+              { name: "Z", color: "#ff6b6b", getValues: (s) => s.builtin.offset.z },
             ]}
           />
         </div>
@@ -153,9 +153,9 @@ export const ImuRealtimePanel: React.FC = () => {
             refreshMs={40}
             label="导航加速度 (m/s^2)"
             series={[
-              { name: "X", color: "#b8c0ff", getValues: (s) => s.accelNav.x },
-              { name: "Y", color: "#ffd6a5", getValues: (s) => s.accelNav.y },
-              { name: "Z", color: "#caffbf", getValues: (s) => s.accelNav.z },
+              { name: "X", color: "#b8c0ff", getValues: (s) => s.builtin.accelNav.x },
+              { name: "Y", color: "#ffd6a5", getValues: (s) => s.builtin.accelNav.y },
+              { name: "Z", color: "#caffbf", getValues: (s) => s.builtin.accelNav.z },
             ]}
           />
         </div>

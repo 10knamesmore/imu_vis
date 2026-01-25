@@ -190,9 +190,9 @@ export const Statistics: React.FC = () => {
             yTitle="加速度 (m/s²)"
             time={dataHistory.time}
             series={[
-              { name: 'X', values: dataHistory.accel.x },
-              { name: 'Y', values: dataHistory.accel.y },
-              { name: 'Z', values: dataHistory.accel.z },
+              { name: 'X', values: dataHistory.builtin.accel.x },
+              { name: 'Y', values: dataHistory.builtin.accel.y },
+              { name: 'Z', values: dataHistory.builtin.accel.z },
             ]}
             layoutBase={commonLayout}
             revision={plotRevision}
@@ -204,9 +204,9 @@ export const Statistics: React.FC = () => {
             yTitle="角速度 (deg/s)"
             time={dataHistory.time}
             series={[
-              { name: 'X', values: dataHistory.gyro.x },
-              { name: 'Y', values: dataHistory.gyro.y },
-              { name: 'Z', values: dataHistory.gyro.z },
+              { name: 'X', values: dataHistory.builtin.gyro.x },
+              { name: 'Y', values: dataHistory.builtin.gyro.y },
+              { name: 'Z', values: dataHistory.builtin.gyro.z },
             ]}
             layoutBase={commonLayout}
             revision={plotRevision}
@@ -218,9 +218,9 @@ export const Statistics: React.FC = () => {
             yTitle="角度 (deg)"
             time={dataHistory.time}
             series={[
-              { name: 'X', values: dataHistory.angle.x },
-              { name: 'Y', values: dataHistory.angle.y },
-              { name: 'Z', values: dataHistory.angle.z },
+              { name: 'X', values: dataHistory.builtin.angle.x },
+              { name: 'Y', values: dataHistory.builtin.angle.y },
+              { name: 'Z', values: dataHistory.builtin.angle.z },
             ]}
             layoutBase={commonLayout}
             revision={plotRevision}
@@ -232,9 +232,9 @@ export const Statistics: React.FC = () => {
             yTitle="加速度 (m/s²)"
             time={dataHistory.time}
             series={[
-              { name: 'X', values: dataHistory.accelWithG.x },
-              { name: 'Y', values: dataHistory.accelWithG.y },
-              { name: 'Z', values: dataHistory.accelWithG.z },
+              { name: 'X', values: dataHistory.builtin.accelWithG.x },
+              { name: 'Y', values: dataHistory.builtin.accelWithG.y },
+              { name: 'Z', values: dataHistory.builtin.accelWithG.z },
             ]}
             layoutBase={commonLayout}
             revision={plotRevision}
@@ -246,10 +246,10 @@ export const Statistics: React.FC = () => {
             yTitle="四元数"
             time={dataHistory.time}
             series={[
-              { name: 'W', values: dataHistory.quat.w },
-              { name: 'X', values: dataHistory.quat.x },
-              { name: 'Y', values: dataHistory.quat.y },
-              { name: 'Z', values: dataHistory.quat.z },
+              { name: 'W', values: dataHistory.builtin.quat.w },
+              { name: 'X', values: dataHistory.builtin.quat.x },
+              { name: 'Y', values: dataHistory.builtin.quat.y },
+              { name: 'Z', values: dataHistory.builtin.quat.z },
             ]}
             layoutBase={commonLayout}
             revision={plotRevision}
@@ -261,9 +261,9 @@ export const Statistics: React.FC = () => {
             yTitle="偏移"
             time={dataHistory.time}
             series={[
-              { name: 'X', values: dataHistory.offset.x },
-              { name: 'Y', values: dataHistory.offset.y },
-              { name: 'Z', values: dataHistory.offset.z },
+              { name: 'X', values: dataHistory.builtin.offset.x },
+              { name: 'Y', values: dataHistory.builtin.offset.y },
+              { name: 'Z', values: dataHistory.builtin.offset.z },
             ]}
             layoutBase={commonLayout}
             revision={plotRevision}
@@ -275,9 +275,9 @@ export const Statistics: React.FC = () => {
             yTitle="导航加速度"
             time={dataHistory.time}
             series={[
-              { name: 'X', values: dataHistory.accelNav.x },
-              { name: 'Y', values: dataHistory.accelNav.y },
-              { name: 'Z', values: dataHistory.accelNav.z },
+              { name: 'X', values: dataHistory.builtin.accelNav.x },
+              { name: 'Y', values: dataHistory.builtin.accelNav.y },
+              { name: 'Z', values: dataHistory.builtin.accelNav.z },
             ]}
             layoutBase={commonLayout}
             revision={plotRevision}

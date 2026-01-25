@@ -25,19 +25,6 @@ export interface IMUData {
   accel_nav: Vector3;   // 导航坐标系下的加速度
 }
 
-// IMU 历史数据，用于图表绘制
-// 将每个分量存储为数组以便于 plotting library 使用
-export interface ImuDataHistory {
-  time: number[];
-  accel: { x: number[]; y: number[]; z: number[] };
-  accelWithG: { x: number[]; y: number[]; z: number[] };
-  gyro: { x: number[]; y: number[]; z: number[] };
-  angle: { x: number[]; y: number[]; z: number[] };
-  quat: { w: number[]; x: number[]; y: number[]; z: number[] };
-  offset: { x: number[]; y: number[]; z: number[] };
-  accelNav: { x: number[]; y: number[]; z: number[] };
-}
-
 // 计算后的数据（速度、位置等）
 export interface CalculatedData {
   attitude: Quaternion; // 姿态四元数
@@ -46,14 +33,25 @@ export interface CalculatedData {
   timestamp_ms: number;
 }
 
-// 用于对比原始姿态与计算姿态的数据历史
-export interface ImuComparisonHistory {
+// IMU 历史数据缓冲（内置数据 + 计算数据）
+export interface ImuHistorySnapshot {
   time: number[];
-  rawAngle: { x: number[]; y: number[]; z: number[] };
-  calculatedAngle: { x: number[]; y: number[]; z: number[] };
+  builtin: {
+    accel: { x: number[]; y: number[]; z: number[] };
+    accelWithG: { x: number[]; y: number[]; z: number[] };
+    gyro: { x: number[]; y: number[]; z: number[] };
+    angle: { x: number[]; y: number[]; z: number[] };
+    quat: { w: number[]; x: number[]; y: number[]; z: number[] };
+    offset: { x: number[]; y: number[]; z: number[] };
+    accelNav: { x: number[]; y: number[]; z: number[] };
+  };
+  calculated: {
+    angle: { x: number[]; y: number[]; z: number[] };
+    attitude: { w: number[]; x: number[]; y: number[]; z: number[] };
+    velocity: { x: number[]; y: number[]; z: number[] };
+    position: { x: number[]; y: number[]; z: number[] };
+  };
   deltaAngle: { x: number[]; y: number[]; z: number[] };
-  velocity: { x: number[]; y: number[]; z: number[] };
-  position: { x: number[]; y: number[]; z: number[] };
 }
 
 // 后端返回的完整响应数据

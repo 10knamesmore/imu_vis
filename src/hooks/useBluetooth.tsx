@@ -2,13 +2,13 @@ import React, { useState, useEffect, useCallback, useContext, useRef } from 'rea
 import { message } from 'antd';
 import { Channel } from '@tauri-apps/api/core';
 import { imuApi } from '../services/imu';
-import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus, ImuDataHistory } from '../types';
+import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus, ImuHistorySnapshot } from '../types';
 
 type BluetoothContextValue = {
   scanning: boolean;
   devices: PeripheralInfo[];
   connectedDevice: PeripheralInfo | null;
-  dataHistory: ImuDataHistory;
+  dataHistory: ImuHistorySnapshot;
   plotRevision: number;
   uiRefreshMs: number;
   setUiRefreshMs: React.Dispatch<React.SetStateAction<number>>;
@@ -29,15 +29,24 @@ type BluetoothContextValue = {
   toggleRecording: () => Promise<void>;
 };
 
-const createEmptyHistory = (): ImuDataHistory => ({
+const createEmptyHistory = (): ImuHistorySnapshot => ({
   time: [],
-  accel: { x: [], y: [], z: [] },
-  accelWithG: { x: [], y: [], z: [] },
-  gyro: { x: [], y: [], z: [] },
-  angle: { x: [], y: [], z: [] },
-  quat: { w: [], x: [], y: [], z: [] },
-  offset: { x: [], y: [], z: [] },
-  accelNav: { x: [], y: [], z: [] },
+  builtin: {
+    accel: { x: [], y: [], z: [] },
+    accelWithG: { x: [], y: [], z: [] },
+    gyro: { x: [], y: [], z: [] },
+    angle: { x: [], y: [], z: [] },
+    quat: { w: [], x: [], y: [], z: [] },
+    offset: { x: [], y: [], z: [] },
+    accelNav: { x: [], y: [], z: [] },
+  },
+  calculated: {
+    angle: { x: [], y: [], z: [] },
+    attitude: { w: [], x: [], y: [], z: [] },
+    velocity: { x: [], y: [], z: [] },
+    position: { x: [], y: [], z: [] },
+  },
+  deltaAngle: { x: [], y: [], z: [] },
 });
 
 const BluetoothContext = React.createContext<BluetoothContextValue | null>(null);
@@ -58,7 +67,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   // 是否已连接设备
   const [connectedDevice, setConnectedDevice] = useState<PeripheralInfo | null>(null);
   // 对外提供的 IMU 数据历史
-  const [dataHistory, setDataHistory] = useState<ImuDataHistory>(createEmptyHistory);
+  const [dataHistory, setDataHistory] = useState<ImuHistorySnapshot>(createEmptyHistory);
   // 表示图重绘的版本号，每次更新加一
   const [plotRevision, setPlotRevision] = useState(0);
   // UI 刷新间隔（ms），只影响图表渲染频率，不影响数据接收频率
@@ -68,7 +77,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
   const [recording, setRecording] = useState(false);
   // 高频数据缓存：onmessage 只更新这里，避免每条消息都触发 React 重渲染
-  const dataHistoryRef = useRef<ImuDataHistory>(createEmptyHistory());
+  const dataHistoryRef = useRef<ImuHistorySnapshot>(createEmptyHistory());
   // 记录数据流起始时间（ms），用于生成相对时间轴
   const streamStartMsRef = useRef<number | null>(null);
   // 1s 内的消息计数器（由定时器每秒读取并清零）
@@ -178,13 +187,9 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       const snapshot = dataHistoryRef.current;
       setDataHistory({
         time: snapshot.time,
-        accel: snapshot.accel,
-        accelWithG: snapshot.accelWithG,
-        gyro: snapshot.gyro,
-        angle: snapshot.angle,
-        quat: snapshot.quat,
-        offset: snapshot.offset,
-        accelNav: snapshot.accelNav,
+        builtin: snapshot.builtin,
+        calculated: snapshot.calculated,
+        deltaAngle: snapshot.deltaAngle,
       });
       setPlotRevision((rev) => (rev + 1) % 1_000_000);
     }, Math.max(16, uiRefreshMs)); // 最快 60 FPS
@@ -201,28 +206,28 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         streamStartMsRef.current = imuData.timestamp_ms;
       }
       pushCapped(history.time, imuData.timestamp_ms - (streamStartMsRef.current ?? 0));
-      pushCapped(history.accel.x, imuData.accel_no_g.x);
-      pushCapped(history.accel.y, imuData.accel_no_g.y);
-      pushCapped(history.accel.z, imuData.accel_no_g.z);
-      pushCapped(history.accelWithG.x, imuData.accel_with_g.x);
-      pushCapped(history.accelWithG.y, imuData.accel_with_g.y);
-      pushCapped(history.accelWithG.z, imuData.accel_with_g.z);
-      pushCapped(history.gyro.x, imuData.gyro.x);
-      pushCapped(history.gyro.y, imuData.gyro.y);
-      pushCapped(history.gyro.z, imuData.gyro.z);
-      pushCapped(history.angle.x, imuData.angle.x);
-      pushCapped(history.angle.y, imuData.angle.y);
-      pushCapped(history.angle.z, imuData.angle.z);
-      pushCapped(history.quat.w, imuData.quat.w);
-      pushCapped(history.quat.x, imuData.quat.x);
-      pushCapped(history.quat.y, imuData.quat.y);
-      pushCapped(history.quat.z, imuData.quat.z);
-      pushCapped(history.offset.x, imuData.offset.x);
-      pushCapped(history.offset.y, imuData.offset.y);
-      pushCapped(history.offset.z, imuData.offset.z);
-      pushCapped(history.accelNav.x, imuData.accel_nav.x);
-      pushCapped(history.accelNav.y, imuData.accel_nav.y);
-      pushCapped(history.accelNav.z, imuData.accel_nav.z);
+      pushCapped(history.builtin.accel.x, imuData.accel_no_g.x);
+      pushCapped(history.builtin.accel.y, imuData.accel_no_g.y);
+      pushCapped(history.builtin.accel.z, imuData.accel_no_g.z);
+      pushCapped(history.builtin.accelWithG.x, imuData.accel_with_g.x);
+      pushCapped(history.builtin.accelWithG.y, imuData.accel_with_g.y);
+      pushCapped(history.builtin.accelWithG.z, imuData.accel_with_g.z);
+      pushCapped(history.builtin.gyro.x, imuData.gyro.x);
+      pushCapped(history.builtin.gyro.y, imuData.gyro.y);
+      pushCapped(history.builtin.gyro.z, imuData.gyro.z);
+      pushCapped(history.builtin.angle.x, imuData.angle.x);
+      pushCapped(history.builtin.angle.y, imuData.angle.y);
+      pushCapped(history.builtin.angle.z, imuData.angle.z);
+      pushCapped(history.builtin.quat.w, imuData.quat.w);
+      pushCapped(history.builtin.quat.x, imuData.quat.x);
+      pushCapped(history.builtin.quat.y, imuData.quat.y);
+      pushCapped(history.builtin.quat.z, imuData.quat.z);
+      pushCapped(history.builtin.offset.x, imuData.offset.x);
+      pushCapped(history.builtin.offset.y, imuData.offset.y);
+      pushCapped(history.builtin.offset.z, imuData.offset.z);
+      pushCapped(history.builtin.accelNav.x, imuData.accel_nav.x);
+      pushCapped(history.builtin.accelNav.y, imuData.accel_nav.y);
+      pushCapped(history.builtin.accelNav.z, imuData.accel_nav.z);
     };
 
     imuApi.subscribeOutput(channel);
@@ -352,28 +357,28 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       for (const sample of samples) {
         const imuData = sample.raw_data;
         pushCapped(history.time, imuData.timestamp_ms - startMs, samples.length + 1);
-        pushCapped(history.accel.x, imuData.accel_no_g.x, samples.length + 1);
-        pushCapped(history.accel.y, imuData.accel_no_g.y, samples.length + 1);
-        pushCapped(history.accel.z, imuData.accel_no_g.z, samples.length + 1);
-        pushCapped(history.accelWithG.x, imuData.accel_with_g.x, samples.length + 1);
-        pushCapped(history.accelWithG.y, imuData.accel_with_g.y, samples.length + 1);
-        pushCapped(history.accelWithG.z, imuData.accel_with_g.z, samples.length + 1);
-        pushCapped(history.gyro.x, imuData.gyro.x, samples.length + 1);
-        pushCapped(history.gyro.y, imuData.gyro.y, samples.length + 1);
-        pushCapped(history.gyro.z, imuData.gyro.z, samples.length + 1);
-        pushCapped(history.angle.x, imuData.angle.x, samples.length + 1);
-        pushCapped(history.angle.y, imuData.angle.y, samples.length + 1);
-        pushCapped(history.angle.z, imuData.angle.z, samples.length + 1);
-        pushCapped(history.quat.w, imuData.quat.w, samples.length + 1);
-        pushCapped(history.quat.x, imuData.quat.x, samples.length + 1);
-        pushCapped(history.quat.y, imuData.quat.y, samples.length + 1);
-        pushCapped(history.quat.z, imuData.quat.z, samples.length + 1);
-        pushCapped(history.offset.x, imuData.offset.x, samples.length + 1);
-        pushCapped(history.offset.y, imuData.offset.y, samples.length + 1);
-        pushCapped(history.offset.z, imuData.offset.z, samples.length + 1);
-        pushCapped(history.accelNav.x, imuData.accel_nav.x, samples.length + 1);
-        pushCapped(history.accelNav.y, imuData.accel_nav.y, samples.length + 1);
-        pushCapped(history.accelNav.z, imuData.accel_nav.z, samples.length + 1);
+        pushCapped(history.builtin.accel.x, imuData.accel_no_g.x, samples.length + 1);
+        pushCapped(history.builtin.accel.y, imuData.accel_no_g.y, samples.length + 1);
+        pushCapped(history.builtin.accel.z, imuData.accel_no_g.z, samples.length + 1);
+        pushCapped(history.builtin.accelWithG.x, imuData.accel_with_g.x, samples.length + 1);
+        pushCapped(history.builtin.accelWithG.y, imuData.accel_with_g.y, samples.length + 1);
+        pushCapped(history.builtin.accelWithG.z, imuData.accel_with_g.z, samples.length + 1);
+        pushCapped(history.builtin.gyro.x, imuData.gyro.x, samples.length + 1);
+        pushCapped(history.builtin.gyro.y, imuData.gyro.y, samples.length + 1);
+        pushCapped(history.builtin.gyro.z, imuData.gyro.z, samples.length + 1);
+        pushCapped(history.builtin.angle.x, imuData.angle.x, samples.length + 1);
+        pushCapped(history.builtin.angle.y, imuData.angle.y, samples.length + 1);
+        pushCapped(history.builtin.angle.z, imuData.angle.z, samples.length + 1);
+        pushCapped(history.builtin.quat.w, imuData.quat.w, samples.length + 1);
+        pushCapped(history.builtin.quat.x, imuData.quat.x, samples.length + 1);
+        pushCapped(history.builtin.quat.y, imuData.quat.y, samples.length + 1);
+        pushCapped(history.builtin.quat.z, imuData.quat.z, samples.length + 1);
+        pushCapped(history.builtin.offset.x, imuData.offset.x, samples.length + 1);
+        pushCapped(history.builtin.offset.y, imuData.offset.y, samples.length + 1);
+        pushCapped(history.builtin.offset.z, imuData.offset.z, samples.length + 1);
+        pushCapped(history.builtin.accelNav.x, imuData.accel_nav.x, samples.length + 1);
+        pushCapped(history.builtin.accelNav.y, imuData.accel_nav.y, samples.length + 1);
+        pushCapped(history.builtin.accelNav.z, imuData.accel_nav.z, samples.length + 1);
       }
       dataHistoryRef.current = history;
       setDataHistory(history);

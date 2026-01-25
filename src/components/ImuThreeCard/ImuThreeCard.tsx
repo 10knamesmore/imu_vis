@@ -16,6 +16,8 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
   const { connectedDevice } = useBluetooth();
   const [showTrajectory, setShowTrajectory] = useState(true);
 
+  const [useCalculated, setUseCalculated] = useState(false);
+
   const handleCalibrateZ = async () => {
     const res = await imuApi.setAxisCalibration();
     if (res.success) {
@@ -55,6 +57,10 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
             </Tooltip>
           </div>
           <div className={styles.imuControl}>
+            <span>计算数据</span>
+            <Switch checked={useCalculated} onChange={setUseCalculated} />
+          </div>
+          <div className={styles.imuControl}>
             <span>轨迹</span>
             <Switch checked={showTrajectory} onChange={setShowTrajectory} />
           </div>
@@ -64,7 +70,12 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
       styles={{ header: { color: "white" } }}
     >
       <div className={styles.imuThreePanel}>
-        <ImuThreeView source={source} showTrajectory={showTrajectory} scale={1} />
+        <ImuThreeView
+          source={source}
+          showTrajectory={showTrajectory}
+          scale={1}
+          useCalculated={useCalculated}
+        />
       </div>
     </Card>
   );

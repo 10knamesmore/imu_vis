@@ -15,12 +15,19 @@ type ImuThreeViewProps = {
   showTrajectory: boolean;
   /** 模型显示的缩放倍率 */
   scale: number;
+  /** 是否使用计算后的姿态 */
+  useCalculated: boolean;
 };
 
 /**
  * IMU 三维视图组件：负责创建 Three.js 场景并同步显示姿态与轨迹。
  */
-export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajectory, scale }) => {
+export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
+  source,
+  showTrajectory,
+  scale,
+  useCalculated,
+}) => {
   /** DOM 容器引用，用于挂载 Three.js 的 Canvas */
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** 3D 物体（方块）的 Mesh 引用 */
@@ -39,6 +46,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
   const axisLengthRef = useRef(0.8);
   /** 数据源的 Ref，确保在闭包（如 renderLoop）中能访问最新 source 对象 */
   const sourceRef = useRef(source);
+  const useCalculatedRef = useRef(useCalculated);
   /** 轨迹数据的状态记录：当前写入索引与总点数 */
   const trailStateRef = useRef({ index: 0, count: 0 });
   /** Three.js 透视相机引用 */
@@ -57,6 +65,10 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
   useEffect(() => {
     sourceRef.current = source;
   }, [source]);
+
+  useEffect(() => {
+    useCalculatedRef.current = useCalculated;
+  }, [useCalculated]);
 
   /**
    * 同步轨迹显示开关到本地状态。
@@ -342,7 +354,10 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({ source, showTrajecto
       animationId = requestAnimationFrame(renderLoop);
       const latest = sourceRef.current.latestRef.current;
       if (latest) {
-        tmpQuat.set(latest.quat.x, latest.quat.y, latest.quat.z, latest.quat.w);
+        const attitude = useCalculatedRef.current
+          ? latest.calculated_data.attitude
+          : latest.raw_data.quat;
+        tmpQuat.set(attitude.x, attitude.y, attitude.z, attitude.w);
         body.quaternion.copy(tmpQuat);
         if (axisGroupRef.current) {
           axisGroupRef.current.quaternion.copy(tmpQuat);

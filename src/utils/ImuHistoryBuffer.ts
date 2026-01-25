@@ -1,4 +1,26 @@
-import { IMUData, ImuDataHistory } from "../types";
+import { ImuHistorySnapshot, Quaternion, ResponseData, Vector3 } from "../types";
+
+const radToDeg = (rad: number) => (rad * 180) / Math.PI;
+
+const quatToEulerDegrees = (quat: Quaternion): Vector3 => {
+  const { w, x, y, z } = quat;
+  const sinyCosp = 2 * (w * z + x * y);
+  const cosyCosp = 1 - 2 * (y * y + z * z);
+  const yaw = Math.atan2(sinyCosp, cosyCosp);
+
+  const sinp = 2 * (w * y - z * x);
+  const pitch = Math.abs(sinp) >= 1 ? Math.sign(sinp) * (Math.PI / 2) : Math.asin(sinp);
+
+  const sinrCosp = 2 * (w * x + y * z);
+  const cosrCosp = 1 - 2 * (x * x + y * y);
+  const roll = Math.atan2(sinrCosp, cosrCosp);
+
+  return {
+    x: radToDeg(roll),
+    y: radToDeg(pitch),
+    z: radToDeg(yaw),
+  };
+};
 
 export class ImuHistoryBuffer {
   private capacity: number;
@@ -27,6 +49,22 @@ export class ImuHistoryBuffer {
   private accelNavX: Float32Array;
   private accelNavY: Float32Array;
   private accelNavZ: Float32Array;
+  private calcAngleX: Float32Array;
+  private calcAngleY: Float32Array;
+  private calcAngleZ: Float32Array;
+  private attitudeW: Float32Array;
+  private attitudeX: Float32Array;
+  private attitudeY: Float32Array;
+  private attitudeZ: Float32Array;
+  private deltaAngleX: Float32Array;
+  private deltaAngleY: Float32Array;
+  private deltaAngleZ: Float32Array;
+  private velocityX: Float32Array;
+  private velocityY: Float32Array;
+  private velocityZ: Float32Array;
+  private positionX: Float32Array;
+  private positionY: Float32Array;
+  private positionZ: Float32Array;
 
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -55,6 +93,22 @@ export class ImuHistoryBuffer {
     this.accelNavX = new Float32Array(capacity);
     this.accelNavY = new Float32Array(capacity);
     this.accelNavZ = new Float32Array(capacity);
+    this.calcAngleX = new Float32Array(capacity);
+    this.calcAngleY = new Float32Array(capacity);
+    this.calcAngleZ = new Float32Array(capacity);
+    this.attitudeW = new Float32Array(capacity);
+    this.attitudeX = new Float32Array(capacity);
+    this.attitudeY = new Float32Array(capacity);
+    this.attitudeZ = new Float32Array(capacity);
+    this.deltaAngleX = new Float32Array(capacity);
+    this.deltaAngleY = new Float32Array(capacity);
+    this.deltaAngleZ = new Float32Array(capacity);
+    this.velocityX = new Float32Array(capacity);
+    this.velocityY = new Float32Array(capacity);
+    this.velocityZ = new Float32Array(capacity);
+    this.positionX = new Float32Array(capacity);
+    this.positionY = new Float32Array(capacity);
+    this.positionZ = new Float32Array(capacity);
   }
 
   clear() {
@@ -62,7 +116,9 @@ export class ImuHistoryBuffer {
     this.writeIndex = 0;
   }
 
-  push(imu: IMUData, streamStartMs: number) {
+  push(msg: ResponseData, streamStartMs: number) {
+    const imu = msg.raw_data;
+    const calculated = msg.calculated_data;
     const i = this.writeIndex;
     this.timeMs[i] = imu.timestamp_ms - streamStartMs;
     this.accelX[i] = imu.accel_no_g.x;
@@ -88,21 +144,48 @@ export class ImuHistoryBuffer {
     this.accelNavY[i] = imu.accel_nav.y;
     this.accelNavZ[i] = imu.accel_nav.z;
 
+    const calcAngle = quatToEulerDegrees(calculated.attitude);
+    this.calcAngleX[i] = calcAngle.x;
+    this.calcAngleY[i] = calcAngle.y;
+    this.calcAngleZ[i] = calcAngle.z;
+    this.attitudeW[i] = calculated.attitude.w;
+    this.attitudeX[i] = calculated.attitude.x;
+    this.attitudeY[i] = calculated.attitude.y;
+    this.attitudeZ[i] = calculated.attitude.z;
+    this.deltaAngleX[i] = calcAngle.x - imu.angle.x;
+    this.deltaAngleY[i] = calcAngle.y - imu.angle.y;
+    this.deltaAngleZ[i] = calcAngle.z - imu.angle.z;
+    this.velocityX[i] = calculated.velocity.x;
+    this.velocityY[i] = calculated.velocity.y;
+    this.velocityZ[i] = calculated.velocity.z;
+    this.positionX[i] = calculated.position.x;
+    this.positionY[i] = calculated.position.y;
+    this.positionZ[i] = calculated.position.z;
+
     this.writeIndex = (i + 1) % this.capacity;
     this.count = Math.min(this.count + 1, this.capacity);
   }
 
-  snapshot(windowMs?: number): ImuDataHistory {
+  snapshot(windowMs?: number): ImuHistorySnapshot {
     if (this.count === 0) {
       return {
         time: [],
-        accel: { x: [], y: [], z: [] },
-        accelWithG: { x: [], y: [], z: [] },
-        gyro: { x: [], y: [], z: [] },
-        angle: { x: [], y: [], z: [] },
-        quat: { w: [], x: [], y: [], z: [] },
-        offset: { x: [], y: [], z: [] },
-        accelNav: { x: [], y: [], z: [] },
+        builtin: {
+          accel: { x: [], y: [], z: [] },
+          accelWithG: { x: [], y: [], z: [] },
+          gyro: { x: [], y: [], z: [] },
+          angle: { x: [], y: [], z: [] },
+          quat: { w: [], x: [], y: [], z: [] },
+          offset: { x: [], y: [], z: [] },
+          accelNav: { x: [], y: [], z: [] },
+        },
+        calculated: {
+          angle: { x: [], y: [], z: [] },
+          attitude: { w: [], x: [], y: [], z: [] },
+          velocity: { x: [], y: [], z: [] },
+          position: { x: [], y: [], z: [] },
+        },
+        deltaAngle: { x: [], y: [], z: [] },
       };
     }
 
@@ -131,6 +214,22 @@ export class ImuHistoryBuffer {
     const accelNavX: number[] = new Array(size);
     const accelNavY: number[] = new Array(size);
     const accelNavZ: number[] = new Array(size);
+    const calcAngleX: number[] = new Array(size);
+    const calcAngleY: number[] = new Array(size);
+    const calcAngleZ: number[] = new Array(size);
+    const attitudeW: number[] = new Array(size);
+    const attitudeX: number[] = new Array(size);
+    const attitudeY: number[] = new Array(size);
+    const attitudeZ: number[] = new Array(size);
+    const deltaAngleX: number[] = new Array(size);
+    const deltaAngleY: number[] = new Array(size);
+    const deltaAngleZ: number[] = new Array(size);
+    const velocityX: number[] = new Array(size);
+    const velocityY: number[] = new Array(size);
+    const velocityZ: number[] = new Array(size);
+    const positionX: number[] = new Array(size);
+    const positionY: number[] = new Array(size);
+    const positionZ: number[] = new Array(size);
 
     for (let j = 0; j < size; j += 1) {
       const idx = (start + j) % this.capacity;
@@ -157,18 +256,43 @@ export class ImuHistoryBuffer {
       accelNavX[j] = this.accelNavX[idx];
       accelNavY[j] = this.accelNavY[idx];
       accelNavZ[j] = this.accelNavZ[idx];
+      calcAngleX[j] = this.calcAngleX[idx];
+      calcAngleY[j] = this.calcAngleY[idx];
+      calcAngleZ[j] = this.calcAngleZ[idx];
+      attitudeW[j] = this.attitudeW[idx];
+      attitudeX[j] = this.attitudeX[idx];
+      attitudeY[j] = this.attitudeY[idx];
+      attitudeZ[j] = this.attitudeZ[idx];
+      deltaAngleX[j] = this.deltaAngleX[idx];
+      deltaAngleY[j] = this.deltaAngleY[idx];
+      deltaAngleZ[j] = this.deltaAngleZ[idx];
+      velocityX[j] = this.velocityX[idx];
+      velocityY[j] = this.velocityY[idx];
+      velocityZ[j] = this.velocityZ[idx];
+      positionX[j] = this.positionX[idx];
+      positionY[j] = this.positionY[idx];
+      positionZ[j] = this.positionZ[idx];
     }
 
     if (windowMs === undefined || time.length === 0) {
       return {
         time,
-        accel: { x: accelX, y: accelY, z: accelZ },
-        accelWithG: { x: accelWithGX, y: accelWithGY, z: accelWithGZ },
-        gyro: { x: gyroX, y: gyroY, z: gyroZ },
-        angle: { x: angleX, y: angleY, z: angleZ },
-        quat: { w: quatW, x: quatX, y: quatY, z: quatZ },
-        offset: { x: offsetX, y: offsetY, z: offsetZ },
-        accelNav: { x: accelNavX, y: accelNavY, z: accelNavZ },
+        builtin: {
+          accel: { x: accelX, y: accelY, z: accelZ },
+          accelWithG: { x: accelWithGX, y: accelWithGY, z: accelWithGZ },
+          gyro: { x: gyroX, y: gyroY, z: gyroZ },
+          angle: { x: angleX, y: angleY, z: angleZ },
+          quat: { w: quatW, x: quatX, y: quatY, z: quatZ },
+          offset: { x: offsetX, y: offsetY, z: offsetZ },
+          accelNav: { x: accelNavX, y: accelNavY, z: accelNavZ },
+        },
+        calculated: {
+          angle: { x: calcAngleX, y: calcAngleY, z: calcAngleZ },
+          attitude: { w: attitudeW, x: attitudeX, y: attitudeY, z: attitudeZ },
+          velocity: { x: velocityX, y: velocityY, z: velocityZ },
+          position: { x: positionX, y: positionY, z: positionZ },
+        },
+        deltaAngle: { x: deltaAngleX, y: deltaAngleY, z: deltaAngleZ },
       };
     }
 
@@ -181,41 +305,71 @@ export class ImuHistoryBuffer {
 
     return {
       time: time.slice(sliceStart),
-      accel: {
-        x: accelX.slice(sliceStart),
-        y: accelY.slice(sliceStart),
-        z: accelZ.slice(sliceStart),
+      builtin: {
+        accel: {
+          x: accelX.slice(sliceStart),
+          y: accelY.slice(sliceStart),
+          z: accelZ.slice(sliceStart),
+        },
+        accelWithG: {
+          x: accelWithGX.slice(sliceStart),
+          y: accelWithGY.slice(sliceStart),
+          z: accelWithGZ.slice(sliceStart),
+        },
+        gyro: {
+          x: gyroX.slice(sliceStart),
+          y: gyroY.slice(sliceStart),
+          z: gyroZ.slice(sliceStart),
+        },
+        angle: {
+          x: angleX.slice(sliceStart),
+          y: angleY.slice(sliceStart),
+          z: angleZ.slice(sliceStart),
+        },
+        quat: {
+          w: quatW.slice(sliceStart),
+          x: quatX.slice(sliceStart),
+          y: quatY.slice(sliceStart),
+          z: quatZ.slice(sliceStart),
+        },
+        offset: {
+          x: offsetX.slice(sliceStart),
+          y: offsetY.slice(sliceStart),
+          z: offsetZ.slice(sliceStart),
+        },
+        accelNav: {
+          x: accelNavX.slice(sliceStart),
+          y: accelNavY.slice(sliceStart),
+          z: accelNavZ.slice(sliceStart),
+        },
       },
-      accelWithG: {
-        x: accelWithGX.slice(sliceStart),
-        y: accelWithGY.slice(sliceStart),
-        z: accelWithGZ.slice(sliceStart),
+      calculated: {
+        angle: {
+          x: calcAngleX.slice(sliceStart),
+          y: calcAngleY.slice(sliceStart),
+          z: calcAngleZ.slice(sliceStart),
+        },
+        attitude: {
+          w: attitudeW.slice(sliceStart),
+          x: attitudeX.slice(sliceStart),
+          y: attitudeY.slice(sliceStart),
+          z: attitudeZ.slice(sliceStart),
+        },
+        velocity: {
+          x: velocityX.slice(sliceStart),
+          y: velocityY.slice(sliceStart),
+          z: velocityZ.slice(sliceStart),
+        },
+        position: {
+          x: positionX.slice(sliceStart),
+          y: positionY.slice(sliceStart),
+          z: positionZ.slice(sliceStart),
+        },
       },
-      gyro: {
-        x: gyroX.slice(sliceStart),
-        y: gyroY.slice(sliceStart),
-        z: gyroZ.slice(sliceStart),
-      },
-      angle: {
-        x: angleX.slice(sliceStart),
-        y: angleY.slice(sliceStart),
-        z: angleZ.slice(sliceStart),
-      },
-      quat: {
-        w: quatW.slice(sliceStart),
-        x: quatX.slice(sliceStart),
-        y: quatY.slice(sliceStart),
-        z: quatZ.slice(sliceStart),
-      },
-      offset: {
-        x: offsetX.slice(sliceStart),
-        y: offsetY.slice(sliceStart),
-        z: offsetZ.slice(sliceStart),
-      },
-      accelNav: {
-        x: accelNavX.slice(sliceStart),
-        y: accelNavY.slice(sliceStart),
-        z: accelNavZ.slice(sliceStart),
+      deltaAngle: {
+        x: deltaAngleX.slice(sliceStart),
+        y: deltaAngleY.slice(sliceStart),
+        z: deltaAngleZ.slice(sliceStart),
       },
     };
   }
