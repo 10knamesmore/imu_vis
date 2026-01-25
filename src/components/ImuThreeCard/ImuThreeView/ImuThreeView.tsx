@@ -17,6 +17,8 @@ type ImuThreeViewProps = {
   scale: number;
   /** 是否使用计算后的姿态 */
   useCalculated: boolean;
+  /** 触发轨迹清空的计数器 */
+  trailResetToken: number;
 };
 
 /**
@@ -27,6 +29,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   showTrajectory,
   scale,
   useCalculated,
+  trailResetToken,
 }) => {
   /** DOM 容器引用，用于挂载 Three.js 的 Canvas */
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -40,12 +43,17 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   const axesRef = useRef<THREE.AxesHelper | null>(null);
   /** 轨迹线的引用 */
   const trailRef = useRef<THREE.Line | null>(null);
+  // 缓存轨迹几何与数据，便于外部触发清空而不重建场景。
+  const trailGeometryRef = useRef<THREE.BufferGeometry | null>(null);
+  const trailPositionsRef = useRef<Float32Array | null>(null);
+  const maxTrailPointsRef = useRef(0);
   /** 坐标轴文字标识的引用（用 Sprite 贴图方式实现 3D 文字） */
   const axisLabelsRef = useRef<THREE.Sprite[]>([]);
   /** 坐标轴长度基准（用于计算文字标识的放置位置） */
   const axisLengthRef = useRef(0.8);
   /** 数据源的 Ref，确保在闭包（如 renderLoop）中能访问最新 source 对象 */
   const sourceRef = useRef(source);
+  /** 是否使用计算后姿态的 Ref，确保在闭包中能访问最新值 */
   const useCalculatedRef = useRef(useCalculated);
   /** 轨迹数据的状态记录：当前写入索引与总点数 */
   const trailStateRef = useRef({ index: 0, count: 0 });
@@ -53,7 +61,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   /** 鼠标/触摸拖拽交互的状态记录（旋转角度、拖拽标记等） */
   const dragRef = useRef({ dragging: false, lastX: 0, lastY: 0, yaw: 0, pitch: 0 });
-  
+
   /** 本地状态：轨迹是否可见 */
   const [isTrajectoryVisible, setIsTrajectoryVisible] = useState(showTrajectory);
   /** 本地状态：当前的视图缩放比例 */
@@ -83,6 +91,22 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   useEffect(() => {
     setViewScale(scale);
   }, [scale]);
+
+  /**
+   * 当trailResetToken变化时，变化重置轨迹 清空点位、绘制范围与计数器。
+   */
+  useEffect(() => {
+    // 根据 token ：
+    const geometry = trailGeometryRef.current;
+    const positions = trailPositionsRef.current;
+    if (!geometry || !positions) {
+      return;
+    }
+    positions.fill(0);
+    geometry.setDrawRange(0, 0);
+    (geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+    trailStateRef.current = { index: 0, count: 0 };
+  }, [trailResetToken]);
 
   /**
    * 当轨迹显示状态变化时，更新轨迹线可见性。
@@ -248,6 +272,9 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     trailLine.frustumCulled = false;
     displayGroup.add(trailLine);
     trailRef.current = trailLine;
+    trailGeometryRef.current = trailGeometry;
+    trailPositionsRef.current = trailPositions;
+    maxTrailPointsRef.current = maxTrailPoints;
 
     const forward = new THREE.Vector3(0, 0, 1);
     const tmpQuat = new THREE.Quaternion();

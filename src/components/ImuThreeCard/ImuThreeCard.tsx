@@ -15,6 +15,8 @@ type ImuThreeCardProps = {
 export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
   const { connectedDevice } = useBluetooth();
   const [showTrajectory, setShowTrajectory] = useState(true);
+  // 通过递增 token 触发子组件清空轨迹缓冲。
+  const [trailResetToken, setTrailResetToken] = useState(0);
 
   const [useCalculated, setUseCalculated] = useState(false);
 
@@ -51,14 +53,25 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
                 )
               }
             >
-              <Button onClick={handleCalibrateZ} disabled={!connectedDevice}>
+              <Button onClick={() => {
+                handleCalibrateZ()
+                setTrailResetToken((token) => token + 1)
+              }} disabled={!connectedDevice}>
                 姿态校准
               </Button>
             </Tooltip>
           </div>
           <div className={styles.imuControl}>
-            <span>计算数据</span>
-            <Switch checked={useCalculated} onChange={setUseCalculated} />
+            <Button onClick={() => setTrailResetToken((token) => token + 1)}>
+              清空轨迹
+            </Button>
+          </div>
+          <div className={styles.imuControl}>
+            <span>使用计算数据</span>
+            <Switch checked={useCalculated} onChange={(checked) => {
+              setUseCalculated(checked);
+              setTrailResetToken((token) => token + 1);
+            }} />
           </div>
           <div className={styles.imuControl}>
             <span>轨迹</span>
@@ -75,6 +88,7 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
           showTrajectory={showTrajectory}
           scale={1}
           useCalculated={useCalculated}
+          trailResetToken={trailResetToken}
         />
       </div>
     </Card>
