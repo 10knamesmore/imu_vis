@@ -11,34 +11,34 @@ import styles from "./ImuThreeView.module.scss";
 type ImuThreeViewProps = {
   /** IMU 数据源，包含最新的姿态数据 */
   source: ImuSource;
-  /** 是否在视图中绘制运动轨迹 */
+  /** 是否在视图中绘制轨迹（轴向量端点轨迹 + 未来原点轨迹） */
   showTrajectory: boolean;
-  /** 轨迹线的配置 */
-  showTrajectoryOption: ShowTrajectoryOption;
+  /** 轴向量端点轨迹配置 */
+  axisTrajectoryOption: AxisTrajectoryOption;
   /** 模型显示的缩放倍率 */
   scale: number;
   /** 是否使用计算后的姿态 */
   useCalculated: boolean;
-  /** 触发轨迹清空的计数器 */
+  /** 触发轨迹清空的计数器（轴向量端点轨迹 + 未来原点轨迹） */
   trailResetToken: number;
 };
 
-export type ShowTrajectoryOption = {
+export type AxisTrajectoryOption = {
   x: boolean;
   y: boolean;
   z: boolean;
 };
 
-type AxisKey = keyof ShowTrajectoryOption;
+type AxisKey = keyof AxisTrajectoryOption;
 const axisKeys: AxisKey[] = ["x", "y", "z"];
 
 /**
- * IMU 三维视图组件：负责创建 Three.js 场景并同步显示姿态与轨迹。
+ * IMU 三维视图组件：负责创建 Three.js 场景并同步显示姿态与轴向量端点轨迹。
  */
 export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   source,
   showTrajectory,
-  showTrajectoryOption,
+  axisTrajectoryOption,
   scale,
   useCalculated,
   trailResetToken,
@@ -53,9 +53,9 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   const axisGroupRef = useRef<THREE.Group | null>(null);
   /** 坐标轴辅助对象的引用 */
   const axesRef = useRef<THREE.AxesHelper | null>(null);
-  /** 轨迹线的引用 */
+  /** 轴向量端点轨迹线的引用 */
   const trailRefs = useRef<Record<AxisKey, THREE.Line | null>>({ x: null, y: null, z: null });
-  // 缓存轨迹几何与数据，便于外部触发清空而不重建场景。
+  // 缓存轴向量端点轨迹几何与数据，便于外部触发清空而不重建场景。
   const trailGeometryRefs = useRef<Record<AxisKey, THREE.BufferGeometry | null>>({
     x: null,
     y: null,
@@ -75,7 +75,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   const sourceRef = useRef(source);
   /** 是否使用计算后姿态的 Ref，确保在闭包中能访问最新值 */
   const useCalculatedRef = useRef(useCalculated);
-  /** 轨迹数据的状态记录：当前轨迹点总数 */
+  /** 轴向量端点轨迹数据的状态记录：当前轨迹点总数 */
   const trailStateRef = useRef<Record<AxisKey, { count: number }>>({
     x: { count: 0 },
     y: { count: 0 },
@@ -83,7 +83,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   });
   /** 轨迹开关与配置的 Ref，确保在闭包中能访问最新值 */
   const showTrajectoryRef = useRef(showTrajectory);
-  const showTrajectoryOptionRef = useRef(showTrajectoryOption);
+  const axisTrajectoryOptionRef = useRef(axisTrajectoryOption);
   /** 当前缩放值的 Ref，确保在闭包中能访问最新值 */
   const viewScaleRef = useRef(scale);
   /** Three.js 透视相机引用 */
@@ -116,11 +116,11 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   }, [showTrajectory]);
 
   /**
-   * 同步轨迹配置开关。
+   * 同步轴向量端点轨迹配置开关。
    */
   useEffect(() => {
-    showTrajectoryOptionRef.current = showTrajectoryOption;
-  }, [showTrajectoryOption]);
+    axisTrajectoryOptionRef.current = axisTrajectoryOption;
+  }, [axisTrajectoryOption]);
 
   /**
    * 同步缩放比例。
@@ -140,7 +140,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
    * 当 trailResetToken 变化时清空轨迹缓冲。
    */
   useEffect(() => {
-    // 通过清空位置数组与绘制范围，让轨迹从头开始绘制。
+    // 通过清空位置数组与绘制范围，让轴向量端点轨迹从头开始绘制。
     axisKeys.forEach((axis) => {
       const geometry = trailGeometryRefs.current[axis];
       const positions = trailPositionsRefs.current[axis];
@@ -155,16 +155,16 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   }, [trailResetToken]);
 
   /**
-   * 轨迹开关变化时，更新轨迹线可见性。
+   * 轨迹开关变化时，更新轴向量端点轨迹线可见性。
    */
   useEffect(() => {
     axisKeys.forEach((axis) => {
       const trail = trailRefs.current[axis];
       if (trail) {
-        trail.visible = showTrajectory && showTrajectoryOption[axis];
+        trail.visible = showTrajectory && axisTrajectoryOption[axis];
       }
     });
-  }, [showTrajectory, showTrajectoryOption]);
+  }, [showTrajectory, axisTrajectoryOption]);
 
   /**
    * 缩放变化时，同步模型、坐标轴与文字标识。
@@ -258,9 +258,9 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
 
     /**
      * 创建坐标轴文字标识：
-     * 1) 用 Canvas 绘制大号字母
-     * 2) 转成纹理贴到 Sprite 上
-     * 3) Sprite 在 3D 场景里始终朝向相机，便于阅读
+     * 1: 用 Canvas 绘制大号字母
+     * 2: 转成纹理贴到 Sprite 上
+     * 3: Sprite 在 3D 场景里始终朝向相机，便于阅读
      */
     const createAxisLabel = (text: string, color: string) => {
       const canvas = document.createElement("canvas");
@@ -315,7 +315,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
       });
     }
 
-    // 初始化轨迹线缓存
+    // 初始化轴向量端点轨迹线缓存
     const maxTrailPoints = 300;
     maxTrailPointsRef.current = maxTrailPoints;
     const trailMaterials: Record<AxisKey, THREE.LineBasicMaterial> = {
@@ -329,7 +329,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
       trailGeometry.setAttribute("position", new THREE.BufferAttribute(trailPositions, 3));
       trailGeometry.setDrawRange(0, 0);
       const trailLine = new THREE.Line(trailGeometry, trailMaterials[axis]);
-      trailLine.visible = showTrajectory && showTrajectoryOption[axis];
+      trailLine.visible = showTrajectory && axisTrajectoryOption[axis];
       trailLine.frustumCulled = false;
       displayGroup.add(trailLine);
       trailRefs.current[axis] = trailLine;
@@ -442,10 +442,10 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     let animationId = 0;
     /**
      * 渲染循环：
-     * 1) 读取最新姿态数据
-     * 2) 应用姿态到模型与坐标轴
-     * 3) 写入轨迹点并更新绘制范围
-     * 4) 渲染场景
+     * 1: 读取最新姿态数据
+     * 2: 应用姿态到模型与坐标轴
+     * 3: 写入轴向量端点轨迹点并更新绘制范围
+     * 4: 渲染场景
      */
     const renderLoop = () => {
       // 申请下一帧，维持持续渲染。
@@ -468,9 +468,9 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
         }
 
         if (showTrajectoryRef.current) {
-          // 计算各轴朝向向量，写入对应轨迹缓冲并更新绘制范围。
+          // 计算各轴朝向向量端点，写入对应轨迹缓冲并更新绘制范围。
           axisKeys.forEach((axis) => {
-            if (!showTrajectoryOptionRef.current[axis]) {
+            if (!axisTrajectoryOptionRef.current[axis]) {
               return;
             }
             tmpVec.copy(axisBases[axis]).applyQuaternion(tmpQuat).multiplyScalar(0.8 * viewScaleRef.current);
