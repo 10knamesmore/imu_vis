@@ -68,35 +68,38 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   const [viewScale, setViewScale] = useState(scale);
 
   /**
-   * 监听外部数据源变更，保证渲染循环读取到最新引用。
+   * 同步最新数据源引用，避免渲染循环读取旧对象。
    */
   useEffect(() => {
     sourceRef.current = source;
   }, [source]);
 
+  /**
+   * 同步是否使用计算姿态的开关。
+   */
   useEffect(() => {
     useCalculatedRef.current = useCalculated;
   }, [useCalculated]);
 
   /**
-   * 同步轨迹显示开关到本地状态。
+   * 同步轨迹显示开关。
    */
   useEffect(() => {
     setIsTrajectoryVisible(showTrajectory);
   }, [showTrajectory]);
 
   /**
-   * 同步缩放比例到本地状态。
+   * 同步缩放比例。
    */
   useEffect(() => {
     setViewScale(scale);
   }, [scale]);
 
   /**
-   * 当trailResetToken变化时，变化重置轨迹 清空点位、绘制范围与计数器。
+   * 当 trailResetToken 变化时清空轨迹缓冲。
    */
   useEffect(() => {
-    // 根据 token ：
+    // 通过清空位置数组与绘制范围，让轨迹从头开始绘制。
     const geometry = trailGeometryRef.current;
     const positions = trailPositionsRef.current;
     if (!geometry || !positions) {
@@ -109,7 +112,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   }, [trailResetToken]);
 
   /**
-   * 当轨迹显示状态变化时，更新轨迹线可见性。
+   * 轨迹开关变化时，更新轨迹线可见性。
    */
   useEffect(() => {
     if (trailRef.current) {
@@ -118,7 +121,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   }, [isTrajectoryVisible]);
 
   /**
-   * 当缩放比例变化时，调整模型与坐标轴缩放。
+   * 缩放变化时，同步模型、坐标轴与文字标识。
    */
   useEffect(() => {
     if (bodyRef.current) {
@@ -151,6 +154,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
       return undefined;
     }
 
+    // 创建场景与相机
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0f14);
 
@@ -161,16 +165,19 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     camera.position.set(2.4, 0, 0);
     camera.lookAt(0, 0, 0);
 
+    // 创建渲染器并挂载到 DOM
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio || 1);
     renderer.setSize(container.clientWidth, container.clientHeight);
     container.appendChild(renderer.domElement);
 
+    // 设置环境光与方向光
     const ambient = new THREE.AmbientLight(0xffffff, 0.6);
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight.position.set(2, 3, 1.5);
     scene.add(ambient, dirLight);
 
+    // 创建镜像分组，统一坐标系方向
     const displayGroup = new THREE.Group();
     // 镜像 X/Y 轴：将 IMU 坐标系映射为屏幕坐标系
     // 目标：X 正方向指向屏幕内部，Y 正方向向右，Z 正方向向上
@@ -178,7 +185,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     scene.add(displayGroup);
     displayGroupRef.current = displayGroup;
 
-    // 传感器外形：Y 最长，Z 最短，X 为宽度（仅用于视觉比例）
+    // 创建传感器模型（仅用于视觉比例）
     const bodyGeometry = new THREE.BoxGeometry(0.6, 0.9, 0.2);
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: 0x4f9bff,
@@ -186,12 +193,13 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
       roughness: 0.5,
       side: THREE.DoubleSide,
     });
+    // 传感器模型
     const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
     body.scale.setScalar(scale);
     displayGroup.add(body);
     bodyRef.current = body;
 
-    // 坐标轴长度：用于 AxesHelper 以及文字标识的位置基准
+    // 创建坐标轴与文字标识
     const axisLength = 0.8;
     axisLengthRef.current = axisLength;
     const axes = new THREE.AxesHelper(axisLength);
@@ -261,6 +269,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
       });
     }
 
+    // 初始化轨迹线缓存
     const maxTrailPoints = 300;
     const trailPositions = new Float32Array(maxTrailPoints * 3);
     const trailGeometry = new THREE.BufferGeometry();
@@ -276,6 +285,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     trailPositionsRef.current = trailPositions;
     maxTrailPointsRef.current = maxTrailPoints;
 
+    // 准备渲染循环使用的临时变量，避免频繁分配
     const forward = new THREE.Vector3(0, 0, 1);
     const tmpQuat = new THREE.Quaternion();
     const tmpVec = new THREE.Vector3();
@@ -283,7 +293,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     const radius = 2.4;
 
     /**
-     * 视图尺寸变化时同步调整渲染器与相机投影。
+     * 监听容器尺寸变化，调整渲染器和相机比例。
      */
     const resize = () => {
       const width = container.clientWidth;
@@ -313,7 +323,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     };
 
     /**
-     * 指针按下：开始记录拖拽基准位置。
+     * 注册交互（拖拽旋转 + 滚轮缩放）。
      */
     const handlePointerDown = (event: PointerEvent) => {
       if (event.button !== 0) {
@@ -375,16 +385,24 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
 
     let animationId = 0;
     /**
-     * 渲染循环：同步姿态、更新轨迹并绘制场景。
+     * 渲染循环：
+     * 1) 读取最新姿态数据
+     * 2) 应用姿态到模型与坐标轴
+     * 3) 写入轨迹点并更新绘制范围
+     * 4) 渲染场景
      */
     const renderLoop = () => {
+      // 申请下一帧，维持持续渲染。
       animationId = requestAnimationFrame(renderLoop);
+      // 读取最新一帧 IMU 数据。
       const latest = sourceRef.current.latestRef.current;
       if (latest) {
+        // 选择原始或计算姿态，并转换成 Three.js 四元数。
         const attitude = useCalculatedRef.current
           ? latest.calculated_data.attitude
           : latest.raw_data.quat;
         tmpQuat.set(attitude.x, attitude.y, attitude.z, attitude.w);
+        // 同步模型与坐标轴姿态。
         body.quaternion.copy(tmpQuat);
         if (axisGroupRef.current) {
           axisGroupRef.current.quaternion.copy(tmpQuat);
@@ -394,6 +412,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
         }
 
         if (isTrajectoryVisible) {
+          // 计算朝向向量，写入轨迹缓冲并更新绘制范围。
           tmpVec.copy(forward).applyQuaternion(tmpQuat).multiplyScalar(0.8 * viewScale);
           const state = trailStateRef.current;
           const i = state.index % maxTrailPoints;
@@ -406,6 +425,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
           (trailGeometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
         }
       }
+      // 渲染当前场景。
       renderer.render(scene, camera);
     };
     renderLoop();
