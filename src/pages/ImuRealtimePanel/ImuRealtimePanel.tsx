@@ -238,11 +238,11 @@ export const ImuRealtimePanel: React.FC = () => {
       </Card>
 
       <div className={styles.mainGrid}>
-        <div className={styles.leftColumn}>
+        <div className={styles.topRow}>
           <ImuThreeCard source={imuSource} />
         </div>
 
-        <div className={styles.rightColumn}>
+        <div className={styles.bottomRow}>
           <ImuChartTabs items={chartItems} />
 
         </div>

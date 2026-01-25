@@ -1,5 +1,28 @@
-.imuThreeView {
+.imuThreeContainer {
+  display: flex;
   width: 100%;
   height: 100%;
   min-height: 320px;
+  gap: 1px; // Slight gap for visual separation
+  background: #303030; // Border color between views
+
+  .leftPanel {
+    flex: 3.5;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .rightPanel {
+    flex: 6.5;
+    height: 100%;
+    position: relative;
+    overflow: hidden;
+  }
+}
+
+.imuThreeView {
+  flex: 1;
+  width: 100%;
+  height: 100%;
 }
