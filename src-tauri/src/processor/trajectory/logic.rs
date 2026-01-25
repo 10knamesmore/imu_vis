@@ -60,8 +60,23 @@ impl TrajectoryCalculator {
         if dt > 0.0 {
             // 将加速度转到世界系并去重力
             let a_world = attitude.quat.rotate_vec3(sample.accel_lp);
-            let g_world = DVec3::new(0.0, 0.0, -1.0);
-            let a_lin = a_world - g_world * self.config.gravity;
+            // 重力向量：世界系中向下（正 Z 方向），幅值为重力加速度
+            let g_world = DVec3::new(0.0, 0.0, self.config.gravity);
+            let a_lin = a_world - g_world;
+
+            // IMU数据包为255hz
+            if sample.timestamp_ms % 1000 < 4 {
+                tracing::info!(
+                    "Trajectory Debug | dt={:.4}s | accel_lp=[{:.3}, {:.3}, {:.3}] | a_world=[{:.3}, {:.3}, {:.3}] | a_lin=[{:.3}, {:.3}, {:.3}] | vel=[{:.3}, {:.3}, {:.3}] | pos=[{:.3}, {:.3}, {:.3}]",
+                    dt,
+                    sample.accel_lp.x, sample.accel_lp.y, sample.accel_lp.z,
+                    a_world.x, a_world.y, a_world.z,
+                    a_lin.x, a_lin.y, a_lin.z,
+                    self.nav_state.velocity.x, self.nav_state.velocity.y, self.nav_state.velocity.z,
+                    self.nav_state.position.x, self.nav_state.position.y, self.nav_state.position.z
+                );
+            }
+
             // 速度/位置积分
             self.nav_state.velocity += a_lin * dt;
             self.nav_state.position += self.nav_state.velocity * dt;

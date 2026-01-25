@@ -37,7 +37,8 @@ pub fn init_tracing() -> WorkerGuard {
         .with_writer(file_writer)
         .with_current_span(true)
         .with_span_list(true)
-        .with_span_events(FmtSpan::CLOSE);
+        .with_span_events(FmtSpan::CLOSE)
+        .with_filter(LevelFilter::INFO);
 
     tracing_subscriber::registry()
         .with(stdout_layer)
