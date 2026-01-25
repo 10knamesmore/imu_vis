@@ -42,7 +42,7 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
 
   // 本地对象 Refs
   const axesRef = useRef<THREE.AxesHelper | null>(null);
-  
+
   // 中心轨迹 Refs
   const centerTrailRef = useRef<THREE.Line | null>(null);
   const centerTrailGeometryRef = useRef<THREE.BufferGeometry | null>(null);
@@ -113,14 +113,15 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     displayGroup.add(axes);
     axesRef.current = axes;
 
-    // Grid (Optional, but helpful for trajectory context)
+    // 网格辅助线（可选，但对观察轨迹和姿态参考非常有帮助）
     const grid = new THREE.GridHelper(10, 10, 0x444444, 0x222222);
-    grid.rotation.x = Math.PI / 2; // Rotate to match Z-up if needed, but displayGroup mirrors X/Y?
-    // DisplayGroup mirrors X/Y, so Z is up. GridHelper defaults to XZ plane.
-    // If we want grid on XY plane (ground), we need to rotate it to be on XY.
-    // Three.js GridHelper is on XZ plane by default.
-    // If Z is up, we want grid on XY.
+
+    // Three.js 的 GridHelper 默认位于 XZ 平面（假设 Y 轴向上）
+    // 当前 displayGroup 对 X / Y 做了镜像处理，采用的是 Z 轴向上坐标系
+    // 如果希望把网格作为“地面参考平面”，就需要将其从 XZ 平面旋转到 XY 平面
     grid.rotation.x = Math.PI / 2;
+
+    // 将旋转后的网格加入显示组，用于辅助观察 IMU 姿态与轨迹方向
     displayGroup.add(grid);
 
     // Center Trail
