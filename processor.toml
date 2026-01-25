@@ -1,36 +1,56 @@
+# ===== IMU 数据处理管线配置 =====
+
+# --- 标定模块 ---
+# 作用：对原始 acc/gyro 数据进行零偏补偿和矩阵校正
 [calibration]
-passby = true
-accel_bias = { x = 0.0, y = 0.0, z = 0.0 }
-gyro_bias = { x = 0.0, y = 0.0, z = 0.0 }
-accel_matrix = [
+passby = true           # true = 跳过标定，直接透传原始数据（适用于硬件已完成标定的情况）
+                        # false = 应用下方的 bias 和 matrix 进行校正
+accel_bias = { x = 0.0, y = 0.0, z = 0.0 }    # 加速度计零偏（m/s²）
+gyro_bias = { x = 0.0, y = 0.0, z = 0.0 }     # 陀螺仪零偏（rad/s）
+accel_matrix = [        # 加速度计校正矩阵（3x3）
   [1.0, 0.0, 0.0],
   [0.0, 1.0, 0.0],
   [0.0, 0.0, 1.0],
 ]
-gyro_matrix = [
+gyro_matrix = [         # 陀螺仪校正矩阵（3x3）
   [1.0, 0.0, 0.0],
   [0.0, 1.0, 0.0],
   [0.0, 0.0, 1.0],
 ]
 
+# --- 低通滤波模块 ---
+# 作用：平滑 acc/gyro 数据，降低高频噪声
 [filter]
-passby = true
-alpha = 0.9
+passby = true           # true = 跳过滤波，直接使用标定后的数据
+                        # false = 应用低通滤波器
+alpha = 0.9             # 滤波系数（0~1），越大越平滑但延迟越高
 
+# --- 姿态融合模块 ---
+# 作用：融合 acc/gyro/mag 估算姿态四元数（Madgwick/Mahony 算法）
 [attitude_fusion]
-passby = true
-beta = 0.02
+passby = true           # true = 跳过融合计算，直接使用硬件提供的 quat（适用于 IMU 自带姿态解算）
+                        # false = 通过软件算法重新计算姿态
+beta = 0.02             # 融合增益（仅 passby=false 时生效）
 
+# --- 捷联惯导模块 ---
+# 作用：通过姿态和加速度积分计算速度/位置
 [strapdown]
-passby = true
-gravity = 9.80665
+passby = true           # true = 跳过捷联解算，不进行位置推算
+                        # false = 启用惯导解算（注意：长时间会漂移）
+gravity = 9.80665       # 当地重力加速度（m/s²）
 
+# --- 零速修正模块 (ZUPT) ---
+# 作用：检测静止状态并修正速度漂移
 [zupt]
-passby = true
-gyro_thresh = 0.1
-accel_thresh = 0.2
-bias_correction_gain = 0.01
+passby = true           # true = 跳过零速检测
+                        # false = 启用零速修正（适用于步行等间歇运动）
+gyro_thresh = 0.1       # 陀螺仪静止阈值（rad/s）
+accel_thresh = 0.2      # 加速度静止阈值（m/s²）
+bias_correction_gain = 0.01  # 偏置修正增益
 
+# --- 扩展卡尔曼滤波模块 (EKF) ---
+# 作用：融合多传感器数据，进一步优化导航结果
 [ekf]
-passby = true
-enabled = false
+passby = true           # true = 跳过 EKF
+                        # false = 启用扩展卡尔曼滤波
+enabled = false         # 模块总开关（与 passby 配合使用）
