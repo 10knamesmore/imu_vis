@@ -23,7 +23,7 @@ pub fn run() {
         .invoke_handler(commands::handlers())
         .setup(|app| {
             app.get_webview_window("main").unwrap().open_devtools();
-            app.manage(app_state::AppState::new());
+            app.manage(app_state::AppState::new(app.handle().clone()));
 
             Ok(())
         })

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useContext, useRef } from 'react';
 import { message } from 'antd';
 import { Channel } from '@tauri-apps/api/core';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { imuApi } from '../services/imu';
 import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus, ImuHistorySnapshot } from '../types';
 
@@ -89,6 +90,26 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   useEffect(() => {
     replayingRef.current = replaying;
   }, [replaying]);
+
+  // 监听配置更新事件
+  useEffect(() => {
+    let unlisten: UnlistenFn | null = null;
+    const setupListener = async () => {
+      try {
+        unlisten = await listen('config_update', () => {
+          message.info('流水线配置已更新');
+        });
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    setupListener();
+    return () => {
+      if (unlisten) {
+        unlisten();
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let interval: number;

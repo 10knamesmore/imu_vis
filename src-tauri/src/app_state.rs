@@ -64,7 +64,7 @@ impl AppState {
     /// processor -.-> |flume::bounded| sub
     /// sub -.-> |tauri ipc channel| front end
     /// 创建应用状态。
-    pub fn new() -> Self {
+    pub fn new(app_handle: tauri::AppHandle) -> Self {
         let (upstream_tx, upstream_rx) = flume::bounded(256);
         let (downstream_tx, downstream_rx) = flume::bounded(256);
         let (record_tx, record_rx) = flume::bounded(2048);
@@ -73,7 +73,13 @@ impl AppState {
         let (calibration_handle, calibration_rx) = CalibrationHandle::new();
         AppState {
             imu_client: Mutex::new(IMUClient::new(upstream_tx)),
-            processor: Processor::new(upstream_rx, downstream_tx, record_tx, calibration_rx),
+            processor: Processor::new(
+                upstream_rx,
+                downstream_tx,
+                record_tx,
+                calibration_rx,
+                app_handle,
+            ),
             downstream_rx,
             recorder_tx,
             calibration_handle,

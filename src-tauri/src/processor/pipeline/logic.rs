@@ -1,6 +1,9 @@
 //! IMU 处理管线实现。
 
-use std::path::Path;
+use std::{
+    path::{Path, PathBuf},
+    time::SystemTime,
+};
 
 use crate::{
     processor::{
@@ -29,6 +32,16 @@ pub struct ProcessorPipeline {
     latest_raw: Option<ImuSampleRaw>,
 }
 
+/// 处理管线配置快照。
+pub struct PipelineConfigSnapshot {
+    /// 解析后的配置。
+    pub config: ProcessorPipelineConfig,
+    /// 配置来源路径。
+    pub source: PathBuf,
+    /// 配置文件最后修改时间。
+    pub modified: SystemTime,
+}
+
 impl ProcessorPipeline {
     /// 创建处理管线。
     pub fn new(config: ProcessorPipelineConfig) -> Self {
@@ -41,6 +54,16 @@ impl ProcessorPipeline {
             zupt: ZuptDetector::new(config.zupt),
             ekf: EkfProcessor::new(config.ekf),
             latest_raw: None,
+        }
+    }
+
+    /// 重置并应用新的配置。
+    /// 并自动执行一次姿态零位校准。
+    pub fn reset_with_config(&mut self, config: ProcessorPipelineConfig) {
+        let last_raw = self.latest_raw;
+        *self = Self::new(config);
+        if let Some(raw) = last_raw {
+            self.axis_calibration.update_from_raw(&raw);
         }
     }
 
@@ -103,29 +126,35 @@ impl ProcessorPipeline {
 }
 
 impl ProcessorPipelineConfig {
-    /// 从默认路径加载配置文件。
-    pub fn load_from_default_paths() -> Self {
-        // 按常见路径查找配置文件
+    /// 从默认路径加载配置与修改时间。
+    pub fn load_from_default_paths_with_modified() -> Option<PipelineConfigSnapshot> {
         let candidates = [
             "processor.toml",
             "src-tauri/processor.toml",
             "../processor.toml",
         ];
         for path in candidates {
-            if let Some(config) = read_config(Path::new(path)) {
-                return config;
+            if let Some((config, modified)) = read_config_with_modified(Path::new(path)) {
+                let source = PathBuf::from(path)
+                    .canonicalize()
+                    .unwrap_or(PathBuf::from(path));
+
+                return Some(PipelineConfigSnapshot {
+                    config,
+                    source,
+                    modified,
+                });
             }
         }
-
-        tracing::warn!("未找到 processor.toml，使用默认参数配置");
-        ProcessorPipelineConfig::default()
+        None
     }
 }
 
-fn read_config(path: &Path) -> Option<ProcessorPipelineConfig> {
+fn read_config_with_modified(path: &Path) -> Option<(ProcessorPipelineConfig, SystemTime)> {
     let content = std::fs::read_to_string(path).ok()?;
+    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
     match toml::from_str::<ProcessorPipelineConfig>(&content) {
-        Ok(config) => Some(config),
+        Ok(config) => Some((config, modified)),
         Err(err) => {
             tracing::warn!("读取配置失败 {:?}: {}", path, err);
             None

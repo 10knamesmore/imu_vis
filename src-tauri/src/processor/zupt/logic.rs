@@ -44,9 +44,9 @@ impl ZuptDetector {
         // 仅在状态切换时记录日志
         if self.last_is_static != Some(is_static) {
             if is_static {
-                tracing::info!("ZUPT: enter static state");
+                tracing::info!("ZUPT: 进入静止状态");
             } else {
-                tracing::info!("ZUPT: exit static state");
+                tracing::info!("ZUPT: 退出静止状态");
             }
             self.last_is_static = Some(is_static);
         }

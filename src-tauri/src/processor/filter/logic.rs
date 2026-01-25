@@ -24,7 +24,6 @@ impl LowPassFilter {
 
     /// 应用滤波并输出低通样本。
     pub fn apply(&mut self, sample: &ImuSampleCalibrated) -> ImuSampleFiltered {
-        let alpha = self.config.alpha;
         // 一阶低通滤波
         if self.config.passby {
             return ImuSampleFiltered {
@@ -33,6 +32,7 @@ impl LowPassFilter {
                 gyro_lp: sample.gyro,
             };
         }
+        let alpha = self.config.alpha;
 
         let accel_lp = match self.prev_accel {
             Some(prev) => prev * alpha + sample.accel * (1.0 - alpha),
