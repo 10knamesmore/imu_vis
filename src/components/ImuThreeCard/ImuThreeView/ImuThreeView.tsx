@@ -55,8 +55,8 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
   const sourceRef = useRef(source);
   /** 是否使用计算后姿态的 Ref，确保在闭包中能访问最新值 */
   const useCalculatedRef = useRef(useCalculated);
-  /** 轨迹数据的状态记录：当前写入索引与总点数 */
-  const trailStateRef = useRef({ index: 0, count: 0 });
+  /** 轨迹数据的状态记录：当前轨迹点总数 */
+  const trailStateRef = useRef({ count: 0 });
   /** Three.js 透视相机引用 */
   const cameraRef = useRef<THREE.PerspectiveCamera | null>(null);
   /** 鼠标/触摸拖拽交互的状态记录（旋转角度、拖拽标记等） */
@@ -108,7 +108,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     positions.fill(0);
     geometry.setDrawRange(0, 0);
     (geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
-    trailStateRef.current = { index: 0, count: 0 };
+    trailStateRef.current = { count: 0 };
   }, [trailResetToken]);
 
   /**
@@ -415,12 +415,20 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
           // 计算朝向向量，写入轨迹缓冲并更新绘制范围。
           tmpVec.copy(forward).applyQuaternion(tmpQuat).multiplyScalar(0.8 * viewScale);
           const state = trailStateRef.current;
-          const i = state.index % maxTrailPoints;
-          trailPositions[i * 3] = tmpVec.x;
-          trailPositions[i * 3 + 1] = tmpVec.y;
-          trailPositions[i * 3 + 2] = tmpVec.z;
-          state.index += 1;
-          state.count = Math.min(state.count + 1, maxTrailPoints);
+          if (state.count < maxTrailPoints) {
+            const i = state.count;
+            trailPositions[i * 3] = tmpVec.x;
+            trailPositions[i * 3 + 1] = tmpVec.y;
+            trailPositions[i * 3 + 2] = tmpVec.z;
+            state.count += 1;
+          } else {
+            // 保持轨迹顺序，避免首尾相连的闭合线段
+            trailPositions.copyWithin(0, 3);
+            const i = maxTrailPoints - 1;
+            trailPositions[i * 3] = tmpVec.x;
+            trailPositions[i * 3 + 1] = tmpVec.y;
+            trailPositions[i * 3 + 2] = tmpVec.z;
+          }
           trailGeometry.setDrawRange(0, state.count);
           (trailGeometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
         }
