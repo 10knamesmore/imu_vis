@@ -14,7 +14,7 @@ use crate::{
         output::{OutputBuilder, OutputFrame},
         parser::{ImuParser, ImuSampleRaw},
         pipeline::types::ProcessorPipelineConfig,
-        strapdown::Strapdown,
+        trajectory::TrajectoryCalculator,
         zupt::ZuptDetector,
     },
     types::outputs::ResponseData,
@@ -26,7 +26,7 @@ pub struct ProcessorPipeline {
     calibration: Calibration,
     filter: LowPassFilter,
     attitude_fusion: AttitudeFusion,
-    strapdown: Strapdown,
+    trajectory: TrajectoryCalculator,
     zupt: ZuptDetector,
     ekf: EkfProcessor,
     latest_raw: Option<ImuSampleRaw>,
@@ -50,7 +50,7 @@ impl ProcessorPipeline {
             calibration: Calibration::new(config.calibration),
             filter: LowPassFilter::new(config.filter),
             attitude_fusion: AttitudeFusion::new(config.attitude_fusion),
-            strapdown: Strapdown::new(config.strapdown),
+            trajectory: TrajectoryCalculator::new(config.trajectory),
             zupt: ZuptDetector::new(config.zupt),
             ekf: EkfProcessor::new(config.ekf),
             latest_raw: None,
@@ -81,11 +81,11 @@ impl ProcessorPipeline {
         self.latest_raw = Some(raw);
         self.axis_calibration.apply(&mut raw);
 
-        // 处理链：标定 -> 滤波 -> 姿态融合 -> 捷联 -> ZUPT -> EKF -> 输出
+        // 处理链：标定 -> 滤波 -> 姿态融合 -> 轨迹计算 -> ZUPT -> EKF -> 输出
         let calibrated = self.calibration.update(&raw);
         let filtered = self.filter.apply(&calibrated);
         let attitude = self.attitude_fusion.update(&filtered, Some(raw.quat));
-        let nav = self.strapdown.propagate(&attitude, &filtered);
+        let nav = self.trajectory.calculate(&attitude, &filtered);
         let (nav, obs) = self.zupt.apply(nav, &filtered);
         let nav = self.ekf.update(nav, &obs);
 
@@ -99,7 +99,7 @@ impl ProcessorPipeline {
         self.calibration.reset();
         self.filter.reset();
         self.attitude_fusion.reset();
-        self.strapdown.reset();
+        self.trajectory.reset();
         self.zupt.reset();
         self.ekf.reset();
         self.latest_raw = None;

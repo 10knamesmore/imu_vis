@@ -4,7 +4,7 @@ use math_f64::{DQuat, DVec3};
 use serde::Serialize;
 
 use crate::processor::parser::ImuSampleRaw;
-use crate::processor::strapdown::NavState;
+use crate::processor::trajectory::NavState;
 
 #[derive(Debug, Clone, Copy, Serialize)]
 /// 计算后的状态数据。

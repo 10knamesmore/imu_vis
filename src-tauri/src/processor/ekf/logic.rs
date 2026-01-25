@@ -1,7 +1,7 @@
 //! 误差状态 EKF 处理器。
 
 use crate::processor::ekf::types::EkfConfig;
-use crate::processor::strapdown::NavState;
+use crate::processor::trajectory::NavState;
 use crate::processor::zupt::ZuptObservation;
 
 /// EKF 处理器。

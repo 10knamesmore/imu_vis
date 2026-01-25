@@ -1,21 +1,21 @@
-//! 捷联惯导传播实现。
+//! 三维轨迹计算实现。
 
 use math_f64::DVec3;
 
 use crate::processor::attitude_fusion::AttitudeEstimate;
 use crate::processor::filter::ImuSampleFiltered;
-use crate::processor::strapdown::types::{NavState, StrapdownConfig};
+use crate::processor::trajectory::types::{NavState, TrajectoryConfig};
 
-/// 捷联惯导传播器。
-pub struct Strapdown {
-    config: StrapdownConfig,
+/// 三维轨迹计算器。
+pub struct TrajectoryCalculator {
+    config: TrajectoryConfig,
     nav_state: NavState,
     last_timestamp_ms: Option<u64>,
 }
 
-impl Strapdown {
-    /// 创建捷联惯导传播器。
-    pub fn new(config: StrapdownConfig) -> Self {
+impl TrajectoryCalculator {
+    /// 创建轨迹计算器。
+    pub fn new(config: TrajectoryConfig) -> Self {
         Self {
             config,
             nav_state: NavState {
@@ -30,8 +30,15 @@ impl Strapdown {
         }
     }
 
-    /// 传播导航状态。
-    pub fn propagate(
+    /// 根据姿态和加速度计算三维轨迹。
+    ///
+    /// 参数:
+    /// - `attitude`: 姿态估计（四元数）。
+    /// - `sample`: 滤波后的加速度和角速度数据。
+    ///
+    /// 返回:
+    /// - 更新后的导航状态（包含世界坐标系中的位置和速度）。
+    pub fn calculate(
         &mut self,
         attitude: &AttitudeEstimate,
         sample: &ImuSampleFiltered,
@@ -64,7 +71,7 @@ impl Strapdown {
         self.nav_state
     }
 
-    /// 重置惯导状态。
+    /// 重置轨迹状态（清空位置、速度、时间戳）。
     pub fn reset(&mut self) {
         self.nav_state = NavState {
             timestamp_ms: 0,

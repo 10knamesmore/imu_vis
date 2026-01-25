@@ -33,8 +33,8 @@ pub mod output;
 pub mod parser;
 /// 管线模块。
 pub mod pipeline;
-/// 捷联惯导模块。
-pub mod strapdown;
+/// 三维轨迹计算模块。
+pub mod trajectory;
 /// ZUPT 模块。
 pub mod zupt;
 

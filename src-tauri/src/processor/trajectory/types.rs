@@ -1,18 +1,18 @@
-//! 捷联惯导相关类型。
+//! 轨迹计算相关类型。
 
 use math_f64::{DQuat, DVec3};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Copy, Deserialize)]
-/// 捷联惯导配置。
-pub struct StrapdownConfig {
-    /// 是否跳过捷联惯导传播。
+/// 轨迹计算配置。
+pub struct TrajectoryConfig {
+    /// 是否跳过轨迹计算。
     pub passby: bool,
-    /// 重力常量。
+    /// 当地重力加速度常量（m/s²）。
     pub gravity: f64,
 }
 
-impl Default for StrapdownConfig {
+impl Default for TrajectoryConfig {
     fn default() -> Self {
         Self {
             passby: false,

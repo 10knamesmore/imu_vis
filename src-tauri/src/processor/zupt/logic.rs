@@ -3,7 +3,7 @@
 use math_f64::DVec3;
 
 use crate::processor::filter::ImuSampleFiltered;
-use crate::processor::strapdown::NavState;
+use crate::processor::trajectory::NavState;
 use crate::processor::zupt::types::{ZuptConfig, ZuptObservation};
 
 /// ZUPT 静止检测器。

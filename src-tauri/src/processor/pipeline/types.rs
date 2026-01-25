@@ -6,7 +6,7 @@ use crate::processor::attitude_fusion::AttitudeFusionConfig;
 use crate::processor::calibration::ImuCalibrationConfig;
 use crate::processor::ekf::EkfConfig;
 use crate::processor::filter::LowPassFilterConfig;
-use crate::processor::strapdown::StrapdownConfig;
+use crate::processor::trajectory::TrajectoryConfig;
 use crate::processor::zupt::ZuptConfig;
 
 #[derive(Debug, Clone, Deserialize, Default)]
@@ -18,8 +18,8 @@ pub struct ProcessorPipelineConfig {
     pub filter: LowPassFilterConfig,
     /// 姿态融合配置。
     pub attitude_fusion: AttitudeFusionConfig,
-    /// 捷联惯导配置。
-    pub strapdown: StrapdownConfig,
+    /// 轨迹计算配置。
+    pub trajectory: TrajectoryConfig,
     /// ZUPT 配置。
     pub zupt: ZuptConfig,
     /// EKF 配置。
