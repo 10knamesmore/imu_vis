@@ -1,5 +1,5 @@
 [calibration]
-passby = false
+passby = true
 accel_bias = { x = 0.0, y = 0.0, z = 0.0 }
 gyro_bias = { x = 0.0, y = 0.0, z = 0.0 }
 accel_matrix = [
@@ -14,23 +14,23 @@ gyro_matrix = [
 ]
 
 [filter]
-passby = false
+passby = true
 alpha = 0.9
 
 [attitude_fusion]
-passby = false
+passby = true
 beta = 0.02
 
 [strapdown]
-passby = false
+passby = true
 gravity = 9.80665
 
 [zupt]
-passby = false
+passby = true
 gyro_thresh = 0.1
 accel_thresh = 0.2
 bias_correction_gain = 0.01
 
 [ekf]
-passby = false
+passby = true
 enabled = false
