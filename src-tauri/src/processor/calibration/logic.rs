@@ -25,6 +25,14 @@ impl Calibration {
     }
 
     /// 将原始样本转换为标定后的样本。
+    ///
+    /// 参数:
+    /// - `raw`: 原始 IMU 样本（未标定）。
+    /// 返回:
+    /// - 标定后的样本（去偏置 + 标定矩阵 + 角速度转弧度）。
+    /// 公式:
+    /// - `a = M_a * (a_raw - b_a)`
+    /// - `w = M_g * ((gyro_deg * deg_to_rad) - b_g)`
     pub fn update(&mut self, raw: &ImuSampleRaw) -> ImuSampleCalibrated {
         if self.config.passby {
             return ImuSampleCalibrated {
@@ -66,6 +74,14 @@ impl AxisCalibration {
     }
 
     /// 应用姿态零位校准（角度减偏移，四元数左乘偏移）。
+    ///
+    /// 参数:
+    /// - `raw`: 原始 IMU 样本（会被就地修改）。
+    /// 返回:
+    /// - `()`。
+    /// 公式:
+    /// - `angle' = angle - angle_offset`
+    /// - `quat' = quat_offset * quat`
     pub fn apply(&self, raw: &mut ImuSampleRaw) {
         raw.angle -= self.angle_offset;
         raw.quat = self.quat_offset * raw.quat;

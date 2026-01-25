@@ -21,6 +21,13 @@ impl MadgwickFusion {
     }
 
     /// 更新姿态（当前为占位返回）。
+    ///
+    /// 参数:
+    /// - `sample`: 滤波后的 IMU 样本。
+    /// 返回:
+    /// - 姿态估计（当前占位返回常量）。
+    /// 公式:
+    /// - `q_out = q_prev` (占位)
     pub fn update(&mut self, sample: &ImuSampleFiltered) -> AttitudeEstimate {
         // TODO: 实现 Madgwick 融合更新（当前仅返回恒定姿态）。
         AttitudeEstimate {

@@ -25,6 +25,15 @@ impl MahonyFusion {
     }
 
     /// 根据滤波后的 IMU 样本更新姿态。
+    ///
+    /// 参数:
+    /// - `sample`: 滤波后的 IMU 样本（角速度/加速度）。
+    /// 返回:
+    /// - 姿态估计（四元数 + 时间戳）。
+    /// 公式:
+    /// - `q_dot = 0.5 * Omega(w) * q`
+    /// - `q_gyro = normalize(q * exp(w * dt))`
+    /// - `q = slerp(q_gyro, q_acc * q_gyro, beta)`
     pub fn update(&mut self, sample: &ImuSampleFiltered) -> AttitudeEstimate {
         if self.config.passby {
             return AttitudeEstimate {

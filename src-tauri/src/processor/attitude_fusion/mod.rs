@@ -40,6 +40,15 @@ impl AttitudeFusion {
     }
 
     /// 更新姿态融合结果。
+    ///
+    /// 参数:
+    /// - `sample`: 滤波后的 IMU 样本。
+    /// - `raw_quat`: 透传模式下的原始四元数（可选）。
+    /// 返回:
+    /// - 融合后的姿态估计。
+    /// 公式:
+    /// - `passby`: `q_out = raw_quat` (缺省 `IDENTITY`)
+    /// - 否则: `q_out = Mahony.update(sample)`
     pub fn update(
         &mut self,
         sample: &ImuSampleFiltered,

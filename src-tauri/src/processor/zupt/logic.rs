@@ -22,6 +22,16 @@ impl ZuptDetector {
     }
 
     /// 应用 ZUPT 并返回观测。
+    ///
+    /// 参数:
+    /// - `nav`: 当前导航状态（会被更新后返回）。
+    /// - `sample`: 滤波后的 IMU 样本。
+    /// 返回:
+    /// - 更新后的导航状态与静止观测。
+    /// 公式:
+    /// - `a_lin = R(q) * a_lp - g * 9.80665`
+    /// - `is_static = |w| < gyro_thresh && |a_lin| < accel_thresh`
+    /// - `v = 0`, `b_a = b_a + a_lin * gain` (静止时)
     pub fn apply(
         &mut self,
         mut nav: NavState,
