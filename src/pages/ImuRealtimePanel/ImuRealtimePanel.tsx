@@ -35,12 +35,12 @@ export const ImuRealtimePanel: React.FC = () => {
           <ImuChartsCanvas
             source={imuSource}
             enabled={showCharts}
-            refreshMs={40}
+            refreshMs={16}
             label="加速度 (m/s^2)"
             series={[
-              { name: "X", color: "#57b2ff", getValues: (s) => s.builtin.accel.x },
-              { name: "Y", color: "#ffb74d", getValues: (s) => s.builtin.accel.y },
-              { name: "Z", color: "#88e0a5", getValues: (s) => s.builtin.accel.z },
+              { name: "X", color: "#57b2ff", getBuffer: (w) => w.builtin.accelX },
+              { name: "Y", color: "#ffb74d", getBuffer: (w) => w.builtin.accelY },
+              { name: "Z", color: "#88e0a5", getBuffer: (w) => w.builtin.accelZ },
             ]}
           />
         </div>
@@ -54,12 +54,12 @@ export const ImuRealtimePanel: React.FC = () => {
     //       <ImuChartsCanvas
     //         source={imuSource}
     //         enabled={showCharts}
-    //         refreshMs={40}
+    //         refreshMs={16}
     //         label="Gyroscope (deg/s)"
     //         series={[
-    //           { name: "X", color: "#9b87ff", getValues: (s) => s.builtin.gyro.x },
-    //           { name: "Y", color: "#ff7aa2", getValues: (s) => s.builtin.gyro.y },
-    //           { name: "Z", color: "#ffd166", getValues: (s) => s.builtin.gyro.z },
+    //           { name: "X", color: "#9b87ff", getBuffer: (w) => w.builtin.gyroX },
+    //           { name: "Y", color: "#ff7aa2", getBuffer: (w) => w.builtin.gyroY },
+    //           { name: "Z", color: "#ffd166", getBuffer: (w) => w.builtin.gyroZ },
     //         ]}
     //       />
     //     </div>
@@ -73,12 +73,12 @@ export const ImuRealtimePanel: React.FC = () => {
           <ImuChartsCanvas
             source={imuSource}
             enabled={showCharts}
-            refreshMs={40}
+            refreshMs={16}
             label="偏航 / 俯仰 / 横滚 (deg)"
             series={[
-              { name: "X", color: "#4cc9f0", getValues: (s) => s.builtin.angle.x },
-              { name: "Y", color: "#f8961e", getValues: (s) => s.builtin.angle.y },
-              { name: "Z", color: "#43aa8b", getValues: (s) => s.builtin.angle.z },
+              { name: "X", color: "#4cc9f0", getBuffer: (w) => w.builtin.angleX },
+              { name: "Y", color: "#f8961e", getBuffer: (w) => w.builtin.angleY },
+              { name: "Z", color: "#43aa8b", getBuffer: (w) => w.builtin.angleZ },
             ]}
           />
         </div>
@@ -92,12 +92,12 @@ export const ImuRealtimePanel: React.FC = () => {
     //       <ImuChartsCanvas
     //         source={imuSource}
     //         enabled={showCharts}
-    //         refreshMs={40}
+    //         refreshMs={16}
     //         label="Acceleration (m/s^2)"
     //         series={[
-    //           { name: "X", color: "#9ad1ff", getValues: (s) => s.builtin.accelWithG.x },
-    //           { name: "Y", color: "#ffda7a", getValues: (s) => s.builtin.accelWithG.y },
-    //           { name: "Z", color: "#8ff0c4", getValues: (s) => s.builtin.accelWithG.z },
+    //           { name: "X", color: "#9ad1ff", getBuffer: (w) => w.builtin.accelWithGX },
+    //           { name: "Y", color: "#ffda7a", getBuffer: (w) => w.builtin.accelWithGY },
+    //           { name: "Z", color: "#8ff0c4", getBuffer: (w) => w.builtin.accelWithGZ },
     //         ]}
     //       />
     //     </div>
@@ -111,13 +111,13 @@ export const ImuRealtimePanel: React.FC = () => {
     //       <ImuChartsCanvas
     //         source={imuSource}
     //         enabled={showCharts}
-    //         refreshMs={40}
+    //         refreshMs={16}
     //         label="Quaternion"
     //         series={[
-    //           { name: "W", color: "#f07167", getValues: (s) => s.builtin.quat.w },
-    //           { name: "X", color: "#00afb9", getValues: (s) => s.builtin.quat.x },
-    //           { name: "Y", color: "#fed9b7", getValues: (s) => s.builtin.quat.y },
-    //           { name: "Z", color: "#fdfcdc", getValues: (s) => s.builtin.quat.z },
+    //           { name: "W", color: "#f07167", getBuffer: (w) => w.builtin.quatW },
+    //           { name: "X", color: "#00afb9", getBuffer: (w) => w.builtin.quatX },
+    //           { name: "Y", color: "#fed9b7", getBuffer: (w) => w.builtin.quatY },
+    //           { name: "Z", color: "#fdfcdc", getBuffer: (w) => w.builtin.quatZ },
     //         ]}
     //       />
     //     </div>
@@ -131,12 +131,12 @@ export const ImuRealtimePanel: React.FC = () => {
           <ImuChartsCanvas
             source={imuSource}
             enabled={showCharts}
-            refreshMs={40}
+            refreshMs={16}
             label="m"
             series={[
-              { name: "X", color: "#4d96ff", getValues: (s) => s.builtin.offset.x },
-              { name: "Y", color: "#6bffb8", getValues: (s) => s.builtin.offset.y },
-              { name: "Z", color: "#ff6b6b", getValues: (s) => s.builtin.offset.z },
+              { name: "X", color: "#4d96ff", getBuffer: (w) => w.builtin.offsetX },
+              { name: "Y", color: "#6bffb8", getBuffer: (w) => w.builtin.offsetY },
+              { name: "Z", color: "#ff6b6b", getBuffer: (w) => w.builtin.offsetZ },
             ]}
           />
         </div>
@@ -150,12 +150,12 @@ export const ImuRealtimePanel: React.FC = () => {
           <ImuChartsCanvas
             source={imuSource}
             enabled={showCharts}
-            refreshMs={40}
+            refreshMs={16}
             label="导航加速度 (m/s^2)"
             series={[
-              { name: "X", color: "#b8c0ff", getValues: (s) => s.builtin.accelNav.x },
-              { name: "Y", color: "#ffd6a5", getValues: (s) => s.builtin.accelNav.y },
-              { name: "Z", color: "#caffbf", getValues: (s) => s.builtin.accelNav.z },
+              { name: "X", color: "#b8c0ff", getBuffer: (w) => w.builtin.accelNavX },
+              { name: "Y", color: "#ffd6a5", getBuffer: (w) => w.builtin.accelNavY },
+              { name: "Z", color: "#caffbf", getBuffer: (w) => w.builtin.accelNavZ },
             ]}
           />
         </div>
@@ -169,12 +169,12 @@ export const ImuRealtimePanel: React.FC = () => {
           <ImuChartsCanvas
             source={imuSource}
             enabled={showCharts}
-            refreshMs={40}
+            refreshMs={16}
             label="角度差值 (deg)"
             series={[
-              { name: "偏航 Δ", color: "#57b2ff", getValues: (s) => s.deltaAngle.x },
-              { name: "俯仰 Δ", color: "#ffb74d", getValues: (s) => s.deltaAngle.y },
-              { name: "横滚 Δ", color: "#88e0a5", getValues: (s) => s.deltaAngle.z },
+              { name: "偏航 Δ", color: "#57b2ff", getBuffer: (w) => w.deltaAngleX },
+              { name: "俯仰 Δ", color: "#ffb74d", getBuffer: (w) => w.deltaAngleY },
+              { name: "横滚 Δ", color: "#88e0a5", getBuffer: (w) => w.deltaAngleZ },
             ]}
           />
         </div>
@@ -188,12 +188,12 @@ export const ImuRealtimePanel: React.FC = () => {
           <ImuChartsCanvas
             source={imuSource}
             enabled={showCharts}
-            refreshMs={40}
+            refreshMs={16}
             label="速度 (m/s)"
             series={[
-              { name: "X", color: "#4cc9f0", getValues: (s) => s.calculated.velocity.x },
-              { name: "Y", color: "#f8961e", getValues: (s) => s.calculated.velocity.y },
-              { name: "Z", color: "#43aa8b", getValues: (s) => s.calculated.velocity.z },
+              { name: "X", color: "#4cc9f0", getBuffer: (w) => w.calculated.velocityX },
+              { name: "Y", color: "#f8961e", getBuffer: (w) => w.calculated.velocityY },
+              { name: "Z", color: "#43aa8b", getBuffer: (w) => w.calculated.velocityZ },
             ]}
           />
         </div>
@@ -207,12 +207,12 @@ export const ImuRealtimePanel: React.FC = () => {
           <ImuChartsCanvas
             source={imuSource}
             enabled={showCharts}
-            refreshMs={40}
+            refreshMs={16}
             label="位置 (m)"
             series={[
-              { name: "X", color: "#b8c0ff", getValues: (s) => s.calculated.position.x },
-              { name: "Y", color: "#ffd6a5", getValues: (s) => s.calculated.position.y },
-              { name: "Z", color: "#caffbf", getValues: (s) => s.calculated.position.z },
+              { name: "X", color: "#b8c0ff", getBuffer: (w) => w.calculated.positionX },
+              { name: "Y", color: "#ffd6a5", getBuffer: (w) => w.calculated.positionY },
+              { name: "Z", color: "#caffbf", getBuffer: (w) => w.calculated.positionZ },
             ]}
           />
         </div>

@@ -1,7 +1,63 @@
-import { ImuHistorySnapshot, Quaternion, ResponseData, Vector3 } from "../types";
+import { Quaternion, ResponseData, Vector3 } from "../types";
+
+export type ImuHistoryWindow = {
+  count: number;
+  latestTime: number;
+  getIndex: (viewIndex: number) => number;
+  getTime: (viewIndex: number) => number;
+  getValue: (buffer: Float32Array | Float64Array, viewIndex: number) => number;
+  timeMs: Float64Array;
+  builtin: {
+    accelX: Float32Array;
+    accelY: Float32Array;
+    accelZ: Float32Array;
+    accelWithGX: Float32Array;
+    accelWithGY: Float32Array;
+    accelWithGZ: Float32Array;
+    gyroX: Float32Array;
+    gyroY: Float32Array;
+    gyroZ: Float32Array;
+    angleX: Float32Array;
+    angleY: Float32Array;
+    angleZ: Float32Array;
+    quatW: Float32Array;
+    quatX: Float32Array;
+    quatY: Float32Array;
+    quatZ: Float32Array;
+    offsetX: Float32Array;
+    offsetY: Float32Array;
+    offsetZ: Float32Array;
+    accelNavX: Float32Array;
+    accelNavY: Float32Array;
+    accelNavZ: Float32Array;
+  };
+  calculated: {
+    angleX: Float32Array;
+    angleY: Float32Array;
+    angleZ: Float32Array;
+    attitudeW: Float32Array;
+    attitudeX: Float32Array;
+    attitudeY: Float32Array;
+    attitudeZ: Float32Array;
+    velocityX: Float32Array;
+    velocityY: Float32Array;
+    velocityZ: Float32Array;
+    positionX: Float32Array;
+    positionY: Float32Array;
+    positionZ: Float32Array;
+  };
+  deltaAngleX: Float32Array;
+  deltaAngleY: Float32Array;
+  deltaAngleZ: Float32Array;
+};
 
 const radToDeg = (rad: number) => (rad * 180) / Math.PI;
 
+/**
+ * 四元数转换成欧拉角
+ * @param quat - 四元数
+ * @returns 欧拉角
+ */
 const quatToEulerDegrees = (quat: Quaternion): Vector3 => {
   const { w, x, y, z } = quat;
   const sinyCosp = 2 * (w * z + x * y);
@@ -166,211 +222,170 @@ export class ImuHistoryBuffer {
     this.count = Math.min(this.count + 1, this.capacity);
   }
 
-  snapshot(windowMs?: number): ImuHistorySnapshot {
+  /**
+   * 获取环形缓冲区的时间窗口视图：
+   * - 使用二分查找定位时间范围，避免线性扫描。
+   * - 返回索引映射与原始缓冲区引用，减少中间数组复制。
+   *
+   * @param durationMs 视图窗口的时长（毫秒）。
+   * @param offsetMs 相对最新数据的回退偏移（毫秒），0 表示跟随最新。
+   * @returns 时间窗口视图，包含索引映射、窗口内数量以及原始缓冲区引用。
+   */
+  getWindow(durationMs: number, offsetMs: number): ImuHistoryWindow {
     if (this.count === 0) {
       return {
-        time: [],
+        count: 0,
+        latestTime: 0,
+        getIndex: () => 0,
+        getTime: () => 0,
+        getValue: () => 0,
+        timeMs: this.timeMs,
         builtin: {
-          accel: { x: [], y: [], z: [] },
-          accelWithG: { x: [], y: [], z: [] },
-          gyro: { x: [], y: [], z: [] },
-          angle: { x: [], y: [], z: [] },
-          quat: { w: [], x: [], y: [], z: [] },
-          offset: { x: [], y: [], z: [] },
-          accelNav: { x: [], y: [], z: [] },
+          accelX: this.accelX,
+          accelY: this.accelY,
+          accelZ: this.accelZ,
+          accelWithGX: this.accelWithGX,
+          accelWithGY: this.accelWithGY,
+          accelWithGZ: this.accelWithGZ,
+          gyroX: this.gyroX,
+          gyroY: this.gyroY,
+          gyroZ: this.gyroZ,
+          angleX: this.angleX,
+          angleY: this.angleY,
+          angleZ: this.angleZ,
+          quatW: this.quatW,
+          quatX: this.quatX,
+          quatY: this.quatY,
+          quatZ: this.quatZ,
+          offsetX: this.offsetX,
+          offsetY: this.offsetY,
+          offsetZ: this.offsetZ,
+          accelNavX: this.accelNavX,
+          accelNavY: this.accelNavY,
+          accelNavZ: this.accelNavZ,
         },
         calculated: {
-          angle: { x: [], y: [], z: [] },
-          attitude: { w: [], x: [], y: [], z: [] },
-          velocity: { x: [], y: [], z: [] },
-          position: { x: [], y: [], z: [] },
+          angleX: this.calcAngleX,
+          angleY: this.calcAngleY,
+          angleZ: this.calcAngleZ,
+          attitudeW: this.attitudeW,
+          attitudeX: this.attitudeX,
+          attitudeY: this.attitudeY,
+          attitudeZ: this.attitudeZ,
+          velocityX: this.velocityX,
+          velocityY: this.velocityY,
+          velocityZ: this.velocityZ,
+          positionX: this.positionX,
+          positionY: this.positionY,
+          positionZ: this.positionZ,
         },
-        deltaAngle: { x: [], y: [], z: [] },
+        deltaAngleX: this.deltaAngleX,
+        deltaAngleY: this.deltaAngleY,
+        deltaAngleZ: this.deltaAngleZ,
       };
     }
 
-    const size = this.count;
-    const start = (this.writeIndex - size + this.capacity) % this.capacity;
-    const time: number[] = new Array(size);
-    const accelX: number[] = new Array(size);
-    const accelY: number[] = new Array(size);
-    const accelZ: number[] = new Array(size);
-    const accelWithGX: number[] = new Array(size);
-    const accelWithGY: number[] = new Array(size);
-    const accelWithGZ: number[] = new Array(size);
-    const gyroX: number[] = new Array(size);
-    const gyroY: number[] = new Array(size);
-    const gyroZ: number[] = new Array(size);
-    const angleX: number[] = new Array(size);
-    const angleY: number[] = new Array(size);
-    const angleZ: number[] = new Array(size);
-    const quatW: number[] = new Array(size);
-    const quatX: number[] = new Array(size);
-    const quatY: number[] = new Array(size);
-    const quatZ: number[] = new Array(size);
-    const offsetX: number[] = new Array(size);
-    const offsetY: number[] = new Array(size);
-    const offsetZ: number[] = new Array(size);
-    const accelNavX: number[] = new Array(size);
-    const accelNavY: number[] = new Array(size);
-    const accelNavZ: number[] = new Array(size);
-    const calcAngleX: number[] = new Array(size);
-    const calcAngleY: number[] = new Array(size);
-    const calcAngleZ: number[] = new Array(size);
-    const attitudeW: number[] = new Array(size);
-    const attitudeX: number[] = new Array(size);
-    const attitudeY: number[] = new Array(size);
-    const attitudeZ: number[] = new Array(size);
-    const deltaAngleX: number[] = new Array(size);
-    const deltaAngleY: number[] = new Array(size);
-    const deltaAngleZ: number[] = new Array(size);
-    const velocityX: number[] = new Array(size);
-    const velocityY: number[] = new Array(size);
-    const velocityZ: number[] = new Array(size);
-    const positionX: number[] = new Array(size);
-    const positionY: number[] = new Array(size);
-    const positionZ: number[] = new Array(size);
+    const baseIndex = (this.writeIndex - this.count + this.capacity) % this.capacity;
+    const getTimeAt = (logicalIndex: number) =>
+      this.timeMs[(baseIndex + logicalIndex) % this.capacity];
+    const latestTime = getTimeAt(this.count - 1);
+    const clampedDuration = Math.max(0, durationMs);
+    const clampedOffset = Math.max(0, offsetMs);
+    const endTime = latestTime - clampedOffset;
+    const startTime = endTime - clampedDuration;
 
-    for (let j = 0; j < size; j += 1) {
-      const idx = (start + j) % this.capacity;
-      time[j] = this.timeMs[idx];
-      accelX[j] = this.accelX[idx];
-      accelY[j] = this.accelY[idx];
-      accelZ[j] = this.accelZ[idx];
-      accelWithGX[j] = this.accelWithGX[idx];
-      accelWithGY[j] = this.accelWithGY[idx];
-      accelWithGZ[j] = this.accelWithGZ[idx];
-      gyroX[j] = this.gyroX[idx];
-      gyroY[j] = this.gyroY[idx];
-      gyroZ[j] = this.gyroZ[idx];
-      angleX[j] = this.angleX[idx];
-      angleY[j] = this.angleY[idx];
-      angleZ[j] = this.angleZ[idx];
-      quatW[j] = this.quatW[idx];
-      quatX[j] = this.quatX[idx];
-      quatY[j] = this.quatY[idx];
-      quatZ[j] = this.quatZ[idx];
-      offsetX[j] = this.offsetX[idx];
-      offsetY[j] = this.offsetY[idx];
-      offsetZ[j] = this.offsetZ[idx];
-      accelNavX[j] = this.accelNavX[idx];
-      accelNavY[j] = this.accelNavY[idx];
-      accelNavZ[j] = this.accelNavZ[idx];
-      calcAngleX[j] = this.calcAngleX[idx];
-      calcAngleY[j] = this.calcAngleY[idx];
-      calcAngleZ[j] = this.calcAngleZ[idx];
-      attitudeW[j] = this.attitudeW[idx];
-      attitudeX[j] = this.attitudeX[idx];
-      attitudeY[j] = this.attitudeY[idx];
-      attitudeZ[j] = this.attitudeZ[idx];
-      deltaAngleX[j] = this.deltaAngleX[idx];
-      deltaAngleY[j] = this.deltaAngleY[idx];
-      deltaAngleZ[j] = this.deltaAngleZ[idx];
-      velocityX[j] = this.velocityX[idx];
-      velocityY[j] = this.velocityY[idx];
-      velocityZ[j] = this.velocityZ[idx];
-      positionX[j] = this.positionX[idx];
-      positionY[j] = this.positionY[idx];
-      positionZ[j] = this.positionZ[idx];
+    const lowerBound = (target: number) => {
+      let lo = 0;
+      let hi = this.count;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (getTimeAt(mid) < target) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      return lo;
+    };
+
+    const upperBound = (target: number) => {
+      let lo = 0;
+      let hi = this.count;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (getTimeAt(mid) <= target) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      return lo;
+    };
+
+    let startLogical = lowerBound(startTime);
+    let endLogical = clampedOffset > 0 ? upperBound(endTime) : this.count;
+
+    if (endLogical - startLogical < 2 && this.count >= 2) {
+      endLogical = Math.min(this.count, startLogical + 2);
+      startLogical = Math.max(0, endLogical - 2);
     }
 
-    if (windowMs === undefined || time.length === 0) {
-      return {
-        time,
-        builtin: {
-          accel: { x: accelX, y: accelY, z: accelZ },
-          accelWithG: { x: accelWithGX, y: accelWithGY, z: accelWithGZ },
-          gyro: { x: gyroX, y: gyroY, z: gyroZ },
-          angle: { x: angleX, y: angleY, z: angleZ },
-          quat: { w: quatW, x: quatX, y: quatY, z: quatZ },
-          offset: { x: offsetX, y: offsetY, z: offsetZ },
-          accelNav: { x: accelNavX, y: accelNavY, z: accelNavZ },
-        },
-        calculated: {
-          angle: { x: calcAngleX, y: calcAngleY, z: calcAngleZ },
-          attitude: { w: attitudeW, x: attitudeX, y: attitudeY, z: attitudeZ },
-          velocity: { x: velocityX, y: velocityY, z: velocityZ },
-          position: { x: positionX, y: positionY, z: positionZ },
-        },
-        deltaAngle: { x: deltaAngleX, y: deltaAngleY, z: deltaAngleZ },
-      };
-    }
-
-    const lastTime = time[time.length - 1];
-    const windowStart = lastTime - windowMs;
-    let sliceStart = 0;
-    while (sliceStart < time.length && time[sliceStart] < windowStart) {
-      sliceStart += 1;
-    }
+    const count = Math.max(0, endLogical - startLogical);
+    const startIndex = (baseIndex + startLogical) % this.capacity;
+    const getIndex = (viewIndex: number) => (startIndex + viewIndex) % this.capacity;
+    const getTime = (viewIndex: number) => this.timeMs[getIndex(viewIndex)];
+    const getValue = (buffer: Float32Array | Float64Array, viewIndex: number) =>
+      buffer[getIndex(viewIndex)];
 
     return {
-      time: time.slice(sliceStart),
+      count,
+      latestTime,
+      getIndex,
+      getTime,
+      getValue,
+      timeMs: this.timeMs,
       builtin: {
-        accel: {
-          x: accelX.slice(sliceStart),
-          y: accelY.slice(sliceStart),
-          z: accelZ.slice(sliceStart),
-        },
-        accelWithG: {
-          x: accelWithGX.slice(sliceStart),
-          y: accelWithGY.slice(sliceStart),
-          z: accelWithGZ.slice(sliceStart),
-        },
-        gyro: {
-          x: gyroX.slice(sliceStart),
-          y: gyroY.slice(sliceStart),
-          z: gyroZ.slice(sliceStart),
-        },
-        angle: {
-          x: angleX.slice(sliceStart),
-          y: angleY.slice(sliceStart),
-          z: angleZ.slice(sliceStart),
-        },
-        quat: {
-          w: quatW.slice(sliceStart),
-          x: quatX.slice(sliceStart),
-          y: quatY.slice(sliceStart),
-          z: quatZ.slice(sliceStart),
-        },
-        offset: {
-          x: offsetX.slice(sliceStart),
-          y: offsetY.slice(sliceStart),
-          z: offsetZ.slice(sliceStart),
-        },
-        accelNav: {
-          x: accelNavX.slice(sliceStart),
-          y: accelNavY.slice(sliceStart),
-          z: accelNavZ.slice(sliceStart),
-        },
+        accelX: this.accelX,
+        accelY: this.accelY,
+        accelZ: this.accelZ,
+        accelWithGX: this.accelWithGX,
+        accelWithGY: this.accelWithGY,
+        accelWithGZ: this.accelWithGZ,
+        gyroX: this.gyroX,
+        gyroY: this.gyroY,
+        gyroZ: this.gyroZ,
+        angleX: this.angleX,
+        angleY: this.angleY,
+        angleZ: this.angleZ,
+        quatW: this.quatW,
+        quatX: this.quatX,
+        quatY: this.quatY,
+        quatZ: this.quatZ,
+        offsetX: this.offsetX,
+        offsetY: this.offsetY,
+        offsetZ: this.offsetZ,
+        accelNavX: this.accelNavX,
+        accelNavY: this.accelNavY,
+        accelNavZ: this.accelNavZ,
       },
       calculated: {
-        angle: {
-          x: calcAngleX.slice(sliceStart),
-          y: calcAngleY.slice(sliceStart),
-          z: calcAngleZ.slice(sliceStart),
-        },
-        attitude: {
-          w: attitudeW.slice(sliceStart),
-          x: attitudeX.slice(sliceStart),
-          y: attitudeY.slice(sliceStart),
-          z: attitudeZ.slice(sliceStart),
-        },
-        velocity: {
-          x: velocityX.slice(sliceStart),
-          y: velocityY.slice(sliceStart),
-          z: velocityZ.slice(sliceStart),
-        },
-        position: {
-          x: positionX.slice(sliceStart),
-          y: positionY.slice(sliceStart),
-          z: positionZ.slice(sliceStart),
-        },
+        angleX: this.calcAngleX,
+        angleY: this.calcAngleY,
+        angleZ: this.calcAngleZ,
+        attitudeW: this.attitudeW,
+        attitudeX: this.attitudeX,
+        attitudeY: this.attitudeY,
+        attitudeZ: this.attitudeZ,
+        velocityX: this.velocityX,
+        velocityY: this.velocityY,
+        velocityZ: this.velocityZ,
+        positionX: this.positionX,
+        positionY: this.positionY,
+        positionZ: this.positionZ,
       },
-      deltaAngle: {
-        x: deltaAngleX.slice(sliceStart),
-        y: deltaAngleY.slice(sliceStart),
-        z: deltaAngleZ.slice(sliceStart),
-      },
+      deltaAngleX: this.deltaAngleX,
+      deltaAngleY: this.deltaAngleY,
+      deltaAngleZ: this.deltaAngleZ,
     };
   }
 }

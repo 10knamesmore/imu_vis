@@ -1,24 +1,22 @@
 import React, { useEffect, useRef, useState } from "react";
 
+import type { ImuHistoryWindow } from "../../utils/ImuHistoryBuffer";
+
 import styles from "./ImuChartsCanvas.module.scss";
 
-type SnapshotWithTime = {
-  time: number[];
-};
-
-type SeriesSpec<TSnapshot extends SnapshotWithTime> = {
+type SeriesSpec = {
   name: string;
   color: string;
-  getValues: (snapshot: TSnapshot) => number[];
+  getBuffer: (window: ImuHistoryWindow) => Float32Array | Float64Array;
 };
 
-type ImuChartsCanvasProps<TSnapshot extends SnapshotWithTime> = {
-  source: { bufferRef: React.RefObject<{ snapshot: (windowMs?: number) => TSnapshot }> };
+type ImuChartsCanvasProps = {
+  source: { bufferRef: React.RefObject<{ getWindow: (durationMs: number, offsetMs: number) => ImuHistoryWindow }> };
   enabled: boolean;
   refreshMs?: number;
   windowMs?: number;
   label: string;
-  series: SeriesSpec<TSnapshot>[];
+  series: SeriesSpec[];
 };
 
 /**
@@ -33,9 +31,9 @@ type ImuChartsCanvasProps<TSnapshot extends SnapshotWithTime> = {
  */
 const drawChart = (
   ctx: CanvasRenderingContext2D,
-  time: number[],
+  window: ImuHistoryWindow,
+  series: Array<{ color: string; name: string; buffer: Float32Array | Float64Array }>,
   yAxisLabel: string,
-  series: Array<{ values: number[]; color: string; name: string }>,
   width: number,
   height: number
 ) => {
@@ -47,20 +45,21 @@ const drawChart = (
   };
   const plotHeight = height - padding.top - padding.bottom;
   const plotWidth = width - padding.left - padding.right;
-  if (time.length < 2) {
+  if (window.count < 2) {
     ctx.fillStyle = "#7b8591";
     ctx.fillText("等待数据...", padding.left, 20);
     return;
   }
 
-  const latestTime = time[time.length - 1];
-  const earliestTime = time[0];
+  const latestTime = window.getTime(window.count - 1);
+  const earliestTime = window.getTime(0);
   const timeSpan = latestTime - earliestTime || 1;
 
   let min = Infinity;
   let max = -Infinity;
   for (const s of series) {
-    for (const v of s.values) {
+    for (let i = 0; i < window.count; i += 1) {
+      const v = window.getValue(s.buffer, i);
       min = Math.min(min, v);
       max = Math.max(max, v);
     }
@@ -131,10 +130,11 @@ const drawChart = (
     ctx.strokeStyle = s.color;
     ctx.lineWidth = 1.4;
     ctx.beginPath();
-    for (let i = 0; i < s.values.length; i += 1) {
-      const t = time[i];
+    for (let i = 0; i < window.count; i += 1) {
+      const t = window.getTime(i);
+      const v = window.getValue(s.buffer, i);
       const x = padding.left + ((t - earliestTime) / timeSpan) * plotWidth;
-      const y = padding.top + plotHeight - ((s.values[i] - min) / range) * plotHeight;
+      const y = padding.top + plotHeight - ((v - min) / range) * plotHeight;
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -160,14 +160,14 @@ const drawChart = (
 /**
  * IMU 数据曲线画布组件。
  */
-export const ImuChartsCanvas = <TSnapshot extends SnapshotWithTime>({
+export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
   source,
   enabled,
-  refreshMs = 40,
+  refreshMs = 16,
   windowMs,
   label,
   series,
-}: ImuChartsCanvasProps<TSnapshot>) => {
+}) => {
   /** 容器 div 的引用，用于监听尺寸变化 */
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** Canvas 元素的引用，用于获取绘图上下文 */
@@ -316,64 +316,32 @@ export const ImuChartsCanvas = <TSnapshot extends SnapshotWithTime>({
       }
 
       // 获取全部历史数据
-      const snapshot = source.bufferRef.current.snapshot();
-      if (snapshot.time.length < 2) {
+      const { duration, offset } = viewStateRef.current;
+      const window = source.bufferRef.current.getWindow(duration, offset);
+      if (window.count < 2) {
         ctx.fillStyle = "#6b7280";
         ctx.fillText("等待 IMU 数据流...", 16, 20);
         return;
       }
 
-      // 根据视图状态截取数据
-      const { duration, offset } = viewStateRef.current;
-      const latestTime = snapshot.time[snapshot.time.length - 1];
-      const viewEndTime = latestTime - offset;
-      const viewStartTime = viewEndTime - duration;
-
-      // 查找对应的时间范围索引
-      // 简单遍历查找边界，由于数据有序，可以优化但此处数据量不大直接遍历即可
-      let startIndex = 0;
-      let endIndex = snapshot.time.length;
-
-      // 找到第一个 >= viewStartTime 的点
-      while (startIndex < snapshot.time.length && snapshot.time[startIndex] < viewStartTime) {
-        startIndex++;
-      }
-
-      // 找到第一个 > viewEndTime 的点作为结束
-      // 注意：如果 offset 为 0，endIndex 应该是 length
-      if (offset > 0) {
-        let i = startIndex;
-        while (i < snapshot.time.length && snapshot.time[i] <= viewEndTime) {
-          i++;
-        }
-        endIndex = i;
-      }
-
-      // 如果选区内没有足够数据
-      if (endIndex - startIndex < 2) {
-        // 尝试显示最近的数据，或者保持空
-        if (startIndex > 0) startIndex = Math.max(0, startIndex - 2);
-      }
-
-      const viewTime = snapshot.time.slice(startIndex, endIndex);
-      const seriesValues = series.map((entry) => {
-        const values = entry.getValues(snapshot).slice(startIndex, endIndex);
-        return { name: entry.name, color: entry.color, values };
-      });
-
       const yAxisLabel = label.includes("(")
         ? label.slice(label.indexOf("(") + 1, label.lastIndexOf(")"))
         : label;
-      drawChart(ctx, viewTime, yAxisLabel, seriesValues, width, height);
+      const seriesBuffers = series.map((entry) => ({
+        name: entry.name,
+        color: entry.color,
+        buffer: entry.getBuffer(window),
+      }));
+      drawChart(ctx, window, seriesBuffers, yAxisLabel, width, height);
 
       const now = Date.now();
       if (now - lastStatsUpdateRef.current > 200) {
         lastStatsUpdateRef.current = now;
         setLatestStats(
-          seriesValues.map((entry) => ({
+          seriesBuffers.map((entry) => ({
             name: entry.name,
             color: entry.color,
-            value: entry.values.length ? entry.values[entry.values.length - 1] : undefined,
+            value: window.count ? window.getValue(entry.buffer, window.count - 1) : undefined,
           }))
         );
       }
