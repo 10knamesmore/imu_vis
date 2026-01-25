@@ -9,7 +9,6 @@ type ImuModelViewProps = {
   source: ImuSource;
   showTrajectory: boolean;
   trajectoryOption: TrajectoryOption;
-  scale: number;
   useCalculated: boolean;
   trailResetToken: number;
 };
@@ -25,7 +24,6 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
   source,
   showTrajectory,
   trajectoryOption,
-  scale,
   useCalculated,
   trailResetToken,
 }) => {
@@ -91,7 +89,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
         // 计算各轴朝向向量端点，写入对应轨迹缓冲并更新绘制范围
         axisKeys.forEach((axis) => {
           if (!trajectoryOptionRef.current[axis]) return;
-          
+
           tmpVec.copy(axisBases[axis]).applyQuaternion(tmpQuat).multiplyScalar(0.8 * viewScaleRef.current);
           const positions = trailPositionsRefs.current[axis];
           const geometry = trailGeometryRefs.current[axis];
@@ -99,7 +97,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
 
           const state = trailStateRef.current[axis];
           const maxPoints = maxTrailPointsRef.current;
-          
+
           if (state.count < maxPoints) {
             const i = state.count;
             positions[i * 3] = tmpVec.x;
@@ -124,7 +122,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
   /**
    * 使用基础 Three.js Hook 创建场景
    */
-  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(scale, onRender);
+  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(0.8, onRender);
 
   /**
    * 初始化场景对象（模型、坐标轴、标签、轨迹线）
@@ -135,7 +133,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
     if (!displayGroup) return;
 
     // Body
-    const bodyGeometry = new THREE.BoxGeometry(0.6, 0.9, 0.2);
+    const bodyGeometry = new THREE.BoxGeometry(0.4, 0.6, 0.13);
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: 0x4f9bff,
       metalness: 0.1,
@@ -223,9 +221,9 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
       labelResources.forEach((r) => { r.material.dispose(); r.texture.dispose(); });
       axisLabelsRef.current = [];
       axisKeys.forEach(axis => {
-        if(trailRefs.current[axis]) displayGroup.remove(trailRefs.current[axis]!);
-        if(trailGeometryRefs.current[axis]) trailGeometryRefs.current[axis]!.dispose();
-        if(trailMaterials[axis]) trailMaterials[axis].dispose();
+        if (trailRefs.current[axis]) displayGroup.remove(trailRefs.current[axis]!);
+        if (trailGeometryRefs.current[axis]) trailGeometryRefs.current[axis]!.dispose();
+        if (trailMaterials[axis]) trailMaterials[axis].dispose();
       });
     };
   }, []); // Setup once

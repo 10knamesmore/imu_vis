@@ -17,8 +17,6 @@ type ImuThreeViewProps = {
   showTrajectory: boolean;
   /** 轴向量端点轨迹配置 */
   trajectoryOption: TrajectoryOption;
-  /** 模型显示的缩放倍率 */
-  scale: number;
   /** 是否使用计算后的姿态 */
   useCalculated: boolean;
   /** 触发轨迹清空的计数器（轴向量端点轨迹 + 未来原点轨迹） */

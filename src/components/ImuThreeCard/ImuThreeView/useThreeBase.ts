@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 
+const MAX_PITCH = THREE.MathUtils.degToRad(89);
+
 /**
  * 基础 Three.js Hook
  * 
@@ -32,7 +34,7 @@ export const useThreeBase = (
   const [viewScale, setViewScale] = useState(scale);
   /** 缩放比例 Ref，供闭包内访问最新值 */
   const viewScaleRef = useRef(scale);
-  
+
   /** 拖拽交互状态 */
   const dragRef = useRef({ dragging: false, lastX: 0, lastY: 0, yaw: 0, pitch: 0 });
   const onRenderRef = useRef(onRender);
@@ -126,7 +128,7 @@ export const useThreeBase = (
       dragRef.current.lastY = event.clientY;
       dragRef.current.yaw -= dx * 0.005;
       dragRef.current.pitch += dy * 0.005;
-      dragRef.current.pitch = Math.max(-1.2, Math.min(1.2, dragRef.current.pitch));
+      dragRef.current.pitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, dragRef.current.pitch));
       updateCamera();
     };
 

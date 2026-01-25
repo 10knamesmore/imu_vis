@@ -50,11 +50,6 @@ const AppContent: React.FC = () => {
 
   return (
     <Layout className={styles.appLayout}>
-      <Header style={{ display: 'flex', alignItems: 'center', color: 'white', background: '#141414', borderBottom: '1px solid #303030' }}>
-        <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
-          IMU 轨迹重建可视化
-        </div>
-      </Header>
       <Content className={styles.appContent}>
         <Tabs
           defaultActiveKey="1"

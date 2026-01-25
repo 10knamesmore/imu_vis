@@ -25,7 +25,7 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
       x: false,
       y: false,
       z: true,
-      center: false,
+      center: true,
     });
 
   // 通过递增 token 触发子组件清空轨迹缓冲（轴向量端点轨迹 + 未来原点轨迹）
@@ -168,7 +168,6 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
       <div className={styles.imuThreePanel}>
         <ImuThreeView
           source={source}
-          scale={1}
           useCalculated={useCalculated}
           showTrajectory={showTrajectory}
           trajectoryOption={trajectoryOption}

@@ -9,7 +9,6 @@ type ImuTrajectoryViewProps = {
   source: ImuSource;
   showTrajectory: boolean;
   trajectoryOption: TrajectoryOption;
-  scale: number;
   useCalculated: boolean;
   trailResetToken: number;
 };
@@ -22,7 +21,6 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   source,
   showTrajectory,
   trajectoryOption,
-  scale,
   useCalculated,
   trailResetToken,
 }) => {
@@ -42,6 +40,7 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
 
   // 本地对象 Refs
   const axesRef = useRef<THREE.AxesHelper | null>(null);
+  const gridRef = useRef<THREE.GridHelper | null>(null);
 
   // 中心轨迹 Refs
   const centerTrailRef = useRef<THREE.Line | null>(null);
@@ -97,7 +96,7 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   /**
    * 使用基础 Three.js Hook 创建场景
    */
-  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(scale, onRender);
+  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(1.5, onRender);
 
   /**
    * 初始化场景对象（坐标轴、网格、中心轨迹线）
@@ -108,13 +107,14 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     if (!displayGroup) return;
 
     // Axes
-    const axes = new THREE.AxesHelper(0.8);
+    const axes = new THREE.AxesHelper(0.5);
     axes.scale.setScalar(viewScaleRef.current);
+    axes.material.linewidth = 2
     displayGroup.add(axes);
     axesRef.current = axes;
 
     // 网格辅助线（可选，但对观察轨迹和姿态参考非常有帮助）
-    const grid = new THREE.GridHelper(10, 10, 0x444444, 0x222222);
+    const grid = new THREE.GridHelper(5, 10, 0x444444, 0x222222);
 
     // Three.js 的 GridHelper 默认位于 XZ 平面（假设 Y 轴向上）
     // 当前 displayGroup 对 X / Y 做了镜像处理，采用的是 Z 轴向上坐标系
@@ -123,6 +123,9 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
 
     // 将旋转后的网格加入显示组，用于辅助观察 IMU 姿态与轨迹方向
     displayGroup.add(grid);
+    gridRef.current = grid;
+    // 初始化时同步缩放
+    grid.scale.setScalar(viewScaleRef.current);
 
     // Center Trail
     const maxPoints = maxTrailPointsRef.current;
@@ -156,6 +159,8 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   useEffect(() => {
     const scale = viewScaleRef.current;
     if (axesRef.current) axesRef.current.scale.setScalar(scale);
+    if (gridRef.current) gridRef.current.scale.setScalar(scale);
+    if (centerTrailRef.current) centerTrailRef.current.scale.setScalar(scale);
   }, [viewScaleRef.current]);
 
   /**
