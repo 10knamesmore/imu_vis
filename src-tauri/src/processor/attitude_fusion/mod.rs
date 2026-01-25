@@ -13,15 +13,14 @@
 //!
 //! beta 控制纠偏强度，越大越依赖加速度，越小越依赖陀螺。
 
-/// Mahony/互补滤波实现。
-pub mod mahony;
 /// Madgwick 实现。
 pub mod madgwick;
+/// Mahony/互补滤波实现。
+pub mod mahony;
 /// 姿态融合类型定义。
 pub mod types;
 
-use crate::processor::attitude_fusion::mahony::MahonyFusion;
-use crate::processor::filter::ImuSampleFiltered;
+use crate::processor::{attitude_fusion::mahony::MahonyFusion, filter::ImuSampleFiltered};
 use math_f64::DQuat;
 
 /// 统一姿态融合入口。
@@ -44,8 +43,10 @@ impl AttitudeFusion {
     /// 参数:
     /// - `sample`: 滤波后的 IMU 样本。
     /// - `raw_quat`: 透传模式下的原始四元数（可选）。
+    ///
     /// 返回:
     /// - 融合后的姿态估计。
+    ///
     /// 公式:
     /// - `passby`: `q_out = raw_quat` (缺省 `IDENTITY`)
     /// - 否则: `q_out = Mahony.update(sample)`
@@ -56,11 +57,7 @@ impl AttitudeFusion {
     ) -> AttitudeEstimate {
         if self.passby {
             let quat = raw_quat.unwrap_or(DQuat::IDENTITY);
-            return AttitudeEstimate {
-                timestamp_ms: sample.timestamp_ms,
-                quat,
-                euler: math_f64::DVec3::ZERO,
-            };
+            return AttitudeEstimate { quat };
         }
 
         self.inner.update(sample)

@@ -20,8 +20,10 @@ impl EkfProcessor {
     /// 参数:
     /// - `nav`: 当前导航状态。
     /// - `obs`: ZUPT 观测（当前未使用）。
+    ///
     /// 返回:
     /// - 更新后的导航状态（当前透传或占位）。
+    ///
     /// 公式:
     /// - `passby || !enabled`: `nav_out = nav_in`
     /// - TODO: `x_k = f(x_{k-1}, u_k)`, `K = P H^T (H P H^T + R)^{-1}`, `x_k = x_k + K * y`

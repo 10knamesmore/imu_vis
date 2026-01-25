@@ -28,8 +28,10 @@ impl Calibration {
     ///
     /// 参数:
     /// - `raw`: 原始 IMU 样本（未标定）。
+    ///
     /// 返回:
     /// - 标定后的样本（去偏置 + 标定矩阵 + 角速度转弧度）。
+    ///
     /// 公式:
     /// - `a = M_a * (a_raw - b_a)`
     /// - `w = M_g * ((gyro_deg * deg_to_rad) - b_g)`
@@ -77,8 +79,7 @@ impl AxisCalibration {
     ///
     /// 参数:
     /// - `raw`: 原始 IMU 样本（会被就地修改）。
-    /// 返回:
-    /// - `()`。
+    ///
     /// 公式:
     /// - `angle' = angle - angle_offset`
     /// - `quat' = quat_offset * quat`

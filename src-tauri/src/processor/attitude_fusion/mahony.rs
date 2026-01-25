@@ -28,19 +28,17 @@ impl MahonyFusion {
     ///
     /// 参数:
     /// - `sample`: 滤波后的 IMU 样本（角速度/加速度）。
+    ///
     /// 返回:
     /// - 姿态估计（四元数 + 时间戳）。
+    ///
     /// 公式:
     /// - `q_dot = 0.5 * Omega(w) * q`
     /// - `q_gyro = normalize(q * exp(w * dt))`
     /// - `q = slerp(q_gyro, q_acc * q_gyro, beta)`
     pub fn update(&mut self, sample: &ImuSampleFiltered) -> AttitudeEstimate {
         if self.config.passby {
-            return AttitudeEstimate {
-                timestamp_ms: sample.timestamp_ms,
-                quat: self.quat,
-                euler: DVec3::ZERO,
-            };
+            return AttitudeEstimate { quat: self.quat };
         }
 
         let dt = self
@@ -68,12 +66,7 @@ impl MahonyFusion {
             }
         }
 
-        AttitudeEstimate {
-            timestamp_ms: sample.timestamp_ms,
-            quat: self.quat,
-            // TODO: 需要欧拉角时再补充从四元数转换的计算。
-            euler: DVec3::ZERO,
-        }
+        AttitudeEstimate { quat: self.quat }
     }
 
     /// 重置融合状态。

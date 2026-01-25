@@ -26,8 +26,10 @@ impl LowPassFilter {
     ///
     /// 参数:
     /// - `sample`: 标定后的 IMU 样本（加速度/角速度）。
+    ///
     /// 返回:
     /// - 低通滤波后的样本。
+    ///
     /// 公式: `y_t = alpha * y_{t-1} + (1 - alpha) * x_t`
     pub fn apply(&mut self, sample: &ImuSampleCalibrated) -> ImuSampleFiltered {
         // 一阶低通滤波
