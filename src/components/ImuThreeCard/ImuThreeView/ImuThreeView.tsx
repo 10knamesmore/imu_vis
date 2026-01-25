@@ -233,7 +233,7 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x0b0f14);
 
-    const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 100);
+    const camera = new THREE.PerspectiveCamera(35, 1, 0.01, 100);
     cameraRef.current = camera;
     // 以 Z 轴为朝上，X 轴指向屏幕外侧
     camera.up.set(0, 0, 1);
@@ -257,11 +257,13 @@ export const ImuThreeView: React.FC<ImuThreeViewProps> = ({
     // 镜像 X/Y 轴：将 IMU 坐标系映射为屏幕坐标系
     // 目标：X 正方向指向屏幕内部，Y 正方向向右，Z 正方向向上
     displayGroup.scale.set(-1, -1, 1);
+    // 将模型整体下移，避免放大时被顶部遮挡
+    displayGroup.position.set(0, 0, -0.4);
     scene.add(displayGroup);
     displayGroupRef.current = displayGroup;
 
     // 创建传感器模型（仅用于视觉比例）
-    const bodyGeometry = new THREE.BoxGeometry(0.6, 0.9, 0.2);
+    const bodyGeometry = new THREE.BoxGeometry(0.4, 0.6, 0.13);
     const bodyMaterial = new THREE.MeshStandardMaterial({
       color: 0x4f9bff,
       metalness: 0.1,
