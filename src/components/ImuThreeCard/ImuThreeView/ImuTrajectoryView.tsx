@@ -41,6 +41,7 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   // 本地对象 Refs
   const axesRef = useRef<THREE.AxesHelper | null>(null);
   const gridRef = useRef<THREE.GridHelper | null>(null);
+  const axisLabelsRef = useRef<THREE.Sprite[]>([]);
 
   // 中心轨迹 Refs
   const centerTrailRef = useRef<THREE.Line | null>(null);
@@ -127,6 +128,56 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     // 初始化时同步缩放
     grid.scale.setScalar(viewScaleRef.current);
 
+    // Labels
+    const createAxisLabel = (text: string, color: string) => {
+      const canvas = document.createElement("canvas");
+      const size = 128;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return undefined;
+      ctx.clearRect(0, 0, size, size);
+      ctx.fillStyle = color;
+      ctx.font = "bold 40px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(text, size / 2, size / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      return { sprite, material, texture };
+    };
+
+    const labelDefs = [
+      { text: "X", color: "#ff6b6b" },
+      { text: "Y", color: "#6bffb8" },
+      { text: "Z", color: "#57b2ff" },
+    ];
+    const labelResources: Array<{ material: THREE.SpriteMaterial; texture: THREE.Texture }> = [];
+    axisLabelsRef.current = labelDefs
+      .map((def) => {
+        const label = createAxisLabel(def.text, def.color);
+        if (!label) return null;
+        labelResources.push({ material: label.material, texture: label.texture });
+        displayGroup.add(label.sprite);
+        return label.sprite;
+      })
+      .filter((label): label is THREE.Sprite => label !== null);
+
+    // Initial label positioning
+    if (axisLabelsRef.current.length) {
+      const scale = viewScaleRef.current;
+      const axisLength = 0.5 * scale; // 坐标轴长度为 0.5
+      const labelOffset = 0.10 * scale;
+      const labelScale = 0.18 * scale;
+      axisLabelsRef.current[0].position.set(axisLength + labelOffset, 0, 0);
+      axisLabelsRef.current[1].position.set(0, axisLength + labelOffset, 0);
+      axisLabelsRef.current[2].position.set(0, 0, axisLength + labelOffset);
+      axisLabelsRef.current.forEach((label) => {
+        label.scale.set(-labelScale, -labelScale, labelScale);
+      });
+    }
+
     // Center Trail
     const maxPoints = maxTrailPointsRef.current;
     const centerTrailPositions = new Float32Array(maxPoints * 3);
@@ -147,6 +198,9 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
       displayGroup.remove(axes);
       axes.dispose();
       displayGroup.remove(grid);
+      labelResources.forEach((r) => { r.material.dispose(); r.texture.dispose(); });
+      axisLabelsRef.current.forEach((label) => displayGroup.remove(label));
+      axisLabelsRef.current = [];
       displayGroup.remove(centerTrailLine);
       centerTrailGeometry.dispose();
       centerTrailMaterial.dispose();
@@ -160,7 +214,20 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     const scale = viewScaleRef.current;
     if (axesRef.current) axesRef.current.scale.setScalar(scale);
     if (gridRef.current) gridRef.current.scale.setScalar(scale);
-    if (centerTrailRef.current) centerTrailRef.current.scale.setScalar(scale);
+    // Not strictly necessary for lines but harmless
+    // if (centerTrailRef.current) centerTrailRef.current.scale.setScalar(scale);
+
+    if (axisLabelsRef.current.length) {
+      const axisLength = 0.5 * scale;
+      const labelOffset = 0.12 * scale;
+      const labelScale = 0.18 * scale;
+      axisLabelsRef.current[0].position.set(axisLength + labelOffset, 0, 0);
+      axisLabelsRef.current[1].position.set(0, axisLength + labelOffset, 0);
+      axisLabelsRef.current[2].position.set(0, 0, axisLength + labelOffset);
+      axisLabelsRef.current.forEach((label) => {
+        label.scale.set(-labelScale, -labelScale, labelScale);
+      });
+    }
   }, [viewScaleRef.current]);
 
   /**
