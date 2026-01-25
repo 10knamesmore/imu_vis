@@ -7,7 +7,7 @@ import { imuApi } from "../../services/imu";
 
 import { ImuThreeView } from "./ImuThreeView";
 import styles from "./ImuThreeCard.module.scss";
-import type { AxisTrajectoryOption } from "./ImuThreeView/ImuThreeView";
+import type { TrajectoryOption } from "./ImuThreeView/ImuThreeView";
 
 type ImuThreeCardProps = {
   source: ImuSource;
@@ -19,12 +19,13 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
   // 轨迹总开关（轴向量端点轨迹 + 未来原点轨迹）
   const [showTrajectory, setShowTrajectory] = useState(true);
 
-  // 各轴轴向量端点轨迹开关
-  const [axisTrajectoryOption, setAxisTrajectoryOption] =
-    useState<AxisTrajectoryOption>({
+  // 各轴轴向量端点及中心轨迹开关
+  const [trajectoryOption, setTrajectoryOption] =
+    useState<TrajectoryOption>({
       x: false,
       y: false,
-      z: true
+      z: true,
+      center: false,
     });
 
   // 通过递增 token 触发子组件清空轨迹缓冲（轴向量端点轨迹 + 未来原点轨迹）
@@ -44,10 +45,13 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
     }
   };
 
-  const toggleAxis = (axis: keyof AxisTrajectoryOption, checked: boolean) => {
-    setAxisTrajectoryOption((prev: AxisTrajectoryOption) => ({
+  /**
+   * 切换特定轨迹（X/Y/Z轴或中心）的显示状态
+   */
+  const toggleTrajectory = (key: keyof TrajectoryOption, checked: boolean) => {
+    setTrajectoryOption((prev: TrajectoryOption) => ({
       ...prev,
-      [axis]: checked
+      [key]: checked
     }));
   };
 
@@ -110,27 +114,35 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
               title={
                 <div style={{ minWidth: 120 }}>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>X轴向量轨迹</span>
+                    <span>X轴向量顶点</span>
                     <Switch
                       size="small"
-                      checked={axisTrajectoryOption.x}
-                      onChange={(checked) => toggleAxis("x", checked)}
+                      checked={trajectoryOption.x}
+                      onChange={(checked) => toggleTrajectory("x", checked)}
                     />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>Y轴向量轨迹</span>
+                    <span>Y轴向量顶点</span>
                     <Switch
                       size="small"
-                      checked={axisTrajectoryOption.y}
-                      onChange={(checked) => toggleAxis("y", checked)}
+                      checked={trajectoryOption.y}
+                      onChange={(checked) => toggleTrajectory("y", checked)}
                     />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between" }}>
-                    <span>Z轴向量轨迹</span>
+                    <span>Z轴向量顶点</span>
                     <Switch
                       size="small"
-                      checked={axisTrajectoryOption.z}
-                      onChange={(checked) => toggleAxis("z", checked)}
+                      checked={trajectoryOption.z}
+                      onChange={(checked) => toggleTrajectory("z", checked)}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>中心轨迹</span>
+                    <Switch
+                      size="small"
+                      checked={trajectoryOption.center}
+                      onChange={(checked) => toggleTrajectory("center", checked)}
                     />
                   </div>
                 </div>
@@ -159,7 +171,7 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
           scale={1}
           useCalculated={useCalculated}
           showTrajectory={showTrajectory}
-          axisTrajectoryOption={axisTrajectoryOption}
+          trajectoryOption={trajectoryOption}
           trailResetToken={trailResetToken}
         />
       </div>
