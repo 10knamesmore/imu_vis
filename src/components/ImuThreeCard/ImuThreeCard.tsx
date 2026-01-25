@@ -7,6 +7,7 @@ import { imuApi } from "../../services/imu";
 
 import { ImuThreeView } from "./ImuThreeView";
 import styles from "./ImuThreeCard.module.scss";
+import type { ShowTrajectoryOption } from "./ImuThreeView/ImuThreeView";
 
 type ImuThreeCardProps = {
   source: ImuSource;
@@ -14,19 +15,40 @@ type ImuThreeCardProps = {
 
 export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
   const { connectedDevice } = useBluetooth();
+
+  // 轨迹总开关
   const [showTrajectory, setShowTrajectory] = useState(true);
-  // 通过递增 token 触发子组件清空轨迹缓冲。
+
+  // 各轴轨迹开关
+  const [showTrajectoryOption, setShowTrajectoryOption] =
+    useState<ShowTrajectoryOption>({
+      x: false,
+      y: false,
+      z: true
+    });
+
+  // 通过递增 token 触发子组件清空轨迹缓冲
   const [trailResetToken, setTrailResetToken] = useState(0);
 
+  // 是否使用后端计算姿态
   const [useCalculated, setUseCalculated] = useState(false);
 
   const handleCalibrateZ = async () => {
     const res = await imuApi.setAxisCalibration();
     if (res.success) {
       message.success("姿态已校准");
+      // 校准后清空轨迹
+      setTrailResetToken((token) => token + 1);
     } else {
       message.error(res.message || "姿态校准失败");
     }
+  };
+
+  const toggleAxis = (axis: keyof ShowTrajectoryOption, checked: boolean) => {
+    setShowTrajectoryOption((prev) => ({
+      ...prev,
+      [axis]: checked
+    }));
   };
 
   return (
@@ -37,6 +59,7 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
       className={styles.imuThreeCard}
       extra={
         <div className={styles.imuControls}>
+          {/* 姿态校准 */}
           <div className={styles.imuControl}>
             <Tooltip
               title={
@@ -53,29 +76,77 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
                 )
               }
             >
-              <Button onClick={() => {
-                handleCalibrateZ()
-                setTrailResetToken((token) => token + 1)
-              }} disabled={!connectedDevice}>
+              <Button
+                onClick={handleCalibrateZ}
+                disabled={!connectedDevice}
+              >
                 姿态校准
               </Button>
             </Tooltip>
           </div>
+
+          {/* 清空轨迹 */}
           <div className={styles.imuControl}>
             <Button onClick={() => setTrailResetToken((token) => token + 1)}>
               清空轨迹
             </Button>
           </div>
+
+          {/* 数据源切换 */}
           <div className={styles.imuControl}>
             <span>使用计算数据</span>
-            <Switch checked={useCalculated} onChange={(checked) => {
-              setUseCalculated(checked);
-              setTrailResetToken((token) => token + 1);
-            }} />
+            <Switch
+              checked={useCalculated}
+              onChange={(checked) => {
+                setUseCalculated(checked);
+                setTrailResetToken((token) => token + 1);
+              }}
+            />
           </div>
+
+          {/* 轨迹控制 */}
           <div className={styles.imuControl}>
-            <span>轨迹</span>
-            <Switch checked={showTrajectory} onChange={setShowTrajectory} />
+            <Tooltip
+              title={
+                <div style={{ minWidth: 120 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>X轴轨迹</span>
+                    <Switch
+                      size="small"
+                      checked={showTrajectoryOption.x}
+                      onChange={(checked) => toggleAxis("x", checked)}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>Y轴轨迹</span>
+                    <Switch
+                      size="small"
+                      checked={showTrajectoryOption.y}
+                      onChange={(checked) => toggleAxis("y", checked)}
+                    />
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "space-between" }}>
+                    <span>Z轴轨迹</span>
+                    <Switch
+                      size="small"
+                      checked={showTrajectoryOption.z}
+                      onChange={(checked) => toggleAxis("z", checked)}
+                    />
+                  </div>
+                </div>
+              }
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span>轴轨迹</span>
+                <Switch
+                  checked={showTrajectory}
+                  onChange={(checked) => {
+                    setShowTrajectory(checked);
+                    setTrailResetToken((token) => token + 1);
+                  }}
+                />
+              </div>
+            </Tooltip>
           </div>
         </div>
       }
@@ -85,9 +156,10 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
       <div className={styles.imuThreePanel}>
         <ImuThreeView
           source={source}
-          showTrajectory={showTrajectory}
           scale={1}
           useCalculated={useCalculated}
+          showTrajectory={showTrajectory}
+          showTrajectoryOption={showTrajectoryOption}
           trailResetToken={trailResetToken}
         />
       </div>
