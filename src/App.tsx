@@ -4,7 +4,6 @@ import { SettingOutlined } from '@ant-design/icons';
 
 import { ConnectionPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
-import { ImuComparisonPanel } from './pages/ImuComparisonPanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
 import styles from "./App.module.scss";
@@ -25,11 +24,6 @@ const AppContent: React.FC = () => {
       key: '1',
       label: '可视化',
       children: <ImuRealtimePanel />,
-    },
-    {
-      key: '2',
-      label: '计算对比',
-      children: <ImuComparisonPanel />,
     },
   ];
 

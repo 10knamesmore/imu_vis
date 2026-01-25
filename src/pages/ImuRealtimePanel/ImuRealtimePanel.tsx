@@ -132,7 +132,7 @@ export const ImuRealtimePanel: React.FC = () => {
             source={imuSource}
             enabled={showCharts}
             refreshMs={40}
-            label="偏移"
+            label="m"
             series={[
               { name: "X", color: "#4d96ff", getValues: (s) => s.builtin.offset.x },
               { name: "Y", color: "#6bffb8", getValues: (s) => s.builtin.offset.y },
@@ -156,6 +156,63 @@ export const ImuRealtimePanel: React.FC = () => {
               { name: "X", color: "#b8c0ff", getValues: (s) => s.builtin.accelNav.x },
               { name: "Y", color: "#ffd6a5", getValues: (s) => s.builtin.accelNav.y },
               { name: "Z", color: "#caffbf", getValues: (s) => s.builtin.accelNav.z },
+            ]}
+          />
+        </div>
+      ),
+    },
+    {
+      key: "angle-delta",
+      label: "姿态差值",
+      children: (
+        <div className={styles.imuChartPanel}>
+          <ImuChartsCanvas
+            source={imuSource}
+            enabled={showCharts}
+            refreshMs={40}
+            label="角度差值 (deg)"
+            series={[
+              { name: "偏航 Δ", color: "#57b2ff", getValues: (s) => s.deltaAngle.x },
+              { name: "俯仰 Δ", color: "#ffb74d", getValues: (s) => s.deltaAngle.y },
+              { name: "横滚 Δ", color: "#88e0a5", getValues: (s) => s.deltaAngle.z },
+            ]}
+          />
+        </div>
+      ),
+    },
+    {
+      key: "velocity",
+      label: "速度（计算）",
+      children: (
+        <div className={styles.imuChartPanel}>
+          <ImuChartsCanvas
+            source={imuSource}
+            enabled={showCharts}
+            refreshMs={40}
+            label="速度 (m/s)"
+            series={[
+              { name: "X", color: "#4cc9f0", getValues: (s) => s.calculated.velocity.x },
+              { name: "Y", color: "#f8961e", getValues: (s) => s.calculated.velocity.y },
+              { name: "Z", color: "#43aa8b", getValues: (s) => s.calculated.velocity.z },
+            ]}
+          />
+        </div>
+      ),
+    },
+    {
+      key: "position",
+      label: "位置（计算）",
+      children: (
+        <div className={styles.imuChartPanel}>
+          <ImuChartsCanvas
+            source={imuSource}
+            enabled={showCharts}
+            refreshMs={40}
+            label="位置 (m)"
+            series={[
+              { name: "X", color: "#b8c0ff", getValues: (s) => s.calculated.position.x },
+              { name: "Y", color: "#ffd6a5", getValues: (s) => s.calculated.position.y },
+              { name: "Z", color: "#caffbf", getValues: (s) => s.calculated.position.z },
             ]}
           />
         </div>
