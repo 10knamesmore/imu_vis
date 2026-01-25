@@ -70,7 +70,7 @@ impl ProcessorPipeline {
     /// 处理单个原始数据包并输出响应。
     pub fn process_packet(&mut self, packet: &[u8]) -> Option<ResponseData> {
         // 解析原始蓝牙包
-        let raw = match ImuParser::parse(packet) {
+        let mut raw = match ImuParser::parse(packet) {
             Ok(sample) => sample,
             Err(e) => {
                 tracing::warn!("IMU 数据解析失败: {:?}", e);
@@ -78,7 +78,6 @@ impl ProcessorPipeline {
             }
         };
 
-        let mut raw = raw;
         self.latest_raw = Some(raw);
         self.axis_calibration.apply(&mut raw);
 
