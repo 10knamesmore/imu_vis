@@ -14,6 +14,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         imu::connect_peripheral,
         imu::disconnect_peripheral,
         imu::set_axis_calibration,
+        imu::set_position,
         output::subscribe_output,
         recording::start_recording,
         recording::stop_recording,

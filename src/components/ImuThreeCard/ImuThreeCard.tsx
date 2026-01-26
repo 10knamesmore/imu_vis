@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Button, Card, Switch, Tooltip, message } from "antd";
+import { Button, Card, Switch, Tooltip, message, InputNumber } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import type { ImuSource } from "../../hooks/useImuSource";
@@ -34,6 +34,11 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
   // 是否使用后端计算姿态
   const [useCalculated, setUseCalculated] = useState(true);
 
+  // 位置校正输入值
+  const [posX, setPosX] = useState(0);
+  const [posY, setPosY] = useState(0);
+  const [posZ, setPosZ] = useState(0);
+
   const handleCalibrateZ = async () => {
     const res = await imuApi.setAxisCalibration();
     if (res.success) {
@@ -43,6 +48,16 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
     } else {
       message.error(res.message || "姿态校准失败");
     }
+  };
+
+  const handleSetPosition = async () => {
+    const res = await imuApi.setPosition(posX, posY, posZ);
+    if (res.success) {
+      message.success("位置已校正");
+    } else {
+      message.error(res.message || "位置校正失败");
+    }
+    setTrailResetToken((token) => token + 1);
   };
 
   /**
@@ -89,11 +104,63 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
             </Tooltip>
           </div>
 
+          {/* 位置校正 */}
+          <div className={styles.imuControl}>
+            <Tooltip
+              title={
+                connectedDevice ?
+                  <div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span>X:</span>
+                      <InputNumber
+                        size="small"
+                        value={posX}
+                        onChange={(val) => setPosX(val ?? 0)}
+                        step={0.5}
+                        style={{ width: 80 }}
+                      />
+                      <span>m</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span>Y:</span>
+                      <InputNumber
+                        size="small"
+                        value={posY}
+                        onChange={(val) => setPosY(val ?? 0)}
+                        step={0.5}
+                        style={{ width: 80 }}
+                      />
+                      <span>m</span>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span>Z:</span>
+                      <InputNumber
+                        size="small"
+                        value={posZ}
+                        onChange={(val) => setPosZ(val ?? 0)}
+                        step={0.5}
+                        style={{ width: 80 }}
+                      />
+                      <span>m</span>
+                    </div>
+                  </div>
+                  : <div>请先连接设备</div>
+              }
+              mouseEnterDelay={0}
+            >
+              <Button onClick={handleSetPosition} disabled={!connectedDevice}>
+                坐标校正
+              </Button>
+            </Tooltip>
+          </div>
+
           {/* 清空轨迹 */}
           <div className={styles.imuControl}>
-            <Button onClick={() => setTrailResetToken((token) => token + 1)}>
-              清空轨迹
-            </Button>
+            <Tooltip title={connectedDevice ? "清空当前轨迹数据" : "请先连接设备"}>
+              <Button onClick={() => setTrailResetToken((token) => token + 1)} disabled={!connectedDevice}>
+                清空轨迹
+              </Button>
+            </Tooltip>
           </div>
 
           {/* 数据源切换 */}

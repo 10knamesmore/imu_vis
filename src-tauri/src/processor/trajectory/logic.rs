@@ -109,6 +109,16 @@ impl TrajectoryCalculator {
         self.nav_state.bias_g = nav.bias_g;
     }
 
+    /// 强制设置位置（用于手动校正）。
+    pub fn set_position(&mut self, position: DVec3) {
+        tracing::info!(
+            "位置手动校正 | old=[{:.3}, {:.3}, {:.3}] | new=[{:.3}, {:.3}, {:.3}]",
+            self.nav_state.position.x, self.nav_state.position.y, self.nav_state.position.z,
+            position.x, position.y, position.z
+        );
+        self.nav_state.position = position;
+    }
+
     /// 重置轨迹状态（清空位置、速度、时间戳）。
     pub fn reset(&mut self) {
         self.nav_state = NavState {

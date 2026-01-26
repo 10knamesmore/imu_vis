@@ -5,14 +5,14 @@ use tokio::sync::{oneshot, Mutex, MutexGuard};
 
 use crate::{
     imu::IMUClient,
-    processor::{calibration::AxisCalibrationRequest, Processor},
+    processor::{calibration::CorrectionRequest, Processor},
     recorder::{spawn_recorder, RecorderCommand},
     types::outputs::ResponseData,
 };
 
 /// 姿态零位校准请求通道句柄。
 pub struct CalibrationHandle {
-    tx: flume::Sender<AxisCalibrationRequest>,
+    tx: flume::Sender<CorrectionRequest>,
 }
 
 const CALIBRATION_ERROR: &str = "Failed to update axis calibration";
@@ -20,7 +20,8 @@ const CALIBRATION_ERROR: &str = "Failed to update axis calibration";
 impl CalibrationHandle {
     /// 创建校准通道句柄与接收端。
     /// rx 交给processor用于接收请求。
-    pub fn new() -> (Self, flume::Receiver<AxisCalibrationRequest>) {
+    /// 这种设计模式用来在异步的通道中发送请求并等待响应
+    pub fn new() -> (Self, flume::Receiver<CorrectionRequest>) {
         let (tx, rx) = flume::unbounded();
         (Self { tx }, rx)
     }
@@ -31,7 +32,19 @@ impl CalibrationHandle {
         // 给 Processor 发一个请求， 等待其完成后返回结果
         let (respond_to, response_rx) = oneshot::channel();
         self.tx
-            .send(AxisCalibrationRequest::SetAxis { respond_to })
+            .send(CorrectionRequest::SetAxis { respond_to })
+            .map_err(|_| CALIBRATION_ERROR)?;
+        response_rx.await.map_err(|_| CALIBRATION_ERROR)?
+    }
+
+    /// 请求设置位置。
+    pub async fn request_set_position(&self, x: f64, y: f64, z: f64) -> Result<(), &'static str> {
+        let (respond_to, response_rx) = oneshot::channel();
+        self.tx
+            .send(CorrectionRequest::SetPosition {
+                position: math_f64::DVec3::new(x, y, z),
+                respond_to,
+            })
             .map_err(|_| CALIBRATION_ERROR)?;
         response_rx.await.map_err(|_| CALIBRATION_ERROR)?
     }
@@ -94,5 +107,10 @@ impl AppState {
     /// 请求姿态零位校准。
     pub async fn request_axis_calibration(&self) -> Result<(), &'static str> {
         self.calibration_handle.request_axis_calibration().await
+    }
+
+    /// 请求设置位置。
+    pub async fn request_set_position(&self, x: f64, y: f64, z: f64) -> Result<(), &'static str> {
+        self.calibration_handle.request_set_position(x, y, z).await
     }
 }

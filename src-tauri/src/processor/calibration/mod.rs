@@ -20,6 +20,6 @@ pub mod types;
 pub use logic::Calibration;
 /// 标定类型导出。
 pub use types::{
-    AxisCalibration, AxisCalibrationRequest, CalibrationState, ImuCalibrationConfig,
+    AxisCalibration, CalibrationState, CorrectionRequest, ImuCalibrationConfig,
     ImuSampleCalibrated,
 };

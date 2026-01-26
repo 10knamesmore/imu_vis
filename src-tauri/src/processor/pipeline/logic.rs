@@ -8,7 +8,7 @@ use std::{
 use crate::{
     processor::{
         attitude_fusion::AttitudeFusion,
-        calibration::{AxisCalibration, AxisCalibrationRequest, Calibration},
+        calibration::{AxisCalibration, Calibration, CorrectionRequest},
         ekf::EkfProcessor,
         filter::LowPassFilter,
         output::{OutputBuilder, OutputFrame},
@@ -110,9 +110,9 @@ impl ProcessorPipeline {
     }
 
     /// 响应姿态零位校准请求。
-    pub fn handle_calibration_request(&mut self, request: AxisCalibrationRequest) {
+    pub fn handle_calibration_request(&mut self, request: CorrectionRequest) {
         match request {
-            AxisCalibrationRequest::SetAxis { respond_to } => {
+            CorrectionRequest::SetAxis { respond_to } => {
                 let result = match self.latest_raw {
                     Some(raw) => {
                         self.axis_calibration.update_from_raw(&raw);
@@ -122,6 +122,12 @@ impl ProcessorPipeline {
                 };
                 if respond_to.send(result).is_err() {
                     tracing::error!("标定 response 接受端在发送前已被丢弃");
+                };
+            }
+            CorrectionRequest::SetPosition { position, respond_to } => {
+                self.trajectory.set_position(position);
+                if respond_to.send(Ok(())).is_err() {
+                    tracing::error!("位置校正 response 接受端在发送前已被丢弃");
                 };
             }
         }

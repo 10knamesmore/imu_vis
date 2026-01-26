@@ -47,7 +47,7 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   const centerTrailRef = useRef<THREE.Line | null>(null);
   const centerTrailGeometryRef = useRef<THREE.BufferGeometry | null>(null);
   const centerTrailPositionsRef = useRef<Float32Array | null>(null);
-  const maxTrailPointsRef = useRef(300);
+  const maxTrailPointsRef = useRef(3000);
   const centerTrailStateRef = useRef<{ count: number }>({ count: 0 });
 
   // 渲染临时变量
@@ -214,8 +214,7 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     const scale = viewScaleRef.current;
     if (axesRef.current) axesRef.current.scale.setScalar(scale);
     if (gridRef.current) gridRef.current.scale.setScalar(scale);
-    // Not strictly necessary for lines but harmless
-    // if (centerTrailRef.current) centerTrailRef.current.scale.setScalar(scale);
+    if (centerTrailRef.current) centerTrailRef.current.scale.setScalar(scale);
 
     if (axisLabelsRef.current.length) {
       const axisLength = 0.5 * scale;

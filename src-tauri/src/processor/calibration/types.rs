@@ -83,11 +83,16 @@ impl Default for AxisCalibration {
     }
 }
 
-/// 姿态零位校准请求。
-pub enum AxisCalibrationRequest {
+/// 手动校正请求。
+pub enum CorrectionRequest {
     /// 以最新原始姿态作为零位。
     /// response tells the caller the result
     SetAxis {
+        respond_to: oneshot::Sender<Result<(), &'static str>>,
+    },
+    /// 强制设置位置。
+    SetPosition {
+        position: DVec3,
         respond_to: oneshot::Sender<Result<(), &'static str>>,
     },
 }

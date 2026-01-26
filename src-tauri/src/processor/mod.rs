@@ -13,7 +13,7 @@ use tauri::Emitter as _;
 
 use crate::{
     processor::{
-        calibration::AxisCalibrationRequest,
+        calibration::CorrectionRequest,
         pipeline::{ProcessorPipeline, ProcessorPipelineConfig},
     },
     types::outputs::ResponseData,
@@ -68,12 +68,12 @@ impl Processor {
     /// * `upstream_rx`: 接收来自 imu_client 的原始蓝牙二进制数据
     /// * `downstream_tx`: 发给 AppState 的 rx（command 中接收）
     /// * `record_tx`: 发给 recorder 线程的录制通道
-    /// * `calibration_rx`: 姿态零位校准请求通道
+    /// * `calibration_rx`: 手动校正请求通道
     pub fn new(
         upstream_rx: flume::Receiver<RawImuData>,
         downstream_tx: flume::Sender<ResponseData>,
         record_tx: flume::Sender<ResponseData>,
-        calibration_rx: flume::Receiver<AxisCalibrationRequest>,
+        calibration_rx: flume::Receiver<CorrectionRequest>,
         app_handle: tauri::AppHandle,
     ) -> Self {
         let (config, config_rx) = Self::init_config_watcher();
@@ -88,7 +88,7 @@ impl Processor {
                 loop {
                     enum PipelineEvent {
                         Packet(Vec<u8>),
-                        Calibration(AxisCalibrationRequest),
+                        Calibration(CorrectionRequest),
                         UpstreamClosed,
                         CalibrationClosed,
                         Reset,

@@ -1,5 +1,3 @@
-//! IMU 设备相关命令。
-
 use crate::{
     app_state::AppState, commands::response::Response as IpcResponse,
     types::bluetooth::PeripheralInfo,
@@ -52,9 +50,19 @@ pub async fn disconnect_peripheral(state: State<'_, AppState>) -> Response<Perip
 
 #[tauri::command]
 #[tracing::instrument(level = "debug", skip(state))]
-/// 设置姿态矫正值（按当前姿态作为零位）
+/// 设置姿态校正值（按当前姿态作为零位）
 pub async fn set_axis_calibration(state: State<'_, AppState>) -> Response<()> {
     match state.request_axis_calibration().await {
+        Ok(()) => Ok(IpcResponse::success(())),
+        Err(err) => Ok(IpcResponse::error(err)),
+    }
+}
+
+#[tauri::command]
+#[tracing::instrument(level = "debug", skip(state))]
+/// 设置位置（手动校正）
+pub async fn set_position(state: State<'_, AppState>, x: f64, y: f64, z: f64) -> Response<()> {
+    match state.request_set_position(x, y, z).await {
         Ok(()) => Ok(IpcResponse::success(())),
         Err(err) => Ok(IpcResponse::error(err)),
     }
