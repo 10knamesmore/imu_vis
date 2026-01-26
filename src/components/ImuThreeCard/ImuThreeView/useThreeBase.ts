@@ -89,15 +89,25 @@ export const useThreeBase = (
 
     // 尺寸调整监听
     const resize = () => {
+      if (!container) return;
       const width = container.clientWidth;
       const height = container.clientHeight;
       if (width === 0 || height === 0) return;
-      renderer.setSize(width, height);
+      
+      // 更新 renderer 和 camera
+      renderer.setSize(width, height, true); // 第三个参数 updateStyle=true
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     };
+    
+    // 初始调用
     resize();
-    window.addEventListener("resize", resize);
+    
+    // 使用 ResizeObserver 监听容器尺寸变化
+    const resizeObserver = new ResizeObserver(() => {
+      resize();
+    });
+    resizeObserver.observe(container);
 
     // 交互逻辑
     const target = new THREE.Vector3(0, 0, 0);
@@ -166,7 +176,7 @@ export const useThreeBase = (
 
     return () => {
       cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", resize);
+      resizeObserver.disconnect();
       renderer.domElement.removeEventListener("pointerdown", handlePointerDown);
       renderer.domElement.removeEventListener("pointermove", handlePointerMove);
       renderer.domElement.removeEventListener("pointerup", handlePointerUp);
