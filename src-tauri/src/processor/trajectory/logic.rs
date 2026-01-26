@@ -9,15 +9,17 @@ use crate::processor::trajectory::types::{NavState, TrajectoryConfig};
 /// 三维轨迹计算器。
 pub struct TrajectoryCalculator {
     config: TrajectoryConfig,
+    gravity: f64,
     nav_state: NavState,
     last_timestamp_ms: Option<u64>,
 }
 
 impl TrajectoryCalculator {
     /// 创建轨迹计算器。
-    pub fn new(config: TrajectoryConfig) -> Self {
+    pub fn new(config: TrajectoryConfig, gravity: f64) -> Self {
         Self {
             config,
+            gravity,
             nav_state: NavState {
                 timestamp_ms: 0,
                 position: DVec3::ZERO,
@@ -61,7 +63,7 @@ impl TrajectoryCalculator {
             // 将加速度转到世界系并去重力
             let a_world = attitude.quat.rotate_vec3(sample.accel_lp);
             // 重力向量：世界系中向下（正 Z 方向），幅值为重力加速度
-            let g_world = DVec3::new(0.0, 0.0, self.config.gravity);
+            let g_world = DVec3::new(0.0, 0.0, self.gravity);
             let a_lin = a_world - g_world;
 
             // IMU数据包为255hz
@@ -84,6 +86,27 @@ impl TrajectoryCalculator {
 
         self.nav_state.timestamp_ms = sample.timestamp_ms;
         self.nav_state
+    }
+
+    /// 同步外部修正后的状态（用于 ZUPT、EKF 等反馈）。
+    ///
+    /// 重要：下游模块（ZUPT/EKF）修改状态后，必须调用此方法同步回来。
+    pub fn sync_state(&mut self, nav: &NavState) {
+        // 检测是否有显著修正（用于调试）
+        let vel_diff = (nav.velocity - self.nav_state.velocity).length();
+        if vel_diff > 0.01 {
+            tracing::debug!(
+                "Trajectory 状态同步 | vel_before=[{:.3}, {:.3}, {:.3}] | vel_after=[{:.3}, {:.3}, {:.3}] | diff={:.4}",
+                self.nav_state.velocity.x, self.nav_state.velocity.y, self.nav_state.velocity.z,
+                nav.velocity.x, nav.velocity.y, nav.velocity.z,
+                vel_diff
+            );
+        }
+        
+        self.nav_state.velocity = nav.velocity;
+        self.nav_state.position = nav.position;
+        self.nav_state.bias_a = nav.bias_a;
+        self.nav_state.bias_g = nav.bias_g;
     }
 
     /// 重置轨迹状态（清空位置、速度、时间戳）。

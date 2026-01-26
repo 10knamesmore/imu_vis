@@ -32,7 +32,7 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
   const [trailResetToken, setTrailResetToken] = useState(0);
 
   // 是否使用后端计算姿态
-  const [useCalculated, setUseCalculated] = useState(false);
+  const [useCalculated, setUseCalculated] = useState(true);
 
   const handleCalibrateZ = async () => {
     const res = await imuApi.setAxisCalibration();

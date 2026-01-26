@@ -50,8 +50,8 @@ impl ProcessorPipeline {
             calibration: Calibration::new(config.calibration),
             filter: LowPassFilter::new(config.filter),
             attitude_fusion: AttitudeFusion::new(config.attitude_fusion),
-            trajectory: TrajectoryCalculator::new(config.trajectory),
-            zupt: ZuptDetector::new(config.zupt),
+            trajectory: TrajectoryCalculator::new(config.trajectory, config.global.gravity),
+            zupt: ZuptDetector::new(config.zupt, config.global.gravity),
             ekf: EkfProcessor::new(config.ekf),
             latest_raw: None,
         }
@@ -87,6 +87,10 @@ impl ProcessorPipeline {
         let attitude = self.attitude_fusion.update(&filtered, Some(raw.quat));
         let nav = self.trajectory.calculate(&attitude, &filtered);
         let (nav, obs) = self.zupt.apply(nav, &filtered);
+        
+        // ZUPT 修正后的状态反馈回 Trajectory（关键：闭环反馈）
+        self.trajectory.sync_state(&nav);
+        
         let nav = self.ekf.update(nav, &obs);
 
         let frame = OutputFrame { raw, nav };

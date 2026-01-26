@@ -9,9 +9,24 @@ use crate::processor::filter::LowPassFilterConfig;
 use crate::processor::trajectory::TrajectoryConfig;
 use crate::processor::zupt::ZuptConfig;
 
+#[derive(Debug, Clone, Deserialize)]
+/// 全局配置参数。
+pub struct GlobalConfig {
+    /// 重力加速度常数（m/s²）。
+    pub gravity: f64,
+}
+
+impl Default for GlobalConfig {
+    fn default() -> Self {
+        Self { gravity: 9.80665 }
+    }
+}
+
 #[derive(Debug, Clone, Deserialize, Default)]
 /// 处理管线配置。
 pub struct ProcessorPipelineConfig {
+    /// 全局配置。
+    pub global: GlobalConfig,
     /// 标定配置。
     pub calibration: ImuCalibrationConfig,
     /// 滤波配置。

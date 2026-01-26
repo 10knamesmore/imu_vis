@@ -84,25 +84,25 @@ export const ImuRealtimePanel: React.FC = () => {
         </div>
       ),
     },
-    // {
-    //   key: "accel-with-g",
-    //   label: "加速度（含重力）",
-    //   children: (
-    //     <div className={styles.imuChartPanel}>
-    //       <ImuChartsCanvas
-    //         source={imuSource}
-    //         enabled={showCharts}
-    //         refreshMs={16}
-    //         label="Acceleration (m/s^2)"
-    //         series={[
-    //           { name: "X", color: "#9ad1ff", getBuffer: (w) => w.builtin.accelWithGX },
-    //           { name: "Y", color: "#ffda7a", getBuffer: (w) => w.builtin.accelWithGY },
-    //           { name: "Z", color: "#8ff0c4", getBuffer: (w) => w.builtin.accelWithGZ },
-    //         ]}
-    //       />
-    //     </div>
-    //   ),
-    // },
+    {
+      key: "accel-with-g",
+      label: "加速度（含重力）",
+      children: (
+        <div className={styles.imuChartPanel}>
+          <ImuChartsCanvas
+            source={imuSource}
+            enabled={showCharts}
+            refreshMs={16}
+            label="Acceleration (m/s^2)"
+            series={[
+              { name: "X", color: "#9ad1ff", getBuffer: (w) => w.builtin.accelWithGX },
+              { name: "Y", color: "#ffda7a", getBuffer: (w) => w.builtin.accelWithGY },
+              { name: "Z", color: "#8ff0c4", getBuffer: (w) => w.builtin.accelWithGZ },
+            ]}
+          />
+        </div>
+      ),
+    },
     // {
     //   key: "quat",
     //   label: "四元数",

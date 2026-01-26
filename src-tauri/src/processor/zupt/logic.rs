@@ -9,14 +9,16 @@ use crate::processor::zupt::types::{ZuptConfig, ZuptObservation};
 /// ZUPT 静止检测器。
 pub struct ZuptDetector {
     config: ZuptConfig,
+    gravity: f64,
     last_is_static: Option<bool>,
 }
 
 impl ZuptDetector {
     /// 创建 ZUPT 检测器。
-    pub fn new(config: ZuptConfig) -> Self {
+    pub fn new(config: ZuptConfig, gravity: f64) -> Self {
         Self {
             config,
+            gravity,
             last_is_static: None,
         }
     }
@@ -44,9 +46,10 @@ impl ZuptDetector {
         }
 
         let gyro_norm = sample.gyro_lp.length();
-        let g_world = DVec3::new(0.0, 0.0, -1.0);
+        // 重力向量：世界系中向下（正 Z 方向），幅值为重力加速度
+        let g_world = DVec3::new(0.0, 0.0, self.gravity);
         let accel_world = nav.attitude.rotate_vec3(sample.accel_lp);
-        let accel_lin = accel_world - g_world * 9.80665;
+        let accel_lin = accel_world - g_world;
         let accel_norm = accel_lin.length();
 
         // 静止检测：角速度和线加速度同时低于阈值
@@ -56,17 +59,35 @@ impl ZuptDetector {
         // 仅在状态切换时记录日志
         if self.last_is_static != Some(is_static) {
             if is_static {
-                tracing::info!("ZUPT: 进入静止状态");
+                tracing::info!(
+                    "ZUPT: 进入静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s² | vel=[{:.3}, {:.3}, {:.3}]",
+                    gyro_norm, accel_norm,
+                    nav.velocity.x, nav.velocity.y, nav.velocity.z
+                );
             } else {
-                tracing::info!("ZUPT: 退出静止状态");
+                tracing::info!(
+                    "ZUPT: 退出静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s²",
+                    gyro_norm, accel_norm
+                );
             }
             self.last_is_static = Some(is_static);
         }
 
         if is_static {
             // 静止时速度归零，并做偏置回归
+            let vel_before = nav.velocity;
             nav.velocity = DVec3::ZERO;
             nav.bias_a += accel_lin * self.config.bias_correction_gain;
+            
+            // 每秒打印一次详细状态（仅在静止时）
+            if sample.timestamp_ms % 1000 < 4 {
+                tracing::info!(
+                    "ZUPT 静止修正 | vel_before=[{:.3}, {:.3}, {:.3}] → [0, 0, 0] | bias_a=[{:.4}, {:.4}, {:.4}] | a_lin=[{:.3}, {:.3}, {:.3}]",
+                    vel_before.x, vel_before.y, vel_before.z,
+                    nav.bias_a.x, nav.bias_a.y, nav.bias_a.z,
+                    accel_lin.x, accel_lin.y, accel_lin.z
+                );
+            }
         }
 
         (nav, ZuptObservation { is_static })
