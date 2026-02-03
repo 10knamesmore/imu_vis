@@ -8,7 +8,7 @@ import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
 import styles from "./App.module.scss";
 
-const { Header, Content } = Layout;
+const { Content } = Layout;
 
 /**
  * 应用主内容区域组件。
