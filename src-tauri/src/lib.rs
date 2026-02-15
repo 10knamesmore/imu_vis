@@ -22,7 +22,9 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(commands::handlers())
         .setup(|app| {
+            #[cfg(debug_assertions)]
             app.get_webview_window("main").unwrap().open_devtools();
+
             app.manage(app_state::AppState::new(app.handle().clone()));
 
             Ok(())
