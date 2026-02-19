@@ -5,6 +5,8 @@ use std::{
     time::SystemTime,
 };
 
+use anyhow::Context;
+
 use crate::{
     processor::{
         attitude_fusion::AttitudeFusion,
@@ -87,10 +89,10 @@ impl ProcessorPipeline {
         let attitude = self.attitude_fusion.update(&filtered, Some(raw.quat));
         let nav = self.trajectory.calculate(&attitude, &filtered);
         let (nav, obs) = self.zupt.apply(nav, &filtered);
-        
+
         // ZUPT 修正后的状态反馈回 Trajectory（关键：闭环反馈）
         self.trajectory.sync_state(&nav);
-        
+
         let nav = self.ekf.update(nav, &obs);
 
         let frame = OutputFrame { raw, nav };
@@ -124,7 +126,10 @@ impl ProcessorPipeline {
                     tracing::error!("标定 response 接受端在发送前已被丢弃");
                 };
             }
-            CorrectionRequest::SetPosition { position, respond_to } => {
+            CorrectionRequest::SetPosition {
+                position,
+                respond_to,
+            } => {
                 self.trajectory.set_position(position);
                 if respond_to.send(Ok(())).is_err() {
                     tracing::error!("位置校正 response 接受端在发送前已被丢弃");
@@ -135,15 +140,18 @@ impl ProcessorPipeline {
 }
 
 impl ProcessorPipelineConfig {
-    /// 从默认路径加载配置与修改时间。
-    pub fn load_from_default_paths_with_modified() -> Option<PipelineConfigSnapshot> {
-        let path = "processor.toml";
-        let (config, modified) = read_config_with_modified(Path::new(path))?;
-        let source = PathBuf::from(path)
-            .canonicalize()
-            .unwrap_or(PathBuf::from(path));
+    /// 返回 pipeline 配置文件的固定路径（当前工作目录）。
+    pub fn default_config_path() -> PathBuf {
+        PathBuf::from("processor.toml")
+    }
 
-        Some(PipelineConfigSnapshot {
+    /// 从默认路径加载配置与修改时间。
+    pub fn load_from_default_paths_with_modified() -> anyhow::Result<PipelineConfigSnapshot> {
+        let path = Self::default_config_path();
+        let (config, modified) = read_config_with_modified(&path)?;
+        let source = path.canonicalize().unwrap_or(path);
+
+        Ok(PipelineConfigSnapshot {
             config,
             source,
             modified,
@@ -151,14 +159,14 @@ impl ProcessorPipelineConfig {
     }
 }
 
-fn read_config_with_modified(path: &Path) -> Option<(ProcessorPipelineConfig, SystemTime)> {
-    let content = std::fs::read_to_string(path).ok()?;
-    let modified = std::fs::metadata(path).ok()?.modified().ok()?;
-    match toml::from_str::<ProcessorPipelineConfig>(&content) {
-        Ok(config) => Some((config, modified)),
-        Err(err) => {
-            tracing::warn!("读取配置失败 {:?}: {}", path, err);
-            None
-        }
-    }
+fn read_config_with_modified(path: &Path) -> anyhow::Result<(ProcessorPipelineConfig, SystemTime)> {
+    let content = std::fs::read_to_string(path)
+        .with_context(|| format!("读取配置文件内容失败: {}", path.display()))?;
+    let modified = std::fs::metadata(path)
+        .with_context(|| format!("读取文件元数据失败: {}", path.display()))?
+        .modified()
+        .with_context(|| format!("读取文件修改时间失败: {}", path.display()))?;
+    let config = toml::from_str::<ProcessorPipelineConfig>(&content)
+        .with_context(|| format!("解析 TOML 配置失败: {}", path.display()))?;
+    Ok((config, modified))
 }

@@ -175,7 +175,8 @@ impl AppState {
         let config = self.get_pipeline_config().await?;
         let content =
             toml::to_string_pretty(&config).map_err(|_| PIPELINE_CONFIG_SAVE_ERROR)?;
-        std::fs::write("processor.toml", content).map_err(|_| PIPELINE_CONFIG_SAVE_ERROR)?;
+        let path = ProcessorPipelineConfig::default_config_path();
+        std::fs::write(path, content).map_err(|_| PIPELINE_CONFIG_SAVE_ERROR)?;
         Ok(())
     }
 }

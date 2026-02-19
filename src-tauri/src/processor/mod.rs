@@ -212,28 +212,44 @@ impl Processor {
     ///   config: 第一次默认的配置
     ///   config_rx: 配置更新通道接收端
     fn init_config_watcher() -> (ProcessorPipelineConfig, Receiver<ProcessorPipelineConfig>) {
-        let config_snapshot = ProcessorPipelineConfig::load_from_default_paths_with_modified();
-        let config = config_snapshot
-            .as_ref()
-            .map(|snapshot| snapshot.config.clone())
-            .unwrap_or_default();
-        let initial_modified = config_snapshot.map(|snapshot| snapshot.modified);
+        let (config, initial_modified) =
+            match ProcessorPipelineConfig::load_from_default_paths_with_modified() {
+                Ok(snapshot) => {
+                    tracing::info!("读取配置文件 {:?} : {:?}", snapshot.source, snapshot.config);
+                    (snapshot.config, Some(snapshot.modified))
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "读取 processor.toml 失败，使用默认配置。path: {:?}, err: {:#}",
+                        ProcessorPipelineConfig::default_config_path(),
+                        err
+                    );
+                    (ProcessorPipelineConfig::default(), None)
+                }
+            };
         let (config_tx, config_rx) = flume::unbounded::<ProcessorPipelineConfig>();
         thread::Builder::new()
             .name("PipelineConfigWatcher".into())
             .spawn(move || {
                 let mut last_modified = initial_modified;
                 loop {
-                    if let Some(snapshot) =
-                        ProcessorPipelineConfig::load_from_default_paths_with_modified()
-                    {
-                        let modified = snapshot.modified;
-                        if last_modified != Some(modified) {
-                            last_modified = Some(modified);
-                            tracing::info!("处理管线配置文件变更，路径: {:?}", snapshot.source);
-                            if config_tx.send(snapshot.config).is_err() {
-                                break;
+                    match ProcessorPipelineConfig::load_from_default_paths_with_modified() {
+                        Ok(snapshot) => {
+                            let modified = snapshot.modified;
+                            if last_modified != Some(modified) {
+                                last_modified = Some(modified);
+                                tracing::info!("处理管线配置文件变更，路径: {:?}", snapshot.source);
+                                if config_tx.send(snapshot.config).is_err() {
+                                    break;
+                                }
                             }
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                "轮询读取 processor.toml 失败。path: {:?}, err: {:#}",
+                                ProcessorPipelineConfig::default_config_path(),
+                                err
+                            );
                         }
                     }
                     thread::sleep(Duration::from_secs(3));
