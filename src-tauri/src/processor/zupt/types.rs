@@ -1,8 +1,8 @@
 //! ZUPT 相关类型。
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 /// ZUPT 配置参数。
 pub struct ZuptConfig {
     /// 是否跳过 ZUPT 处理。

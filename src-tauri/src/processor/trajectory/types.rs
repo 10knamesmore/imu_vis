@@ -1,9 +1,9 @@
 //! 轨迹计算相关类型。
 
 use math_f64::{DQuat, DVec3};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default)]
 /// 轨迹计算配置。
 pub struct TrajectoryConfig {
     /// 是否跳过轨迹计算。

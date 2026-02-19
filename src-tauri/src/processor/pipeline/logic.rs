@@ -137,25 +137,17 @@ impl ProcessorPipeline {
 impl ProcessorPipelineConfig {
     /// 从默认路径加载配置与修改时间。
     pub fn load_from_default_paths_with_modified() -> Option<PipelineConfigSnapshot> {
-        let candidates = [
-            "processor.toml",
-            "src-tauri/processor.toml",
-            "../processor.toml",
-        ];
-        for path in candidates {
-            if let Some((config, modified)) = read_config_with_modified(Path::new(path)) {
-                let source = PathBuf::from(path)
-                    .canonicalize()
-                    .unwrap_or(PathBuf::from(path));
+        let path = "processor.toml";
+        let (config, modified) = read_config_with_modified(Path::new(path))?;
+        let source = PathBuf::from(path)
+            .canonicalize()
+            .unwrap_or(PathBuf::from(path));
 
-                return Some(PipelineConfigSnapshot {
-                    config,
-                    source,
-                    modified,
-                });
-            }
-        }
-        None
+        Some(PipelineConfigSnapshot {
+            config,
+            source,
+            modified,
+        })
     }
 }
 

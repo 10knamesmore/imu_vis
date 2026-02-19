@@ -1,5 +1,11 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
-import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus } from "../types";
+import {
+  PeripheralInfo,
+  ProcessorPipelineConfig,
+  ResponseData,
+  RecordingMeta,
+  RecordingStatus,
+} from "../types";
 
 // 通用 API 响应接口
 export interface imuApiResponse<T> {
@@ -25,6 +31,15 @@ export const imuApi = {
   // 设置位置（手动校正）
   setPosition: (x: number, y: number, z: number) =>
     invoke<imuApiResponse<void>>("set_position", { x, y, z }),
+  // 获取当前 pipeline 配置
+  getPipelineConfig: () =>
+    invoke<imuApiResponse<ProcessorPipelineConfig>>("get_pipeline_config"),
+  // 更新 pipeline 配置（实时生效）
+  updatePipelineConfig: (config: ProcessorPipelineConfig) =>
+    invoke<imuApiResponse<void>>("update_pipeline_config", { config }),
+  // 将当前生效 pipeline 配置写入 processor.toml
+  savePipelineConfig: () =>
+    invoke<imuApiResponse<void>>("save_pipeline_config"),
 
   // 订阅数据输出
   // onEvent: Tauri Channel，用于接收实时数据流

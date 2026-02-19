@@ -1,5 +1,7 @@
 use crate::{
-    app_state::AppState, commands::response::Response as IpcResponse,
+    app_state::AppState,
+    commands::response::Response as IpcResponse,
+    processor::pipeline::ProcessorPipelineConfig,
     types::bluetooth::PeripheralInfo,
 };
 use tauri::State;
@@ -63,6 +65,39 @@ pub async fn set_axis_calibration(state: State<'_, AppState>) -> Response<()> {
 /// 设置位置（手动校正）
 pub async fn set_position(state: State<'_, AppState>, x: f64, y: f64, z: f64) -> Response<()> {
     match state.request_set_position(x, y, z).await {
+        Ok(()) => Ok(IpcResponse::success(())),
+        Err(err) => Ok(IpcResponse::error(err)),
+    }
+}
+
+#[tauri::command]
+#[tracing::instrument(level = "debug", skip(state))]
+/// 获取当前生效的 pipeline 配置。
+pub async fn get_pipeline_config(state: State<'_, AppState>) -> Response<ProcessorPipelineConfig> {
+    match state.get_pipeline_config().await {
+        Ok(config) => Ok(IpcResponse::success(config)),
+        Err(err) => Ok(IpcResponse::error(err)),
+    }
+}
+
+#[tauri::command]
+#[tracing::instrument(level = "debug", skip(state, config))]
+/// 更新 pipeline 配置并立即生效。
+pub async fn update_pipeline_config(
+    state: State<'_, AppState>,
+    config: ProcessorPipelineConfig,
+) -> Response<()> {
+    match state.update_pipeline_config(config).await {
+        Ok(()) => Ok(IpcResponse::success(())),
+        Err(err) => Ok(IpcResponse::error(err)),
+    }
+}
+
+#[tauri::command]
+#[tracing::instrument(level = "debug", skip(state))]
+/// 将当前生效的 pipeline 配置保存到 processor.toml。
+pub async fn save_pipeline_config(state: State<'_, AppState>) -> Response<()> {
+    match state.save_pipeline_config_to_file().await {
         Ok(()) => Ok(IpcResponse::success(())),
         Err(err) => Ok(IpcResponse::error(err)),
     }

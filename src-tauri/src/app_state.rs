@@ -5,7 +5,11 @@ use tokio::sync::{oneshot, Mutex, MutexGuard};
 
 use crate::{
     imu::IMUClient,
-    processor::{calibration::CorrectionRequest, Processor},
+    processor::{
+        calibration::CorrectionRequest,
+        pipeline::{PipelineConfigRequest, ProcessorPipelineConfig},
+        Processor,
+    },
     recorder::{spawn_recorder, RecorderCommand},
     types::outputs::ResponseData,
 };
@@ -16,6 +20,8 @@ pub struct CalibrationHandle {
 }
 
 const CALIBRATION_ERROR: &str = "Failed to update axis calibration";
+const PIPELINE_CONFIG_ERROR: &str = "Failed to update pipeline config";
+const PIPELINE_CONFIG_SAVE_ERROR: &str = "Failed to save pipeline config";
 
 impl CalibrationHandle {
     /// 创建校准通道句柄与接收端。
@@ -50,6 +56,37 @@ impl CalibrationHandle {
     }
 }
 
+/// Pipeline 配置请求通道句柄。
+pub struct PipelineConfigHandle {
+    tx: flume::Sender<PipelineConfigRequest>,
+}
+
+impl PipelineConfigHandle {
+    /// 创建配置通道句柄与接收端。
+    pub fn new() -> (Self, flume::Receiver<PipelineConfigRequest>) {
+        let (tx, rx) = flume::unbounded();
+        (Self { tx }, rx)
+    }
+
+    /// 获取当前生效配置。
+    pub async fn get_config(&self) -> Result<ProcessorPipelineConfig, &'static str> {
+        let (respond_to, response_rx) = oneshot::channel();
+        self.tx
+            .send(PipelineConfigRequest::Get { respond_to })
+            .map_err(|_| PIPELINE_CONFIG_ERROR)?;
+        response_rx.await.map_err(|_| PIPELINE_CONFIG_ERROR)
+    }
+
+    /// 更新并应用配置。
+    pub async fn update_config(&self, config: ProcessorPipelineConfig) -> Result<(), &'static str> {
+        let (respond_to, response_rx) = oneshot::channel();
+        self.tx
+            .send(PipelineConfigRequest::Update { config, respond_to })
+            .map_err(|_| PIPELINE_CONFIG_ERROR)?;
+        response_rx.await.map_err(|_| PIPELINE_CONFIG_ERROR)?
+    }
+}
+
 /// 应用状态。
 ///
 /// * `imu_client`: 与IMU连接相关的客户端 上游
@@ -69,6 +106,9 @@ pub struct AppState {
 
     /// 姿态零位校准控制句柄。
     pub calibration_handle: CalibrationHandle,
+
+    /// Pipeline 配置控制句柄。
+    pub pipeline_config_handle: PipelineConfigHandle,
 }
 
 impl AppState {
@@ -84,6 +124,7 @@ impl AppState {
         let (recorder_tx, recorder_rx) = flume::unbounded();
         spawn_recorder(record_rx, recorder_rx);
         let (calibration_handle, calibration_rx) = CalibrationHandle::new();
+        let (pipeline_config_handle, pipeline_config_rx) = PipelineConfigHandle::new();
         AppState {
             imu_client: Mutex::new(IMUClient::new(upstream_tx)),
             processor: Processor::new(
@@ -91,11 +132,13 @@ impl AppState {
                 downstream_tx,
                 record_tx,
                 calibration_rx,
+                pipeline_config_rx,
                 app_handle,
             ),
             downstream_rx,
             recorder_tx,
             calibration_handle,
+            pipeline_config_handle,
         }
     }
 
@@ -112,5 +155,27 @@ impl AppState {
     /// 请求设置位置。
     pub async fn request_set_position(&self, x: f64, y: f64, z: f64) -> Result<(), &'static str> {
         self.calibration_handle.request_set_position(x, y, z).await
+    }
+
+    /// 获取当前生效的 Pipeline 配置。
+    pub async fn get_pipeline_config(&self) -> Result<ProcessorPipelineConfig, &'static str> {
+        self.pipeline_config_handle.get_config().await
+    }
+
+    /// 更新 Pipeline 配置并立即生效。
+    pub async fn update_pipeline_config(
+        &self,
+        config: ProcessorPipelineConfig,
+    ) -> Result<(), &'static str> {
+        self.pipeline_config_handle.update_config(config).await
+    }
+
+    /// 持久化当前生效的 Pipeline 配置到 processor.toml。
+    pub async fn save_pipeline_config_to_file(&self) -> Result<(), &'static str> {
+        let config = self.get_pipeline_config().await?;
+        let content =
+            toml::to_string_pretty(&config).map_err(|_| PIPELINE_CONFIG_SAVE_ERROR)?;
+        std::fs::write("processor.toml", content).map_err(|_| PIPELINE_CONFIG_SAVE_ERROR)?;
+        Ok(())
     }
 }

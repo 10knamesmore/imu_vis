@@ -1,10 +1,10 @@
 //! 标定相关类型。
 
 use math_f64::{DQuat, DVec3};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::oneshot;
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 /// IMU 标定参数配置。
 pub struct ImuCalibrationConfig {
     /// 是否跳过标定处理。

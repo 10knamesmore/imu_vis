@@ -1,9 +1,9 @@
 //! 姿态融合相关类型。
 
 use math_f64::DQuat;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize)]
 /// 姿态融合配置。
 pub struct AttitudeFusionConfig {
     /// 是否跳过姿态融合处理。

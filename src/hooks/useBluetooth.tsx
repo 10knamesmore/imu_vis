@@ -3,7 +3,14 @@ import { message } from 'antd';
 import { Channel } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { imuApi } from '../services/imu';
-import { PeripheralInfo, ResponseData, RecordingMeta, RecordingStatus, ImuHistorySnapshot } from '../types';
+import {
+  PeripheralInfo,
+  ProcessorPipelineConfig,
+  ResponseData,
+  RecordingMeta,
+  RecordingStatus,
+  ImuHistorySnapshot,
+} from '../types';
 
 type BluetoothContextValue = {
   scanning: boolean;
@@ -28,6 +35,9 @@ type BluetoothContextValue = {
   connect: (deviceId: string) => Promise<boolean>;
   disconnect: () => Promise<void>;
   toggleRecording: () => Promise<void>;
+  getPipelineConfig: () => Promise<ProcessorPipelineConfig | null>;
+  updatePipelineConfig: (config: ProcessorPipelineConfig) => Promise<boolean>;
+  savePipelineConfig: () => Promise<boolean>;
 };
 
 const createEmptyHistory = (): ImuHistorySnapshot => ({
@@ -329,6 +339,53 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, [recording, startRecording, stopRecording]);
 
+  // 获取当前 pipeline 配置
+  const getPipelineConfig = useCallback(async () => {
+    try {
+      const res = await imuApi.getPipelineConfig();
+      if (res.success && res.data) {
+        return res.data;
+      }
+      throw new Error(res.message || '未知错误');
+    } catch (e) {
+      console.error(e);
+      message.error('获取流水线配置失败');
+      return null;
+    }
+  }, []);
+
+  // 更新 pipeline 配置并立即生效
+  const updatePipelineConfig = useCallback(async (config: ProcessorPipelineConfig) => {
+    try {
+      const res = await imuApi.updatePipelineConfig(config);
+      if (!res.success) {
+        throw new Error(res.message || '未知错误');
+      }
+      message.success('流水线配置已更新并生效');
+      return true;
+    } catch (e) {
+      console.error(e);
+      message.error('更新流水线配置失败');
+      return false;
+    }
+  }, []);
+
+  // 保存当前生效配置到 processor.toml
+  const savePipelineConfig = useCallback(async () => {
+    try {
+      const res = await imuApi.savePipelineConfig();
+      if (!res.success) {
+        throw new Error(res.message || '未知错误');
+      }
+      message.success('当前生效配置已保存到 processor.toml');
+      return true;
+    } catch (e) {
+      console.error(e);
+      message.error('保存流水线配置失败');
+      return false;
+    }
+  }, []);
+
   // 刷新录制列表
   const refreshRecordings = useCallback(async () => {
     try {
@@ -442,7 +499,10 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     toggleScan,
     connect,
     disconnect,
-    toggleRecording
+    toggleRecording,
+    getPipelineConfig,
+    updatePipelineConfig,
+    savePipelineConfig,
   };
 };
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Layout, Tabs, Modal, Button } from 'antd';
 import { SettingOutlined } from '@ant-design/icons';
 
-import { ConnectionPanel } from './components/ConnectionPanel';
+import { ConfigPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
@@ -69,13 +69,13 @@ const AppContent: React.FC = () => {
         />
 
         <Modal
-          title="设备管理"
+          title="设备与配置"
           open={isModalOpen}
           onCancel={handleModalClose}
           footer={null}
           width={800}
         >
-          <ConnectionPanel />
+          <ConfigPanel />
         </Modal>
       </Content>
     </Layout>

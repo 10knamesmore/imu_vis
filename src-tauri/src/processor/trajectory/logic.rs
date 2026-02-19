@@ -102,7 +102,7 @@ impl TrajectoryCalculator {
                 vel_diff
             );
         }
-        
+
         self.nav_state.velocity = nav.velocity;
         self.nav_state.position = nav.position;
         self.nav_state.bias_a = nav.bias_a;
@@ -113,8 +113,12 @@ impl TrajectoryCalculator {
     pub fn set_position(&mut self, position: DVec3) {
         tracing::info!(
             "位置手动校正 | old=[{:.3}, {:.3}, {:.3}] | new=[{:.3}, {:.3}, {:.3}]",
-            self.nav_state.position.x, self.nav_state.position.y, self.nav_state.position.z,
-            position.x, position.y, position.z
+            self.nav_state.position.x,
+            self.nav_state.position.y,
+            self.nav_state.position.z,
+            position.x,
+            position.y,
+            position.z
         );
         self.nav_state.position = position;
     }

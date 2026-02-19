@@ -14,7 +14,7 @@ use tauri::Emitter as _;
 use crate::{
     processor::{
         calibration::CorrectionRequest,
-        pipeline::{ProcessorPipeline, ProcessorPipelineConfig},
+        pipeline::{PipelineConfigRequest, ProcessorPipeline, ProcessorPipelineConfig},
     },
     types::outputs::ResponseData,
 };
@@ -74,6 +74,7 @@ impl Processor {
         downstream_tx: flume::Sender<ResponseData>,
         record_tx: flume::Sender<ResponseData>,
         calibration_rx: flume::Receiver<CorrectionRequest>,
+        pipeline_config_rx: flume::Receiver<PipelineConfigRequest>,
         app_handle: tauri::AppHandle,
     ) -> Self {
         let (config, config_rx) = Self::init_config_watcher();
@@ -82,6 +83,7 @@ impl Processor {
         let _processor_thread = thread::Builder::new()
             .name("DataProcessorThread".into())
             .spawn(move || {
+                let mut current_config = config.clone();
                 let mut pipeline = ProcessorPipeline::new(config);
                 let mut config_enabled = true;
 
@@ -93,7 +95,9 @@ impl Processor {
                         CalibrationClosed,
                         Reset,
                         ConfigUpdated(Box<ProcessorPipelineConfig>),
+                        PipelineConfigRequest(PipelineConfigRequest),
                         ConfigClosed,
+                        PipelineConfigClosed,
                     }
 
                     let mut selector = flume::Selector::new()
@@ -114,6 +118,14 @@ impl Processor {
                                 PipelineEvent::CalibrationClosed
                             }
                         });
+
+                    selector = selector.recv(&pipeline_config_rx, |result| match result {
+                        Ok(request) => PipelineEvent::PipelineConfigRequest(request),
+                        Err(e) => {
+                            tracing::warn!("从 pipeline 配置请求通道接收失败: {:?}", e);
+                            PipelineEvent::PipelineConfigClosed
+                        }
+                    });
 
                     if config_enabled {
                         selector = selector.recv(&config_rx, |result| match result {
@@ -155,14 +167,37 @@ impl Processor {
                             tracing::info!("处理管线已重置");
                         }
                         PipelineEvent::ConfigUpdated(config) => {
-                            pipeline.reset_with_config(*config);
+                            current_config = *config;
+                            pipeline.reset_with_config(current_config.clone());
                             if let Err(e) = app_handle.emit("config_update", ()) {
                                 tracing::warn!("推送 config_update 事件失败: {:?}", e);
                             }
                             tracing::info!("处理管线配置已更新");
                         }
+                        PipelineEvent::PipelineConfigRequest(request) => match request {
+                            PipelineConfigRequest::Get { respond_to } => {
+                                if respond_to.send(current_config.clone()).is_err() {
+                                    tracing::warn!("返回 pipeline 配置失败: 接收端已关闭");
+                                }
+                            }
+                            PipelineConfigRequest::Update { config, respond_to } => {
+                                current_config = config.clone();
+                                pipeline.reset_with_config(config);
+                                if let Err(e) = app_handle.emit("config_update", ()) {
+                                    tracing::warn!("推送 config_update 事件失败: {:?}", e);
+                                }
+                                if respond_to.send(Ok(())).is_err() {
+                                    tracing::warn!("返回 pipeline 配置更新结果失败: 接收端已关闭");
+                                }
+                                tracing::info!("处理管线配置已通过命令更新");
+                            }
+                        },
                         PipelineEvent::ConfigClosed => {
                             config_enabled = false;
+                        }
+                        PipelineEvent::PipelineConfigClosed => {
+                            tracing::error!("pipeline 配置请求通道接收失败: channel closed");
+                            break;
                         }
                     }
                 }

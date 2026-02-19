@@ -1,9 +1,9 @@
 //! EKF 相关类型。
 
 use math_f64::DVec3;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, Deserialize, Serialize, Default)]
 /// EKF 配置。
 pub struct EkfConfig {
     /// 是否跳过 EKF 处理。

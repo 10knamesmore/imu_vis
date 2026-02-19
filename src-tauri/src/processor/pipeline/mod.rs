@@ -12,4 +12,4 @@ pub mod types;
 /// 处理管线。
 pub use logic::ProcessorPipeline;
 /// 处理管线配置。
-pub use types::ProcessorPipelineConfig;
+pub use types::{PipelineConfigRequest, ProcessorPipelineConfig};

@@ -88,3 +88,38 @@ export interface PeripheralInfo {
   local_name?: string; // 设备名称
   rssi?: number;     // 信号强度
 }
+
+// Pipeline 配置类型
+export interface ProcessorPipelineConfig {
+  global: {
+    gravity: number;
+  };
+  calibration: {
+    passby: boolean;
+    accel_bias: Vector3;
+    gyro_bias: Vector3;
+    accel_matrix: number[][];
+    gyro_matrix: number[][];
+  };
+  filter: {
+    passby: boolean;
+    alpha: number;
+  };
+  attitude_fusion: {
+    passby: boolean;
+    beta: number;
+  };
+  trajectory: {
+    passby: boolean;
+  };
+  zupt: {
+    passby: boolean;
+    gyro_thresh: number;
+    accel_thresh: number;
+    bias_correction_gain: number;
+  };
+  ekf: {
+    passby: boolean;
+    enabled: boolean;
+  };
+}

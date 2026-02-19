@@ -1,6 +1,7 @@
 //! 处理管线配置类型。
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+use tokio::sync::oneshot;
 
 use crate::processor::attitude_fusion::AttitudeFusionConfig;
 use crate::processor::calibration::ImuCalibrationConfig;
@@ -9,7 +10,7 @@ use crate::processor::filter::LowPassFilterConfig;
 use crate::processor::trajectory::TrajectoryConfig;
 use crate::processor::zupt::ZuptConfig;
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 /// 全局配置参数。
 pub struct GlobalConfig {
     /// 重力加速度常数（m/s²）。
@@ -22,7 +23,7 @@ impl Default for GlobalConfig {
     }
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 /// 处理管线配置。
 pub struct ProcessorPipelineConfig {
     /// 全局配置。
@@ -39,4 +40,20 @@ pub struct ProcessorPipelineConfig {
     pub zupt: ZuptConfig,
     /// EKF 配置。
     pub ekf: EkfConfig,
+}
+
+/// Pipeline 运行时配置请求。
+pub enum PipelineConfigRequest {
+    /// 获取当前生效配置。
+    Get {
+        /// 请求响应通道。
+        respond_to: oneshot::Sender<ProcessorPipelineConfig>,
+    },
+    /// 更新并立即应用配置。
+    Update {
+        /// 新配置。
+        config: ProcessorPipelineConfig,
+        /// 请求响应通道。
+        respond_to: oneshot::Sender<Result<(), &'static str>>,
+    },
 }
