@@ -361,7 +361,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       if (!res.success) {
         throw new Error(res.message || '未知错误');
       }
-      message.success('流水线配置已更新并生效');
       return true;
     } catch (e) {
       console.error(e);
