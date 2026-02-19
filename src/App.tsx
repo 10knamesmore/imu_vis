@@ -62,7 +62,7 @@ const AppContent: React.FC = () => {
               className={hasConnectedDevice ? styles.deviceButtonConnected : undefined}
               onClick={handleModalOpen}
             >
-              设备
+              设备与设置
             </Button>
           }
           destroyOnHidden
