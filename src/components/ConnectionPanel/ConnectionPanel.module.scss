@@ -2,6 +2,106 @@
   margin-bottom: 24px;
   background: #141414;
   border: 1px solid #303030;
+  border-radius: 12px;
+  padding: 16px;
+
+  .toolbarRow {
+    margin-bottom: 16px;
+  }
+
+  .deviceTag {
+    font-size: 14px;
+    padding: 5px 10px;
+  }
+
+  .deviceSelect {
+    width: 100%;
+  }
+
+  .deviceOption {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+  }
+
+  .deviceIdText {
+    font-size: 12px;
+  }
+
+  .rssiWrap {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .rssiValue {
+    color: #888;
+    min-width: 30px;
+    text-align: right;
+  }
+
+  .configArea {
+    margin-top: 16px;
+  }
+
+  .connectedLine {
+    text-align: right;
+    margin-bottom: 12px;
+  }
+
+  .configHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+
+  .sectionCard {
+    border-radius: 10px;
+  }
+
+  .formBlock {
+    margin-bottom: 10px;
+  }
+
+  .compactItem {
+    margin-bottom: 10px;
+  }
+
+  .numberInput {
+    width: 100%;
+  }
+
+  .matrixWrap {
+    border: 1px solid #2b2b2b;
+    border-radius: 8px;
+    padding: 10px;
+    background: #111;
+  }
+
+  .matrixRow {
+    margin-bottom: 8px;
+  }
+
+  .matrixHeaderRow {
+    margin-bottom: 6px;
+  }
+
+  .matrixAxisLabel {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .matrixRow:last-child {
+    margin-bottom: 0;
+  }
 
   :global(.ant-card-head) {
     color: white;
@@ -28,5 +128,15 @@
 
   :global(.ant-empty-description) {
     color: rgba(255, 255, 255, 0.45);
+  }
+
+  :global(.ant-form-item-label > label) {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+  }
+
+  :global(.ant-card) {
+    background: #171717;
+    border: 1px solid #2a2a2a;
   }
 }

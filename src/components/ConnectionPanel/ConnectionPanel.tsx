@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Col, Form, InputNumber, Row, Select, Space, Switch, Tag, Typography, message } from 'antd';
+import { Button, Card, Col, Form, InputNumber, Row, Select, Space, Switch, Tag, message } from 'antd';
 import { ReloadOutlined, PoweroffOutlined, CheckCircleOutlined, SignalFilled } from '@ant-design/icons';
 import Text from "antd/es/typography/Text";
 
@@ -9,12 +9,15 @@ import { ProcessorPipelineConfig } from '../../types';
 import styles from "./ConnectionPanel.module.scss";
 
 const DEFAULT_SEARCH_VALUE = "im";
+const MATRIX_INDEX = [0, 1, 2] as const;
+const AXIS_LABELS = ['X', 'Y', 'Z'] as const;
+const numberRules = [{ required: true, message: '必填' }];
 
 const getRssiColor = (rssi?: number) => {
-  if (!rssi) return '#d9d9d9'; // grey for unknown
-  if (rssi >= -60) return '#52c41a'; // green for strong
-  if (rssi >= -80) return '#faad14'; // yellow for medium
-  return '#f5222d'; // red for weak
+  if (!rssi) return '#d9d9d9';
+  if (rssi >= -60) return '#52c41a';
+  if (rssi >= -80) return '#faad14';
+  return '#f5222d';
 };
 
 const DEFAULT_CONFIG: ProcessorPipelineConfig = {
@@ -61,8 +64,6 @@ const DEFAULT_CONFIG: ProcessorPipelineConfig = {
 
 type MatrixField = 'accel_matrix' | 'gyro_matrix';
 
-const MATRIX_INDEX = [0, 1, 2] as const;
-
 /** 连接和处理配置面板。 */
 export const ConfigPanel = () => {
   const [form] = Form.useForm<ProcessorPipelineConfig>();
@@ -77,6 +78,7 @@ export const ConfigPanel = () => {
     updatePipelineConfig,
     savePipelineConfig,
   } = useBluetooth();
+
   const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
   const [searchvalue, setSearchvalue] = useState(DEFAULT_SEARCH_VALUE);
   const [loadingConfig, setLoadingConfig] = useState(false);
@@ -107,12 +109,20 @@ export const ConfigPanel = () => {
     loadConfig();
   }, [connectedDevice, form, getPipelineConfig]);
 
+  useEffect(() => {
+    return () => {
+      if (autoApplyTimerRef.current !== undefined) {
+        window.clearTimeout(autoApplyTimerRef.current);
+      }
+    };
+  }, []);
+
   const handleConnectClick = async () => {
     if (!selectedDeviceId) {
       message.warning('请选择要连接的设备');
       return;
     }
-    const device = devices.find(d => d.id === selectedDeviceId);
+    const device = devices.find((d) => d.id === selectedDeviceId);
     if (!device) {
       message.warning('扫描结果中未找到该设备');
       return;
@@ -125,8 +135,6 @@ export const ConfigPanel = () => {
     setSelectedDeviceId(null);
   };
 
-  const isConnected = !!connectedDevice;
-
   const scheduleAutoApply = () => {
     if (autoApplyTimerRef.current !== undefined) {
       window.clearTimeout(autoApplyTimerRef.current);
@@ -135,9 +143,8 @@ export const ConfigPanel = () => {
       try {
         const config = await form.validateFields();
         await updatePipelineConfig(config);
-      } catch (err) {
-        // 表单未完成输入时跳过本次自动应用
-        console.debug('auto apply skipped', err);
+      } catch {
+        // 输入中态不触发下发
       }
     }, 300);
   };
@@ -151,50 +158,75 @@ export const ConfigPanel = () => {
     }
   };
 
+  const renderVec3Fields = (label: string, basePath: (string | number)[]) => (
+    <Form.Item label={label} className={styles.formBlock}>
+      <Row gutter={12}>
+        <Col xs={24} md={8}>
+          <Form.Item name={[...basePath, 'x']} rules={numberRules} label="X" className={styles.compactItem}>
+            <InputNumber className={styles.numberInput} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={8}>
+          <Form.Item name={[...basePath, 'y']} rules={numberRules} label="Y" className={styles.compactItem}>
+            <InputNumber className={styles.numberInput} />
+          </Form.Item>
+        </Col>
+        <Col xs={24} md={8}>
+          <Form.Item name={[...basePath, 'z']} rules={numberRules} label="Z" className={styles.compactItem}>
+            <InputNumber className={styles.numberInput} />
+          </Form.Item>
+        </Col>
+      </Row>
+    </Form.Item>
+  );
+
   const renderMatrixField = (label: string, field: MatrixField) => (
-    <Form.Item label={label} style={{ marginBottom: 12 }}>
-      <Space orientation="vertical" style={{ width: '100%' }} size={8}>
+    <Form.Item label={label} className={styles.formBlock}>
+      <div className={styles.matrixWrap}>
+        <Row gutter={8} className={styles.matrixHeaderRow}>
+          <Col span={3} />
+          {MATRIX_INDEX.map((col) => (
+            <Col span={7} key={`${field}-header-${col}`} className={styles.matrixAxisLabel}>
+              {AXIS_LABELS[col]}
+            </Col>
+          ))}
+        </Row>
         {MATRIX_INDEX.map((row) => (
-          <Row gutter={8} key={`${field}-${row}`}>
+          <Row gutter={8} key={`${field}-${row}`} className={styles.matrixRow}>
+            <Col span={3} className={styles.matrixAxisLabel}>
+              {AXIS_LABELS[row]}
+            </Col>
             {MATRIX_INDEX.map((col) => (
-              <Col span={8} key={`${field}-${row}-${col}`}>
+              <Col span={7} key={`${field}-${row}-${col}`}>
                 <Form.Item
                   name={['calibration', field, row, col]}
-                  rules={[{ required: true, message: '必填' }]}
-                  style={{ marginBottom: 0 }}
+                  rules={numberRules}
+                  className={styles.compactItem}
                 >
-                  <InputNumber style={{ width: '100%' }} />
+                  <InputNumber className={styles.numberInput} />
                 </Form.Item>
               </Col>
             ))}
           </Row>
         ))}
-      </Space>
+      </div>
     </Form.Item>
   );
 
-  useEffect(() => {
-    return () => {
-      if (autoApplyTimerRef.current !== undefined) {
-        window.clearTimeout(autoApplyTimerRef.current);
-      }
-    };
-  }, []);
+  const isConnected = !!connectedDevice;
 
   return (
     <div className={styles.connectionPanel}>
-      <Row justify="space-between" align="middle" style={{ marginBottom: 16 }}>
+      <Row justify="space-between" align="middle" className={styles.toolbarRow}>
         <Col>
-          <Tag color="blue" style={{ fontSize: '14px', padding: '5px 10px' }}>
+          <Tag color="blue" className={styles.deviceTag}>
             已发现 <strong>{devices.length}</strong> 台设备
           </Tag>
         </Col>
         <Col>
           <Button
             icon={<ReloadOutlined spin={scanning} />}
-            onClick={async () => {
-              await toggleScan();
-            }}
+            onClick={toggleScan}
             type={scanning ? "default" : "primary"}
           >
             {scanning ? "扫描中..." : "开始扫描"}
@@ -205,41 +237,37 @@ export const ConfigPanel = () => {
       <Row gutter={16} align="middle">
         <Col flex="auto">
           <Select
-            style={{ width: '100%' }}
+            className={styles.deviceSelect}
             placeholder="请选择要连接的设备"
-            labelRender={(props) => {
-              return (
-                <Space>
-                  <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                  <span>{props.label}</span>
-                </Space>
-              );
-            }}
-            options={devices.map(peripheral => (
-              {
-                label: peripheral.local_name || '<未知设备>',
-                value: peripheral.id,
-                address: peripheral.address,
-                rssi: peripheral.rssi,
-              }
-            ))}
+            labelRender={(props) => (
+              <Space>
+                <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                <span>{props.label}</span>
+              </Space>
+            )}
+            options={devices.map((peripheral) => ({
+              label: peripheral.local_name || '<未知设备>',
+              value: peripheral.id,
+              address: peripheral.address,
+              rssi: peripheral.rssi,
+            }))}
             optionRender={(option) => {
-              const data = option.data
+              const data = option.data;
               const rssiColor = getRssiColor(data.rssi);
               return (
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                  <Space orientation="vertical" size={0}>
+                <div className={styles.deviceOption}>
+                  <Space direction="vertical" size={0}>
                     <Text strong>{data.label}</Text>
-                    <Text type="secondary" style={{ fontSize: '12px' }}>{data.value}</Text>
+                    <Text type="secondary" className={styles.deviceIdText}>{data.value}</Text>
                   </Space>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <div className={styles.rssiWrap}>
                     <SignalFilled style={{ color: rssiColor }} />
-                    <span style={{ color: '#888', minWidth: 30, textAlign: 'right' }}>
+                    <span className={styles.rssiValue}>
                       {option.data.rssi || '-'}
                     </span>
                   </div>
                 </div>
-              )
+              );
             }}
             value={selectedDeviceId}
             onChange={setSelectedDeviceId}
@@ -277,176 +305,141 @@ export const ConfigPanel = () => {
       </Row>
 
       {isConnected && (
-        <>
-          <div style={{ marginTop: 12, textAlign: 'right' }}>
+        <div className={styles.configArea}>
+          <div className={styles.connectedLine}>
             <Tag color="success" icon={<CheckCircleOutlined />}>
               已连接到 {connectedDevice?.local_name || '设备'}
             </Tag>
           </div>
-          <div style={{ marginTop: 20 }}>
-            <Row justify="space-between" align="middle" style={{ marginBottom: 8 }}>
-              <Col>
-                <Text strong>Pipeline 配置</Text>
+
+          <div className={styles.configHeader}>
+            <Text strong>Pipeline 配置</Text>
+            <Space wrap>
+              <Button
+                onClick={async () => {
+                  setLoadingConfig(true);
+                  try {
+                    const config = await getPipelineConfig();
+                    if (config) {
+                      form.setFieldsValue(config);
+                    }
+                  } finally {
+                    setLoadingConfig(false);
+                  }
+                }}
+                loading={loadingConfig}
+              >
+                读取当前配置
+              </Button>
+              <Button onClick={() => form.setFieldsValue(DEFAULT_CONFIG)}>
+                重置默认值
+              </Button>
+              <Button onClick={handleSaveConfig} loading={savingConfig}>
+                保存当前生效到文件
+              </Button>
+            </Space>
+          </div>
+
+          <Form
+            form={form}
+            layout="vertical"
+            initialValues={DEFAULT_CONFIG}
+            onValuesChange={scheduleAutoApply}
+          >
+            <Row gutter={[16, 16]}>
+              <Col xs={24} lg={8}>
+                <Card size="small" title="全局" className={styles.sectionCard}>
+                  <Form.Item
+                    label="重力加速度"
+                    name={['global', 'gravity']}
+                    rules={numberRules}
+                    className={styles.compactItem}
+                  >
+                    <InputNumber className={styles.numberInput} />
+                  </Form.Item>
+                </Card>
               </Col>
-              <Col>
-                <Space>
-                  <Button
-                    onClick={async () => {
-                      setLoadingConfig(true);
-                      try {
-                        const config = await getPipelineConfig();
-                        if (config) {
-                          form.setFieldsValue(config);
-                        }
-                      } finally {
-                        setLoadingConfig(false);
-                      }
-                    }}
-                    loading={loadingConfig}
-                  >
-                    读取当前配置
-                  </Button>
-                  <Button
-                    onClick={() => form.setFieldsValue(DEFAULT_CONFIG)}
-                  >
-                    重置默认值
-                  </Button>
-                  <Button
-                    onClick={handleSaveConfig}
-                    loading={savingConfig}
-                  >
-                    保存当前生效到文件
-                  </Button>
-                </Space>
+
+              <Col xs={24} lg={8}>
+                <Card size="small" title="滤波" className={styles.sectionCard}>
+                  <Form.Item label="跳过处理" name={['filter', 'passby']} valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item label="平滑系数(alpha)" name={['filter', 'alpha']} rules={numberRules} className={styles.compactItem}>
+                    <InputNumber className={styles.numberInput} />
+                  </Form.Item>
+                </Card>
+              </Col>
+
+              <Col xs={24} lg={8}>
+                <Card size="small" title="姿态融合" className={styles.sectionCard}>
+                  <Form.Item label="跳过处理" name={['attitude_fusion', 'passby']} valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item label="融合增益(beta)" name={['attitude_fusion', 'beta']} rules={numberRules} className={styles.compactItem}>
+                    <InputNumber className={styles.numberInput} />
+                  </Form.Item>
+                </Card>
+              </Col>
+
+              <Col xs={24}>
+                <Card size="small" title="标定" className={styles.sectionCard}>
+                  <Form.Item label="跳过处理" name={['calibration', 'passby']} valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                  {renderVec3Fields('加速度偏置(accel_bias)', ['calibration', 'accel_bias'])}
+                  {renderVec3Fields('陀螺仪偏置(gyro_bias)', ['calibration', 'gyro_bias'])}
+                  {renderMatrixField('加速度矩阵(accel_matrix)', 'accel_matrix')}
+                  {renderMatrixField('陀螺仪矩阵(gyro_matrix)', 'gyro_matrix')}
+                </Card>
+              </Col>
+
+              <Col xs={24} md={12}>
+                <Card size="small" title="轨迹计算" className={styles.sectionCard}>
+                  <Form.Item label="跳过处理" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
+                    <Switch />
+                  </Form.Item>
+                </Card>
+              </Col>
+
+              <Col xs={24} md={12}>
+                <Card size="small" title="EKF(扩展卡尔曼滤波)" className={styles.sectionCard}>
+                  <Form.Item label="跳过处理" name={['ekf', 'passby']} valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                  <Form.Item label="启用" name={['ekf', 'enabled']} valuePropName="checked" className={styles.compactItem}>
+                    <Switch />
+                  </Form.Item>
+                </Card>
+              </Col>
+
+              <Col xs={24}>
+                <Card size="small" title="ZUPT(零速更新)" className={styles.sectionCard}>
+                  <Form.Item label="跳过处理" name={['zupt', 'passby']} valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                  <Row gutter={12}>
+                    <Col xs={24} md={8}>
+                      <Form.Item label="角速度阈值(gyro_thresh)" name={['zupt', 'gyro_thresh']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item label="加速度阈值(accel_thresh)" name={['zupt', 'accel_thresh']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} md={8}>
+                      <Form.Item label="偏置修正增益(bias_correction_gain)" name={['zupt', 'bias_correction_gain']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Card>
               </Col>
             </Row>
-            <Form
-              form={form}
-              layout="vertical"
-              initialValues={DEFAULT_CONFIG}
-              onValuesChange={scheduleAutoApply}
-            >
-              <Typography.Title level={5}>Global</Typography.Title>
-              <Form.Item
-                label="gravity"
-                name={['global', 'gravity']}
-                rules={[{ required: true, message: '必填' }]}
-              >
-                <InputNumber style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Typography.Title level={5}>Calibration</Typography.Title>
-              <Form.Item label="passby" name={['calibration', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Row gutter={12}>
-                <Col span={8}>
-                  <Form.Item label="accel_bias.x" name={['calibration', 'accel_bias', 'x']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="accel_bias.y" name={['calibration', 'accel_bias', 'y']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="accel_bias.z" name={['calibration', 'accel_bias', 'z']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-              <Row gutter={12}>
-                <Col span={8}>
-                  <Form.Item label="gyro_bias.x" name={['calibration', 'gyro_bias', 'x']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="gyro_bias.y" name={['calibration', 'gyro_bias', 'y']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="gyro_bias.z" name={['calibration', 'gyro_bias', 'z']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-              {renderMatrixField('accel_matrix', 'accel_matrix')}
-              {renderMatrixField('gyro_matrix', 'gyro_matrix')}
-
-              <Typography.Title level={5}>Filter</Typography.Title>
-              <Row gutter={12}>
-                <Col span={8}>
-                  <Form.Item label="passby" name={['filter', 'passby']} valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col span={16}>
-                  <Form.Item label="alpha" name={['filter', 'alpha']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Typography.Title level={5}>Attitude Fusion</Typography.Title>
-              <Row gutter={12}>
-                <Col span={8}>
-                  <Form.Item label="passby" name={['attitude_fusion', 'passby']} valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col span={16}>
-                  <Form.Item label="beta" name={['attitude_fusion', 'beta']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Typography.Title level={5}>Trajectory</Typography.Title>
-              <Form.Item label="passby" name={['trajectory', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-
-              <Typography.Title level={5}>ZUPT</Typography.Title>
-              <Form.Item label="passby" name={['zupt', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Row gutter={12}>
-                <Col span={8}>
-                  <Form.Item label="gyro_thresh" name={['zupt', 'gyro_thresh']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="accel_thresh" name={['zupt', 'accel_thresh']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-                <Col span={8}>
-                  <Form.Item label="bias_correction_gain" name={['zupt', 'bias_correction_gain']} rules={[{ required: true, message: '必填' }]}>
-                    <InputNumber style={{ width: '100%' }} />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <Typography.Title level={5}>EKF</Typography.Title>
-              <Row gutter={12}>
-                <Col span={12}>
-                  <Form.Item label="passby" name={['ekf', 'passby']} valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-                <Col span={12}>
-                  <Form.Item label="enabled" name={['ekf', 'enabled']} valuePropName="checked">
-                    <Switch />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Form>
-          </div>
-        </>
+          </Form>
+        </div>
       )}
     </div>
   );
