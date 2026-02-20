@@ -1,1 +1,1 @@
-export { ConfigPanel } from "./ConnectionPanel";
+export { ConnectionPanel, SettingsPanel } from "./ConnectionPanel";

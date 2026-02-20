@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Tabs, Modal, Button } from 'antd';
-import { SettingOutlined } from '@ant-design/icons';
+import { Layout, Tabs, Modal, Button, Space } from 'antd';
+import { ApiOutlined, SettingOutlined } from '@ant-design/icons';
 
-import { ConfigPanel } from './components/ConnectionPanel';
+import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
 
@@ -14,7 +14,8 @@ const { Content } = Layout;
  * 应用主内容区域组件。
  */
 const AppContent: React.FC = () => {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
+  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const { connectedDevice, startScan, stopScan } = useBluetooth()
 
   const hasConnectedDevice = connectedDevice !== null;
@@ -28,25 +29,31 @@ const AppContent: React.FC = () => {
   ];
 
   // 模态框打开时：如果没有连接设备，自动开始扫描
-  const handleModalOpen = async () => {
-    setIsModalOpen(true);
+  const handleDeviceModalOpen = async () => {
+    setIsDeviceModalOpen(true);
     if (!hasConnectedDevice) {
       await startScan();
     }
   }
 
-  // 模态框关闭时：停止扫描
-  const handleModalClose = async () => {
-    setIsModalOpen(false);
+  const handleDeviceModalClose = async () => {
+    setIsDeviceModalOpen(false);
     await stopScan();
   }
 
-  // 当设备连接成功后，自动关闭设备管理模态框
+  const handleSettingsModalOpen = () => {
+    setIsSettingsModalOpen(true);
+  };
+
+  const handleSettingsModalClose = () => {
+    setIsSettingsModalOpen(false);
+  };
+
   useEffect(() => {
-    if (hasConnectedDevice && isModalOpen) {
-      setIsModalOpen(false);
+    if (hasConnectedDevice && isDeviceModalOpen) {
+      setIsDeviceModalOpen(false);
     }
-  }, [hasConnectedDevice]);
+  }, [hasConnectedDevice, isDeviceModalOpen]);
 
   return (
     <Layout className={styles.appLayout}>
@@ -56,26 +63,45 @@ const AppContent: React.FC = () => {
           items={items}
           className={styles.appTabs}
           tabBarExtraContent={
-            <Button
-              type="primary"
-              icon={<SettingOutlined />}
-              className={hasConnectedDevice ? styles.deviceButtonConnected : undefined}
-              onClick={handleModalOpen}
-            >
-              设备与设置
-            </Button>
+            <Space>
+              <Button
+                type="primary"
+                icon={<ApiOutlined />}
+                className={hasConnectedDevice ? styles.deviceButtonConnected : undefined}
+                onClick={handleDeviceModalOpen}
+              >
+                设备
+              </Button>
+              <Button
+                type="default"
+                icon={<SettingOutlined />}
+                onClick={handleSettingsModalOpen}
+              >
+                设置
+              </Button>
+            </Space>
           }
           destroyOnHidden
         />
 
         <Modal
-          title="设备与配置"
-          open={isModalOpen}
-          onCancel={handleModalClose}
+          title="设备"
+          open={isDeviceModalOpen}
+          onCancel={handleDeviceModalClose}
           footer={null}
           width={800}
         >
-          <ConfigPanel />
+          <ConnectionPanel />
+        </Modal>
+
+        <Modal
+          title="设置"
+          open={isSettingsModalOpen}
+          onCancel={handleSettingsModalClose}
+          footer={null}
+          width={980}
+        >
+          <SettingsPanel />
         </Modal>
       </Content>
     </Layout>
