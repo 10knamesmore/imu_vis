@@ -75,6 +75,7 @@ const AppContent: React.FC = () => {
                 设备
               </Button>
               <Button
+                disabled={!hasConnectedDevice}
                 type="default"
                 icon={<SettingOutlined />}
                 onClick={handleSettingsModalOpen}
