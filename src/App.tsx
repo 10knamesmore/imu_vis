@@ -99,7 +99,14 @@ const AppContent: React.FC = () => {
           open={isSettingsModalOpen}
           onCancel={handleSettingsModalClose}
           footer={null}
-          width={980}
+          width={1360}
+          styles={{
+            body: {
+              height: '74vh',
+              overflow: 'hidden',
+              padding: 12,
+            },
+          }}
         >
           <SettingsPanel />
         </Modal>

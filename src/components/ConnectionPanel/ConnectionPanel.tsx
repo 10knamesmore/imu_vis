@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Card, Col, Empty, Form, InputNumber, Row, Select, Space, Switch, Tag, message } from 'antd';
+import { Button, Card, Col, Empty, Form, InputNumber, Row, Select, Space, Switch, Tabs, Tag, message } from 'antd';
 import { ReloadOutlined, PoweroffOutlined, CheckCircleOutlined, SignalFilled } from '@ant-design/icons';
 import Text from "antd/es/typography/Text";
 
@@ -282,16 +282,16 @@ export const SettingsPanel = () => {
 
   if (!connectedDevice) {
     return (
-      <div className={styles.connectionPanel}>
+      <div className={`${styles.connectionPanel} ${styles.settingsPanel}`}>
         <Empty description="请先在“设备”面板连接设备后再配置参数" />
       </div>
     );
   }
 
   return (
-    <div className={styles.connectionPanel}>
+    <div className={`${styles.connectionPanel} ${styles.settingsPanel}`}>
       <div className={styles.configHeader}>
-        <Text strong>Pipeline 配置</Text>
+        <Text strong>流水线 配置</Text>
         <Space wrap>
           <Button
             onClick={async () => {
@@ -318,94 +318,135 @@ export const SettingsPanel = () => {
         </Space>
       </div>
 
-      <Form form={form} layout="vertical" initialValues={DEFAULT_CONFIG} onValuesChange={scheduleAutoApply}>
-        <Row gutter={[16, 16]}>
-          <Col xs={24} lg={8}>
-            <Card size="small" title="全局" className={styles.sectionCard}>
-              <Form.Item label="重力加速度" name={['global', 'gravity']} rules={numberRules} className={styles.compactItem}>
-                <InputNumber className={styles.numberInput} />
-              </Form.Item>
-            </Card>
-          </Col>
-
-          <Col xs={24} lg={8}>
-            <Card size="small" title="滤波" className={styles.sectionCard}>
-              <Form.Item label="跳过处理" name={['filter', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Form.Item label="平滑系数(alpha)" name={['filter', 'alpha']} rules={numberRules} className={styles.compactItem}>
-                <InputNumber className={styles.numberInput} />
-              </Form.Item>
-            </Card>
-          </Col>
-
-          <Col xs={24} lg={8}>
-            <Card size="small" title="姿态融合" className={styles.sectionCard}>
-              <Form.Item label="跳过处理" name={['attitude_fusion', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Form.Item label="融合增益(beta)" name={['attitude_fusion', 'beta']} rules={numberRules} className={styles.compactItem}>
-                <InputNumber className={styles.numberInput} />
-              </Form.Item>
-            </Card>
-          </Col>
-
-          <Col xs={24}>
-            <Card size="small" title="标定" className={styles.sectionCard}>
-              <Form.Item label="跳过处理" name={['calibration', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              {renderVec3Fields('加速度偏置(accel_bias)', ['calibration', 'accel_bias'])}
-              {renderVec3Fields('陀螺仪偏置(gyro_bias)', ['calibration', 'gyro_bias'])}
-              {renderMatrixField('加速度矩阵(accel_matrix)', 'accel_matrix')}
-              {renderMatrixField('陀螺仪矩阵(gyro_matrix)', 'gyro_matrix')}
-            </Card>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Card size="small" title="轨迹计算" className={styles.sectionCard}>
-              <Form.Item label="跳过处理" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
-                <Switch />
-              </Form.Item>
-            </Card>
-          </Col>
-
-          <Col xs={24} md={12}>
-            <Card size="small" title="EKF(扩展卡尔曼滤波)" className={styles.sectionCard}>
-              <Form.Item label="跳过处理" name={['ekf', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Form.Item label="启用" name={['ekf', 'enabled']} valuePropName="checked" className={styles.compactItem}>
-                <Switch />
-              </Form.Item>
-            </Card>
-          </Col>
-
-          <Col xs={24}>
-            <Card size="small" title="ZUPT(零速更新)" className={styles.sectionCard}>
-              <Form.Item label="跳过处理" name={['zupt', 'passby']} valuePropName="checked">
-                <Switch />
-              </Form.Item>
-              <Row gutter={12}>
-                <Col xs={24} md={8}>
-                  <Form.Item label="角速度阈值(gyro_thresh)" name={['zupt', 'gyro_thresh']} rules={numberRules} className={styles.compactItem}>
-                    <InputNumber className={styles.numberInput} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item label="加速度阈值(accel_thresh)" name={['zupt', 'accel_thresh']} rules={numberRules} className={styles.compactItem}>
-                    <InputNumber className={styles.numberInput} />
-                  </Form.Item>
-                </Col>
-                <Col xs={24} md={8}>
-                  <Form.Item label="偏置修正增益(bias_correction_gain)" name={['zupt', 'bias_correction_gain']} rules={numberRules} className={styles.compactItem}>
-                    <InputNumber className={styles.numberInput} />
-                  </Form.Item>
-                </Col>
-              </Row>
-            </Card>
-          </Col>
-        </Row>
+      <Form form={form} layout="vertical" initialValues={DEFAULT_CONFIG} onValuesChange={scheduleAutoApply} className={styles.settingsForm}>
+        <Tabs
+          className={styles.settingsTabs}
+          items={[
+            {
+              key: 'base',
+              label: '基础配置',
+              children: (
+                <div className={styles.tabPane}>
+                  <Row gutter={[12, 12]}>
+                    <Col xs={24} lg={6}>
+                      <Card size="small" title="全局" className={styles.sectionCard}>
+                        <Form.Item label="重力加速度" name={['global', 'gravity']} rules={numberRules} className={styles.compactItem}>
+                          <InputNumber className={styles.numberInput} />
+                        </Form.Item>
+                      </Card>
+                    </Col>
+                    <Col xs={24} lg={6}>
+                      <Card size="small" title="滤波" className={styles.sectionCard}>
+                        <Form.Item label="跳过处理" name={['filter', 'passby']} valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                        <Form.Item label="平滑系数(alpha)" name={['filter', 'alpha']} rules={numberRules} className={styles.compactItem}>
+                          <InputNumber className={styles.numberInput} />
+                        </Form.Item>
+                      </Card>
+                    </Col>
+                    <Col xs={24} lg={6}>
+                      <Card size="small" title="姿态融合" className={styles.sectionCard}>
+                        <Form.Item label="跳过处理" name={['attitude_fusion', 'passby']} valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                        <Form.Item label="融合增益(beta)" name={['attitude_fusion', 'beta']} rules={numberRules} className={styles.compactItem}>
+                          <InputNumber className={styles.numberInput} />
+                        </Form.Item>
+                      </Card>
+                    </Col>
+                    <Col xs={24} lg={6}>
+                      <Card size="small" title="轨迹计算" className={styles.sectionCard}>
+                        <Form.Item label="跳过处理" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
+                          <Switch />
+                        </Form.Item>
+                      </Card>
+                    </Col>
+                    <Col xs={24} lg={6}>
+                      <Card size="small" title="EKF(扩展卡尔曼滤波)" className={styles.sectionCard}>
+                        <Form.Item label="跳过处理" name={['ekf', 'passby']} valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                        <Form.Item label="启用" name={['ekf', 'enabled']} valuePropName="checked" className={styles.compactItem}>
+                          <Switch />
+                        </Form.Item>
+                      </Card>
+                    </Col>
+                    <Col xs={24} lg={18}>
+                      <Card size="small" title="ZUPT(零速更新)" className={styles.sectionCard}>
+                        <Form.Item label="跳过处理" name={['zupt', 'passby']} valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                        <Row gutter={12}>
+                          <Col xs={24} md={8}>
+                            <Form.Item label="角速度阈值(gyro_thresh)" name={['zupt', 'gyro_thresh']} rules={numberRules} className={styles.compactItem}>
+                              <InputNumber className={styles.numberInput} />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={8}>
+                            <Form.Item label="加速度阈值(accel_thresh)" name={['zupt', 'accel_thresh']} rules={numberRules} className={styles.compactItem}>
+                              <InputNumber className={styles.numberInput} />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={8}>
+                            <Form.Item label="偏置修正增益(bias_correction_gain)" name={['zupt', 'bias_correction_gain']} rules={numberRules} className={styles.compactItem}>
+                              <InputNumber className={styles.numberInput} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                      </Card>
+                    </Col>
+                  </Row>
+                </div>
+              ),
+            },
+            {
+              key: 'bias',
+              label: '标定偏置',
+              children: (
+                <div className={styles.tabPane}>
+                  <Card size="small" title="标定偏置" className={styles.sectionCard}>
+                    <Row gutter={12}>
+                      <Col xs={24} lg={8}>
+                        <Form.Item label="跳过处理" name={['calibration', 'passby']} valuePropName="checked">
+                          <Switch />
+                        </Form.Item>
+                      </Col>
+                    </Row>
+                    <Row gutter={12}>
+                      <Col xs={24} lg={12}>
+                        {renderVec3Fields('加速度偏置(accel_bias)', ['calibration', 'accel_bias'])}
+                      </Col>
+                      <Col xs={24} lg={12}>
+                        {renderVec3Fields('陀螺仪偏置(gyro_bias)', ['calibration', 'gyro_bias'])}
+                      </Col>
+                    </Row>
+                  </Card>
+                </div>
+              ),
+            },
+            {
+              key: 'matrix',
+              label: '标定矩阵',
+              children: (
+                <div className={styles.tabPane}>
+                  <Row gutter={12}>
+                    <Col xs={24} lg={12}>
+                      <Card size="small" title="加速度矩阵(accel_matrix)" className={styles.sectionCard}>
+                        {renderMatrixField(' ', 'accel_matrix')}
+                      </Card>
+                    </Col>
+                    <Col xs={24} lg={12}>
+                      <Card size="small" title="陀螺仪矩阵(gyro_matrix)" className={styles.sectionCard}>
+                        {renderMatrixField(' ', 'gyro_matrix')}
+                      </Card>
+                    </Col>
+                  </Row>
+                </div>
+              ),
+            },
+          ]}
+        />
       </Form>
     </div>
   );
