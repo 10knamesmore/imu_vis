@@ -59,10 +59,6 @@ pub struct ImuSampleCalibrated {
     pub accel: DVec3,
     /// 标定后的角速度（rad/s）。
     pub gyro: DVec3,
-    /// 使用的陀螺仪偏置。
-    pub bias_g: DVec3,
-    /// 使用的加速度计偏置。
-    pub bias_a: DVec3,
 }
 
 #[derive(Debug, Clone, Copy)]

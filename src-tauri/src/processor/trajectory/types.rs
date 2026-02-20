@@ -21,8 +21,4 @@ pub struct NavState {
     pub velocity: DVec3,
     /// 姿态四元数。
     pub attitude: DQuat,
-    /// 陀螺仪偏置。
-    pub bias_g: DVec3,
-    /// 加速度计偏置。
-    pub bias_a: DVec3,
 }

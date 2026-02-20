@@ -105,10 +105,6 @@ export interface ProcessorPipelineConfig {
     passby: boolean;
     alpha: number;
   };
-  attitude_fusion: {
-    passby: boolean;
-    beta: number;
-  };
   trajectory: {
     passby: boolean;
   };
@@ -116,10 +112,5 @@ export interface ProcessorPipelineConfig {
     passby: boolean;
     gyro_thresh: number;
     accel_thresh: number;
-    bias_correction_gain: number;
-  };
-  ekf: {
-    passby: boolean;
-    enabled: boolean;
   };
 }

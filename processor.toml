@@ -31,12 +31,7 @@ passby = true           # true = 跳过滤波，直接使用标定后的数据
                         # false = 应用低通滤波器
 alpha = 0.9             # 滤波系数（0~1），越大越平滑但延迟越高
 
-# --- 姿态融合模块 ---
-# 作用：融合 acc/gyro/mag 估算姿态四元数（Madgwick/Mahony 算法）
-[attitude_fusion]
-passby = true           # true = 跳过融合计算，直接使用硬件提供的 quat（适用于 IMU 自带姿态解算）
-                        # false = 通过软件算法重新计算姿态
-beta = 0.02             # 融合增益（仅 passby=false 时生效）
+# 姿态直接使用 IMU 原始四元数（quat），不做额外估计。
 
 # --- 三维轨迹计算模块 ---
 # 作用：通过姿态和加速度积分计算世界坐标系中的三维运动轨迹
@@ -51,11 +46,3 @@ passby = false          # true = 跳过零速检测
                         # false = 启用零速修正（适用于挥拍间歇等间歇运动）
 gyro_thresh = 0.15      # 陀螺仪静止阈值（rad/s）- 稍放宽以适应握拍轻微晃动
 accel_thresh = 0.3      # 加速度静止阈值（m/s²）- 稍放宽以容忍小幅晃动
-bias_correction_gain = 0.005  # 偏置修正增益 - 降低以避免震荡
-
-# --- 扩展卡尔曼滤波模块 (EKF) ---
-# 作用：融合多传感器数据，进一步优化导航结果
-[ekf]
-passby = true           # true = 跳过 EKF
-                        # false = 启用扩展卡尔曼滤波
-enabled = false         # 模块总开关（与 passby 配合使用）

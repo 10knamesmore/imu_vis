@@ -41,8 +41,6 @@ impl Calibration {
                 timestamp_ms: raw.timestamp_ms,
                 accel: raw.accel_with_g,
                 gyro: raw.gyro,
-                bias_g: self.state.bias_g,
-                bias_a: self.state.bias_a,
             };
         }
 
@@ -58,8 +56,6 @@ impl Calibration {
             timestamp_ms: raw.timestamp_ms,
             accel,
             gyro,
-            bias_g: self.state.bias_g,
-            bias_a: self.state.bias_a,
         }
     }
 

@@ -23,10 +23,8 @@ const DEFAULT_CONFIG: ProcessorPipelineConfig = {
     gyro_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
   },
   filter: { passby: false, alpha: 0.9 },
-  attitude_fusion: { passby: false, beta: 0.02 },
   trajectory: { passby: false },
-  zupt: { passby: false, gyro_thresh: 0.1, accel_thresh: 0.2, bias_correction_gain: 0.01 },
-  ekf: { passby: false, enabled: false },
+  zupt: { passby: false, gyro_thresh: 0.1, accel_thresh: 0.2 },
 };
 
 type MatrixField = 'accel_matrix' | 'gyro_matrix';
@@ -346,33 +344,13 @@ export const SettingsPanel = () => {
                       </Card>
                     </Col>
                     <Col xs={24} lg={6}>
-                      <Card size="small" title="姿态融合" className={styles.sectionCard}>
-                        <Form.Item label="跳过处理" name={['attitude_fusion', 'passby']} valuePropName="checked">
-                          <Switch />
-                        </Form.Item>
-                        <Form.Item label="融合增益(beta)" name={['attitude_fusion', 'beta']} rules={numberRules} className={styles.compactItem}>
-                          <InputNumber className={styles.numberInput} />
-                        </Form.Item>
-                      </Card>
-                    </Col>
-                    <Col xs={24} lg={6}>
                       <Card size="small" title="轨迹计算" className={styles.sectionCard}>
                         <Form.Item label="跳过处理" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
                           <Switch />
                         </Form.Item>
                       </Card>
                     </Col>
-                    <Col xs={24} lg={6}>
-                      <Card size="small" title="EKF(扩展卡尔曼滤波)" className={styles.sectionCard}>
-                        <Form.Item label="跳过处理" name={['ekf', 'passby']} valuePropName="checked">
-                          <Switch />
-                        </Form.Item>
-                        <Form.Item label="启用" name={['ekf', 'enabled']} valuePropName="checked" className={styles.compactItem}>
-                          <Switch />
-                        </Form.Item>
-                      </Card>
-                    </Col>
-                    <Col xs={24} lg={18}>
+                    <Col xs={24} lg={12}>
                       <Card size="small" title="ZUPT(零速更新)" className={styles.sectionCard}>
                         <Form.Item label="跳过处理" name={['zupt', 'passby']} valuePropName="checked">
                           <Switch />
@@ -385,11 +363,6 @@ export const SettingsPanel = () => {
                           </Col>
                           <Col xs={24} md={8}>
                             <Form.Item label="加速度阈值(accel_thresh)" name={['zupt', 'accel_thresh']} rules={numberRules} className={styles.compactItem}>
-                              <InputNumber className={styles.numberInput} />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={24} md={8}>
-                            <Form.Item label="偏置修正增益(bias_correction_gain)" name={['zupt', 'bias_correction_gain']} rules={numberRules} className={styles.compactItem}>
                               <InputNumber className={styles.numberInput} />
                             </Form.Item>
                           </Col>

@@ -19,6 +19,7 @@ const AppContent: React.FC = () => {
   const { connectedDevice, startScan, stopScan } = useBluetooth()
 
   const hasConnectedDevice = connectedDevice !== null;
+  const [wasConnected, setWasConnected] = useState(hasConnectedDevice);
 
   const items = [
     {
@@ -50,10 +51,11 @@ const AppContent: React.FC = () => {
   };
 
   useEffect(() => {
-    if (hasConnectedDevice && isDeviceModalOpen) {
+    if (!wasConnected && hasConnectedDevice && isDeviceModalOpen) {
       setIsDeviceModalOpen(false);
     }
-  }, [hasConnectedDevice, isDeviceModalOpen]);
+    setWasConnected(hasConnectedDevice);
+  }, [hasConnectedDevice, isDeviceModalOpen, wasConnected]);
 
   return (
     <Layout className={styles.appLayout}>

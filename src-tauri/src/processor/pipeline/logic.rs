@@ -9,9 +9,7 @@ use anyhow::Context;
 
 use crate::{
     processor::{
-        attitude_fusion::AttitudeFusion,
         calibration::{AxisCalibration, Calibration, CorrectionRequest},
-        ekf::EkfProcessor,
         filter::LowPassFilter,
         output::{OutputBuilder, OutputFrame},
         parser::{ImuParser, ImuSampleRaw},
@@ -27,10 +25,8 @@ pub struct ProcessorPipeline {
     axis_calibration: AxisCalibration,
     calibration: Calibration,
     filter: LowPassFilter,
-    attitude_fusion: AttitudeFusion,
     trajectory: TrajectoryCalculator,
     zupt: ZuptDetector,
-    ekf: EkfProcessor,
     latest_raw: Option<ImuSampleRaw>,
 }
 
@@ -51,10 +47,8 @@ impl ProcessorPipeline {
             axis_calibration: AxisCalibration::new(),
             calibration: Calibration::new(config.calibration),
             filter: LowPassFilter::new(config.filter),
-            attitude_fusion: AttitudeFusion::new(config.attitude_fusion),
             trajectory: TrajectoryCalculator::new(config.trajectory, config.global.gravity),
             zupt: ZuptDetector::new(config.zupt, config.global.gravity),
-            ekf: EkfProcessor::new(config.ekf),
             latest_raw: None,
         }
     }
@@ -83,17 +77,11 @@ impl ProcessorPipeline {
         self.latest_raw = Some(raw);
         self.axis_calibration.apply(&mut raw);
 
-        // 处理链：标定 -> 滤波 -> 姿态融合 -> 轨迹计算 -> ZUPT -> EKF -> 输出
+        // 处理链：标定 -> 滤波 -> 轨迹计算 -> ZUPT -> 输出
         let calibrated = self.calibration.update(&raw);
         let filtered = self.filter.apply(&calibrated);
-        let attitude = self.attitude_fusion.update(&filtered, Some(raw.quat));
-        let nav = self.trajectory.calculate(&attitude, &filtered);
-        let (nav, obs) = self.zupt.apply(nav, &filtered);
-
-        // ZUPT 修正后的状态反馈回 Trajectory（关键：闭环反馈）
-        self.trajectory.sync_state(&nav);
-
-        let nav = self.ekf.update(nav, &obs);
+        let nav = self.trajectory.calculate(raw.quat, &filtered);
+        let nav = self.zupt.apply(nav, &filtered);
 
         let frame = OutputFrame { raw, nav };
         Some(OutputBuilder::build(&frame))
@@ -104,10 +92,8 @@ impl ProcessorPipeline {
         self.axis_calibration.reset();
         self.calibration.reset();
         self.filter.reset();
-        self.attitude_fusion.reset();
         self.trajectory.reset();
         self.zupt.reset();
-        self.ekf.reset();
         self.latest_raw = None;
     }
 
@@ -166,6 +152,12 @@ fn read_config_with_modified(path: &Path) -> anyhow::Result<(ProcessorPipelineCo
         .with_context(|| format!("读取文件元数据失败: {}", path.display()))?
         .modified()
         .with_context(|| format!("读取文件修改时间失败: {}", path.display()))?;
+    let absolute_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    tracing::info!(
+        "读取 processor 配置文件 | path: {} | content:\n{}",
+        absolute_path.display(),
+        content
+    );
     let config = toml::from_str::<ProcessorPipelineConfig>(&content)
         .with_context(|| format!("解析 TOML 配置失败: {}", path.display()))?;
     Ok((config, modified))

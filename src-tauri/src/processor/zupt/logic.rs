@@ -4,7 +4,7 @@ use math_f64::DVec3;
 
 use crate::processor::filter::ImuSampleFiltered;
 use crate::processor::trajectory::NavState;
-use crate::processor::zupt::types::{ZuptConfig, ZuptObservation};
+use crate::processor::zupt::types::ZuptConfig;
 
 /// ZUPT 静止检测器。
 pub struct ZuptDetector {
@@ -30,19 +30,15 @@ impl ZuptDetector {
     /// - `sample`: 滤波后的 IMU 样本。
     ///
     /// 返回:
-    /// - 更新后的导航状态与静止观测。
+    /// - 更新后的导航状态。
     ///
     /// 公式:
     /// - `a_lin = R(q) * a_lp - g * 9.80665`
     /// - `is_static = |w| < gyro_thresh && |a_lin| < accel_thresh`
     /// - `v = 0`, `b_a = b_a + a_lin * gain` (静止时)
-    pub fn apply(
-        &mut self,
-        mut nav: NavState,
-        sample: &ImuSampleFiltered,
-    ) -> (NavState, ZuptObservation) {
+    pub fn apply(&mut self, mut nav: NavState, sample: &ImuSampleFiltered) -> NavState {
         if self.config.passby {
-            return (nav, ZuptObservation { is_static: false });
+            return nav;
         }
 
         let gyro_norm = sample.gyro_lp.length();
@@ -74,23 +70,21 @@ impl ZuptDetector {
         }
 
         if is_static {
-            // 静止时速度归零，并做偏置回归
+            // 静止时速度归零
             let vel_before = nav.velocity;
             nav.velocity = DVec3::ZERO;
-            nav.bias_a += accel_lin * self.config.bias_correction_gain;
-            
+
             // 每秒打印一次详细状态（仅在静止时）
             if sample.timestamp_ms % 1000 < 4 {
                 tracing::info!(
-                    "ZUPT 静止修正 | vel_before=[{:.3}, {:.3}, {:.3}] → [0, 0, 0] | bias_a=[{:.4}, {:.4}, {:.4}] | a_lin=[{:.3}, {:.3}, {:.3}]",
+                    "ZUPT 静止修正 | vel_before=[{:.3}, {:.3}, {:.3}] → [0, 0, 0] | a_lin=[{:.3}, {:.3}, {:.3}]",
                     vel_before.x, vel_before.y, vel_before.z,
-                    nav.bias_a.x, nav.bias_a.y, nav.bias_a.z,
                     accel_lin.x, accel_lin.y, accel_lin.z
                 );
             }
         }
 
-        (nav, ZuptObservation { is_static })
+        nav
     }
 
     /// 重置 ZUPT 状态。
