@@ -152,12 +152,6 @@ fn read_config_with_modified(path: &Path) -> anyhow::Result<(ProcessorPipelineCo
         .with_context(|| format!("读取文件元数据失败: {}", path.display()))?
         .modified()
         .with_context(|| format!("读取文件修改时间失败: {}", path.display()))?;
-    let absolute_path = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
-    tracing::info!(
-        "读取 processor 配置文件 | path: {} | content:\n{}",
-        absolute_path.display(),
-        content
-    );
     let config = toml::from_str::<ProcessorPipelineConfig>(&content)
         .with_context(|| format!("解析 TOML 配置失败: {}", path.display()))?;
     Ok((config, modified))
