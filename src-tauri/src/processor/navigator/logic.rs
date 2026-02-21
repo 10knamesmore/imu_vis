@@ -57,6 +57,12 @@ impl Navigator {
             position.z
         );
         self.nav_state.position = position;
+        // 坐标校正后清零速度，避免残余速度导致下一帧继续积分偏移。
+        self.nav_state.velocity = DVec3::ZERO;
+        // 若当前处于静止锁定，需同步锁定点，否则会被旧锁定点覆盖回去。
+        if self.last_is_static == Some(true) {
+            self.static_position = Some(position);
+        }
     }
 
     /// 重置内部状态。
@@ -214,5 +220,46 @@ mod tests {
         let nav_static_1 = navigator.update(attitude, &static_1);
         assert!(nav_static_1.velocity.length() < 1e-12);
         assert!((nav_static_1.position.z - nav_static_0.position.z).abs() < 1e-12);
+    }
+
+    #[test]
+    fn set_position_updates_static_lock_point_when_stationary() {
+        let gravity = 9.80665;
+        let mut navigator = Navigator::new(NavigatorConfig {
+            gravity,
+            trajectory: TrajectoryConfig { passby: false },
+            zupt: ZuptConfig {
+                passby: false,
+                gyro_thresh: 0.2,
+                accel_thresh: 0.2,
+            },
+        });
+
+        let attitude = DQuat::IDENTITY;
+        let static_0 = ImuSampleFiltered {
+            timestamp_ms: 0,
+            accel_lp: DVec3::new(0.0, 0.0, gravity + 0.01),
+            gyro_lp: DVec3::new(0.01, 0.01, 0.01),
+        };
+        let static_1 = ImuSampleFiltered {
+            timestamp_ms: 20,
+            accel_lp: DVec3::new(0.0, 0.0, gravity + 0.01),
+            gyro_lp: DVec3::new(0.01, 0.01, 0.01),
+        };
+
+        let _ = navigator.update(attitude, &static_0);
+        let _ = navigator.update(attitude, &static_1);
+
+        navigator.set_position(DVec3::ZERO);
+
+        let static_2 = ImuSampleFiltered {
+            timestamp_ms: 40,
+            accel_lp: DVec3::new(0.0, 0.0, gravity + 0.01),
+            gyro_lp: DVec3::new(0.01, 0.01, 0.01),
+        };
+        let nav = navigator.update(attitude, &static_2);
+
+        assert!(nav.velocity.length() < 1e-12);
+        assert!(nav.position.length() < 1e-12);
     }
 }
