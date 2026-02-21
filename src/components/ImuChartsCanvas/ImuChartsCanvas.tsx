@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "antd";
 
 import type { ImuHistoryWindow } from "../../utils/ImuHistoryBuffer";
@@ -22,11 +22,32 @@ type ImuChartsCanvasProps = {
 };
 
 type SeriesVisibilityMap = Record<string, boolean>;
+type TimelineDragState = {
+  active: boolean;
+  pointerId: number | null;
+  startX: number;
+  startThumbLeft: number;
+};
+type TimelineViewState = {
+  historySpanMs: number;
+  durationMs: number;
+  offsetMs: number;
+};
+type TimelineMetrics = {
+  trackWidthPx: number;
+  thumbWidthPx: number;
+  thumbLeftPx: number;
+  movablePx: number;
+  maxOffsetMs: number;
+};
 
 /**
  * 运行时缓存：在同一页面会话中记忆各图表的序列勾选状态。
  */
 const visibilityCache = new Map<string, SeriesVisibilityMap>();
+const MIN_DURATION_MS = 1000;
+const MAX_DURATION_MS = 60000;
+const TIMELINE_THUMB_MIN_PX = 24;
 
 /**
  * 按当前 series 生成可见性映射，缺省值为 true。
@@ -65,6 +86,105 @@ const isSameVisibilityMap = (left: SeriesVisibilityMap, right: SeriesVisibilityM
 };
 
 /**
+ * 将值限制到给定范围内。
+ *
+ * @param value - 输入值
+ * @param min - 最小值
+ * @param max - 最大值
+ * @returns 裁剪后的值
+ */
+const clamp = (value: number, min: number, max: number) => {
+  return Math.min(Math.max(value, min), max);
+};
+
+/**
+ * 计算 offset 允许的最大值。
+ *
+ * @param historySpanMs - 当前可回看总时长
+ * @param durationMs - 当前显示窗口时长
+ * @returns 最大 offset（毫秒）
+ */
+const getMaxOffsetMs = (historySpanMs: number, durationMs: number) => {
+  return Math.max(0, historySpanMs - durationMs);
+};
+
+/**
+ * 约束 duration 到允许区间。
+ *
+ * @param durationMs - 期望窗口时长
+ * @returns 合法窗口时长
+ */
+const clampDurationMs = (durationMs: number) => {
+  return clamp(durationMs, MIN_DURATION_MS, MAX_DURATION_MS);
+};
+
+/**
+ * 约束 offset 到当前历史范围内。
+ *
+ * @param offsetMs - 期望偏移量
+ * @param historySpanMs - 当前可回看总时长
+ * @param durationMs - 当前显示窗口时长
+ * @returns 合法偏移量
+ */
+const clampOffsetMs = (offsetMs: number, historySpanMs: number, durationMs: number) => {
+  const maxOffsetMs = getMaxOffsetMs(historySpanMs, durationMs);
+  return clamp(offsetMs, 0, maxOffsetMs);
+};
+
+/**
+ * 计算时间进度条的滑块几何信息。
+ *
+ * @param historySpanMs - 当前可回看总时长
+ * @param durationMs - 当前显示窗口时长
+ * @param offsetMs - 当前偏移量
+ * @param trackWidthPx - 轨道宽度
+ * @returns 滑块宽度/位置等指标
+ */
+const getTimelineMetrics = (
+  historySpanMs: number,
+  durationMs: number,
+  offsetMs: number,
+  trackWidthPx: number
+): TimelineMetrics => {
+  const safeTrackWidth = Math.max(0, trackWidthPx);
+  const maxOffsetMs = getMaxOffsetMs(historySpanMs, durationMs);
+  if (safeTrackWidth <= 0 || historySpanMs <= 0) {
+    return {
+      trackWidthPx: safeTrackWidth,
+      thumbWidthPx: safeTrackWidth,
+      thumbLeftPx: 0,
+      movablePx: 0,
+      maxOffsetMs,
+    };
+  }
+
+  const rawThumbWidth = (durationMs / historySpanMs) * safeTrackWidth;
+  const thumbWidthPx = clamp(rawThumbWidth, Math.min(TIMELINE_THUMB_MIN_PX, safeTrackWidth), safeTrackWidth);
+  const movablePx = Math.max(0, safeTrackWidth - thumbWidthPx);
+  const clampedOffsetMs = clampOffsetMs(offsetMs, historySpanMs, durationMs);
+  const positionRatio = maxOffsetMs > 0 ? 1 - (clampedOffsetMs / maxOffsetMs) : 1;
+  const thumbLeftPx = movablePx * positionRatio;
+
+  return {
+    trackWidthPx: safeTrackWidth,
+    thumbWidthPx,
+    thumbLeftPx,
+    movablePx,
+    maxOffsetMs,
+  };
+};
+
+/**
+ * 把毫秒格式化为秒文本。
+ *
+ * @param valueMs - 毫秒值
+ * @returns 秒文本（1 位小数）
+ */
+const formatSeconds = (valueMs: number) => {
+  return `${(Math.max(0, valueMs) / 1000).toFixed(1)}s`;
+};
+
+/**
  * 在 Canvas 上绘制折线图。
  *
  * @param ctx - Canvas 2D 绘图上下文
@@ -82,6 +202,7 @@ const drawChart = (
   width: number,
   height: number
 ) => {
+  const yPaddingRatio = 0.1;
   const padding = {
     left: 52,
     right: 12,
@@ -113,7 +234,10 @@ const drawChart = (
     min -= 1;
     max += 1;
   }
-  const range = max - min;
+  const yPadding = (max - min) * yPaddingRatio;
+  const displayMin = min - yPadding;
+  const displayMax = max + yPadding;
+  const range = displayMax - displayMin;
 
   const xTicks = 5;
   const yTicks = 5;
@@ -150,7 +274,7 @@ const drawChart = (
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   for (let i = 0; i <= yTicks; i += 1) {
-    const value = max - (i / yTicks) * range;
+    const value = displayMax - (i / yTicks) * range;
     const y = padding.top + (i / yTicks) * plotHeight;
     ctx.fillText(value.toFixed(2), padding.left - 6, y);
   }
@@ -179,7 +303,7 @@ const drawChart = (
       const t = window.getTime(i);
       const v = window.getValue(s.buffer, i);
       const x = padding.left + ((t - earliestTime) / timeSpan) * plotWidth;
-      const y = padding.top + plotHeight - ((v - min) / range) * plotHeight;
+      const y = padding.top + plotHeight - ((v - displayMin) / range) * plotHeight;
       if (i === 0) {
         ctx.moveTo(x, y);
       } else {
@@ -219,20 +343,75 @@ export const ImuChartsCanvas = ({
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** Canvas 元素的引用，用于获取绘图上下文 */
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** 时间进度条轨道引用。 */
+  const timelineTrackRef = useRef<HTMLDivElement | null>(null);
   const [latestStats, setLatestStats] = useState<Array<{ name: string; color: string; value?: number }>>([]);
   /** 每个序列是否可见。 */
   const [seriesVisibility, setSeriesVisibility] = useState<SeriesVisibilityMap>(() =>
     buildSeriesVisibilityMap(series, visibilityCache.get(visibilityKey))
   );
+  /** 时间进度条视图状态。 */
+  const [timelineView, setTimelineView] = useState<TimelineViewState>({
+    historySpanMs: 0,
+    durationMs: clampDurationMs(windowMs || 10000),
+    offsetMs: 0,
+  });
+  /** 时间进度条轨道宽度。 */
+  const [timelineTrackWidth, setTimelineTrackWidth] = useState(0);
   const lastStatsUpdateRef = useRef(0);
+  const lastTimelineUpdateRef = useRef(0);
+  const latestTimeRef = useRef<number | null>(null);
+  const historySpanRef = useRef(0);
+  const timelineDragRef = useRef<TimelineDragState>({
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startThumbLeft: 0,
+  });
 
   /** 视图状态：时间窗口长度和偏移量 */
   const viewStateRef = useRef({
-    duration: windowMs || 10000,
+    duration: clampDurationMs(windowMs || 10000),
     offset: 0, // 距离最新数据的偏移量（毫秒），0 表示跟随最新
     isDragging: false,
     lastX: 0,
   });
+
+  /**
+   * 同步时间进度条显示状态。
+   *
+   * @param historySpanMs - 当前可回看总时长
+   * @param durationMs - 当前窗口时长
+   * @param offsetMs - 当前偏移量
+   * @param force - 是否强制刷新
+   */
+  const syncTimelineView = useCallback(
+    (historySpanMs: number, durationMs: number, offsetMs: number, force = false) => {
+      const normalizedDuration = clampDurationMs(durationMs);
+      const normalizedOffset = clampOffsetMs(offsetMs, historySpanMs, normalizedDuration);
+      historySpanRef.current = historySpanMs;
+      const now = Date.now();
+      if (!force && now - lastTimelineUpdateRef.current < 50) {
+        return;
+      }
+      lastTimelineUpdateRef.current = now;
+      setTimelineView((prev) => {
+        if (
+          Math.abs(prev.historySpanMs - historySpanMs) < 1 &&
+          Math.abs(prev.durationMs - normalizedDuration) < 1 &&
+          Math.abs(prev.offsetMs - normalizedOffset) < 1
+        ) {
+          return prev;
+        }
+        return {
+          historySpanMs,
+          durationMs: normalizedDuration,
+          offsetMs: normalizedOffset,
+        };
+      });
+    },
+    []
+  );
 
   /**
    * 监听滚轮事件：缩放时间窗口
@@ -240,10 +419,10 @@ export const ImuChartsCanvas = ({
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
-    viewStateRef.current.duration = Math.max(
-      1000, // 最小显示 1 秒
-      Math.min(60000, viewStateRef.current.duration * zoomFactor) // 最大显示 60 秒
-    );
+    const nextDuration = clampDurationMs(viewStateRef.current.duration * zoomFactor);
+    viewStateRef.current.duration = nextDuration;
+    viewStateRef.current.offset = clampOffsetMs(viewStateRef.current.offset, historySpanRef.current, nextDuration);
+    syncTimelineView(historySpanRef.current, nextDuration, viewStateRef.current.offset, true);
   };
 
   /**
@@ -268,10 +447,9 @@ export const ImuChartsCanvas = ({
     const msPerPixel = duration / (canvasRef.current?.getBoundingClientRect().width || 1);
 
     // 拖动方向与数据移动方向相反
-    viewStateRef.current.offset = Math.max(
-      0,
-      viewStateRef.current.offset + dx * msPerPixel
-    );
+    const nextOffset = viewStateRef.current.offset + dx * msPerPixel;
+    viewStateRef.current.offset = clampOffsetMs(nextOffset, historySpanRef.current, duration);
+    syncTimelineView(historySpanRef.current, duration, viewStateRef.current.offset, true);
   };
 
   /**
@@ -305,6 +483,87 @@ export const ImuChartsCanvas = ({
     });
   };
 
+  /**
+   * 时间进度条几何信息：滑块宽度、位置、可移动范围。
+   */
+  const timelineMetrics = useMemo(
+    () => getTimelineMetrics(timelineView.historySpanMs, timelineView.durationMs, timelineView.offsetMs, timelineTrackWidth),
+    [timelineTrackWidth, timelineView.durationMs, timelineView.historySpanMs, timelineView.offsetMs]
+  );
+
+  /**
+   * 点击轨道后跳转到对应历史位置。
+   *
+   * @param event - PointerEvent
+   */
+  const handleTimelineTrackPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (timelineMetrics.trackWidthPx <= 0) {
+      return;
+    }
+    const rect = event.currentTarget.getBoundingClientRect();
+    const clickX = clamp(event.clientX - rect.left, 0, timelineMetrics.trackWidthPx);
+    const targetLeft = clamp(
+      clickX - timelineMetrics.thumbWidthPx / 2,
+      0,
+      timelineMetrics.movablePx
+    );
+    const nextOffsetMs = timelineMetrics.movablePx > 0
+      ? (1 - targetLeft / timelineMetrics.movablePx) * timelineMetrics.maxOffsetMs
+      : 0;
+    viewStateRef.current.offset = nextOffsetMs;
+    syncTimelineView(historySpanRef.current, viewStateRef.current.duration, nextOffsetMs, true);
+  };
+
+  /**
+   * 滑块指针按下：记录拖拽起点。
+   *
+   * @param event - PointerEvent
+   */
+  const handleTimelineThumbPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    event.currentTarget.setPointerCapture(event.pointerId);
+    timelineDragRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startThumbLeft: timelineMetrics.thumbLeftPx,
+    };
+  };
+
+  /**
+   * 滑块拖动：更新 offset 并驱动图表平移。
+   *
+   * @param event - PointerEvent
+   */
+  const handleTimelineThumbPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = timelineDragRef.current;
+    if (!drag.active || drag.pointerId !== event.pointerId) {
+      return;
+    }
+    const dx = event.clientX - drag.startX;
+    const targetLeft = clamp(drag.startThumbLeft + dx, 0, timelineMetrics.movablePx);
+    const nextOffsetMs = timelineMetrics.movablePx > 0
+      ? (1 - targetLeft / timelineMetrics.movablePx) * timelineMetrics.maxOffsetMs
+      : 0;
+    viewStateRef.current.offset = nextOffsetMs;
+    syncTimelineView(historySpanRef.current, viewStateRef.current.duration, nextOffsetMs, true);
+  };
+
+  /**
+   * 滑块拖拽结束。
+   *
+   * @param event - PointerEvent
+   */
+  const handleTimelineThumbPointerUp = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (!timelineDragRef.current.active || timelineDragRef.current.pointerId !== event.pointerId) {
+      return;
+    }
+    timelineDragRef.current.active = false;
+    timelineDragRef.current.pointerId = null;
+    event.currentTarget.releasePointerCapture(event.pointerId);
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -321,6 +580,28 @@ export const ImuChartsCanvas = ({
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointerleave", handlePointerUp);
+    };
+  }, []);
+
+  /**
+   * Effect: 同步时间进度条轨道宽度。
+   */
+  useEffect(() => {
+    const timelineTrack = timelineTrackRef.current;
+    if (!timelineTrack) {
+      return undefined;
+    }
+
+    const resize = () => {
+      setTimelineTrackWidth(timelineTrack.getBoundingClientRect().width);
+    };
+
+    const observer = new ResizeObserver(resize);
+    observer.observe(timelineTrack);
+    resize();
+
+    return () => {
+      observer.disconnect();
     };
   }, []);
 
@@ -383,15 +664,36 @@ export const ImuChartsCanvas = ({
       ctx.fillStyle = "#0c1119";
       ctx.fillRect(0, 0, width, height);
 
+      const fullHistoryWindow = source.bufferRef.current.getWindow(Number.MAX_SAFE_INTEGER, 0);
+      const historySpanMs = fullHistoryWindow.count >= 2
+        ? fullHistoryWindow.getTime(fullHistoryWindow.count - 1) - fullHistoryWindow.getTime(0)
+        : 0;
+      const latestHistoryTime = fullHistoryWindow.count > 0
+        ? fullHistoryWindow.getTime(fullHistoryWindow.count - 1)
+        : null;
+      const durationMs = clampDurationMs(viewStateRef.current.duration);
+      viewStateRef.current.duration = durationMs;
+
+      if (
+        latestHistoryTime !== null &&
+        latestTimeRef.current !== null &&
+        latestHistoryTime > latestTimeRef.current &&
+        viewStateRef.current.offset > 0
+      ) {
+        viewStateRef.current.offset += latestHistoryTime - latestTimeRef.current;
+      }
+      latestTimeRef.current = latestHistoryTime;
+      viewStateRef.current.offset = clampOffsetMs(viewStateRef.current.offset, historySpanMs, durationMs);
+      syncTimelineView(historySpanMs, durationMs, viewStateRef.current.offset);
+
       if (!enabled) {
         ctx.fillStyle = "#6b7280";
         ctx.fillText("图表已暂停", 16, 20);
         return;
       }
 
-      // 获取全部历史数据
-      const { duration, offset } = viewStateRef.current;
-      const window = source.bufferRef.current.getWindow(duration, offset);
+      // 获取当前窗口数据
+      const window = source.bufferRef.current.getWindow(durationMs, viewStateRef.current.offset);
       if (window.count < 2) {
         ctx.fillStyle = "#6b7280";
         ctx.fillText("等待 IMU 数据流...", 16, 20);
@@ -433,7 +735,7 @@ export const ImuChartsCanvas = ({
     return () => {
       window.clearInterval(timer);
     };
-  }, [enabled, refreshMs, source, windowMs, label, series, seriesVisibility]);
+  }, [enabled, refreshMs, source, label, series, seriesVisibility, syncTimelineView]);
 
   /**
    * 以 series 定义为主，组合最新值，保证 checkbox 始终可见。
@@ -453,11 +755,36 @@ export const ImuChartsCanvas = ({
   const unit = label.includes("(")
     ? label.slice(label.indexOf("(") + 1, label.lastIndexOf(")"))
     : label;
+  const isTimelineDisabled = timelineView.historySpanMs <= 0 || timelineMetrics.trackWidthPx <= 0;
 
   return (
     <div className={styles.imuChartsCanvas}>
-      <div className={styles.canvasArea} ref={containerRef}>
-        <canvas ref={canvasRef} aria-label={label} />
+      <div className={styles.chartColumn}>
+        <div className={styles.canvasArea} ref={containerRef}>
+          <canvas ref={canvasRef} aria-label={label} />
+        </div>
+        <div className={`${styles.timelineWrap} ${isTimelineDisabled ? styles.timelineDisabled : ""}`.trim()}>
+          <div
+            ref={timelineTrackRef}
+            className={styles.timelineTrack}
+            onPointerDown={handleTimelineTrackPointerDown}
+          >
+            <div
+              className={styles.timelineThumb}
+              style={{
+                width: `${timelineMetrics.thumbWidthPx}px`,
+                transform: `translateX(${timelineMetrics.thumbLeftPx}px)`,
+              }}
+              onPointerDown={handleTimelineThumbPointerDown}
+              onPointerMove={handleTimelineThumbPointerMove}
+              onPointerUp={handleTimelineThumbPointerUp}
+              onPointerCancel={handleTimelineThumbPointerUp}
+            />
+          </div>
+          <div className={styles.timelineMeta}>
+            范围 {formatSeconds(timelineView.durationMs)} · 位置 回退 {formatSeconds(timelineView.offsetMs)}
+          </div>
+        </div>
       </div>
       <div className={styles.statsColumn}>
         {statEntries.map((entry) => {
