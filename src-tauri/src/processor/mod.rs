@@ -93,7 +93,7 @@ impl Processor {
                         CalibrationClosed,
                         Reset,
                         ConfigUpdated(Box<ProcessorPipelineConfig>),
-                        PipelineConfigRequest(PipelineConfigRequest),
+                        PipelineConfigRequest(Box<PipelineConfigRequest>),
                         ConfigClosed,
                         PipelineConfigClosed,
                         Shutdown,
@@ -121,7 +121,7 @@ impl Processor {
                     selector = selector.recv(&shutdown_rx, |_result| PipelineEvent::Shutdown);
 
                     selector = selector.recv(&pipeline_config_rx, |result| match result {
-                        Ok(request) => PipelineEvent::PipelineConfigRequest(request),
+                        Ok(request) => PipelineEvent::PipelineConfigRequest(Box::new(request)),
                         Err(e) => {
                             tracing::warn!("从 pipeline 配置请求通道接收失败: {:?}", e);
                             PipelineEvent::PipelineConfigClosed
@@ -175,15 +175,16 @@ impl Processor {
                             }
                             tracing::info!("处理管线配置已更新");
                         }
-                        PipelineEvent::PipelineConfigRequest(request) => match request {
+                        PipelineEvent::PipelineConfigRequest(request) => match *request {
                             PipelineConfigRequest::Get { respond_to } => {
                                 if respond_to.send(current_config.clone()).is_err() {
                                     tracing::warn!("返回 pipeline 配置失败: 接收端已关闭");
                                 }
                             }
                             PipelineConfigRequest::Update { config, respond_to } => {
-                                current_config = config.clone();
-                                pipeline.reset_with_config(config);
+                                let new_config = *config;
+                                current_config = new_config.clone();
+                                pipeline.reset_with_config(new_config);
                                 if let Err(e) = app_handle.emit("config_update", ()) {
                                     tracing::warn!("推送 config_update 事件失败: {:?}", e);
                                 }

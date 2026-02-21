@@ -81,7 +81,10 @@ impl PipelineConfigHandle {
     pub async fn update_config(&self, config: ProcessorPipelineConfig) -> Result<(), &'static str> {
         let (respond_to, response_rx) = oneshot::channel();
         self.tx
-            .send(PipelineConfigRequest::Update { config, respond_to })
+            .send(PipelineConfigRequest::Update {
+                config: Box::new(config),
+                respond_to,
+            })
             .map_err(|_| PIPELINE_CONFIG_ERROR)?;
         response_rx.await.map_err(|_| PIPELINE_CONFIG_ERROR)?
     }

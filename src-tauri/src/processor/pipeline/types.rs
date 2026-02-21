@@ -45,7 +45,7 @@ pub enum PipelineConfigRequest {
     /// 更新并立即应用配置。
     Update {
         /// 新配置。
-        config: ProcessorPipelineConfig,
+        config: Box<ProcessorPipelineConfig>,
         /// 请求响应通道。
         respond_to: oneshot::Sender<Result<(), &'static str>>,
     },
