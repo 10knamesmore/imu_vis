@@ -12,12 +12,19 @@ type SeriesSpec = {
 };
 
 type ImuChartsCanvasProps = {
+  /** 图表数据源，提供历史窗口读取能力。 */
   source: { bufferRef: React.RefObject<{ getWindow: (durationMs: number, offsetMs: number) => ImuHistoryWindow }> };
+  /** 是否启用图表渲染。 */
   enabled: boolean;
+  /** 重绘间隔（毫秒），用于控制刷新频率。 */
   refreshMs?: number;
+  /** 初始时间窗口大小（毫秒）。 */
   windowMs?: number;
+  /** 图表名称/纵轴描述文本。 */
   label: string;
+  /** 图表可见性缓存键，用于记忆序列勾选状态。 */
   visibilityKey: string;
+  /** 需要绘制的序列列表。 */
   series: SeriesSpec[];
 };
 

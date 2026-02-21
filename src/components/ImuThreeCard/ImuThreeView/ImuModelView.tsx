@@ -6,10 +6,15 @@ import { useThreeBase } from "./useThreeBase";
 import styles from "./ImuThreeView.module.scss";
 
 type ImuModelViewProps = {
+  /** IMU 数据源，提供最新姿态与位移数据。 */
   source: ImuSource;
+  /** 是否显示轨迹。 */
   showTrajectory: boolean;
+  /** 轨迹各分量开关配置。 */
   trajectoryOption: TrajectoryOption;
+  /** 是否使用后端计算姿态数据。 */
   useCalculated: boolean;
+  /** 轨迹重置计数器，变化时清空轨迹。 */
   trailResetToken: number;
 };
 

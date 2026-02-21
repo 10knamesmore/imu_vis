@@ -5,19 +5,30 @@ import { ResponseData } from "../types";
 import { ImuHistoryBuffer } from "../utils/ImuHistoryBuffer";
 
 export type ImuSource = {
+  /** 环形历史缓冲区引用，供图表窗口读取。 */
   bufferRef: React.RefObject<ImuHistoryBuffer>;
+  /** 最新一帧 IMU 数据引用。 */
   latestRef: React.RefObject<ResponseData | null>;
+  /** 当前数据流起始时间戳（毫秒）引用。 */
   streamStartMsRef: React.RefObject<number | null>;
+  /** 当前数据源模式（实时/回放）引用。 */
   sourceModeRef: React.RefObject<"live" | "replay">;
+  /** 清空当前缓冲与状态。 */
   reset: () => void;
 };
 
 type UseImuSourceOptions = {
+  /** 是否启用数据源订阅。 */
   enabled: boolean;
+  /** 历史缓冲区容量。 */
   capacity: number;
+  /** 是否进入回放模式。 */
   replaying?: boolean;
+  /** 回放样本数据。 */
   replaySamples?: ResponseData[] | null;
+  /** 回放会话 ID。 */
   replaySessionId?: number | null;
+  /** 回放版本号（变化时触发重新回放）。 */
   replayVersion?: number;
 };
 

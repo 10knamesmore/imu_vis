@@ -24,6 +24,7 @@ const formatDuration = (start: number, end?: number | null) => {
  * 录制记录管理面板组件。
  */
 type RecordingsPanelProps = {
+  /** 是否以内嵌模式渲染（用于 Modal 内显示，关闭外层 Card 容器）。 */
   embedded?: boolean;
 };
 

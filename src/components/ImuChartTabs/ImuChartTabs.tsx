@@ -5,6 +5,7 @@ import type { TabsProps } from "antd";
 import styles from "./ImuChartTabs.module.scss";
 
 type ImuChartTabsProps = {
+  /** 图表页签项配置，直接透传给 Ant Design Tabs。 */
   items: TabsProps["items"];
 };
 

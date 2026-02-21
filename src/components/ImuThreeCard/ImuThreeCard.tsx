@@ -10,7 +10,9 @@ import styles from "./ImuThreeCard.module.scss";
 import type { TrajectoryOption } from "./ImuThreeView/ImuThreeView";
 
 type ImuThreeCardProps = {
+  /** Three 视图使用的 IMU 数据源。 */
   source: ImuSource;
+  /** 外部触发的回放轨迹重置计数器，每次变化会清空轨迹。 */
   replayTrailResetToken?: number;
 };
 
