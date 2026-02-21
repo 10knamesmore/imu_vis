@@ -68,6 +68,8 @@ impl ProcessorPipeline {
         *self = Self::new(config);
         if let Some(raw) = last_raw {
             self.axis_calibration.update_from_raw(&raw);
+            self.navigator
+                .set_gravity_reference(self.axis_calibration.quat_offset);
         }
     }
 
@@ -110,6 +112,8 @@ impl ProcessorPipeline {
                 let result = match self.latest_raw {
                     Some(raw) => {
                         self.axis_calibration.update_from_raw(&raw);
+                        self.navigator
+                            .set_gravity_reference(self.axis_calibration.quat_offset);
                         Ok(())
                     }
                     None => Err("在前未接收到任何原始数据包，无法进行校准"),

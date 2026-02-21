@@ -16,6 +16,7 @@ use crate::processor::{
 pub struct Navigator {
     config: NavigatorConfig,
     nav_state: NavState,
+    gravity_ref: DVec3,
     last_timestamp_ms: Option<u64>,
     last_is_static: Option<bool>,
     static_position: Option<DVec3>,
@@ -24,6 +25,7 @@ pub struct Navigator {
 impl Navigator {
     /// 创建导航融合器。
     pub fn new(config: NavigatorConfig) -> Self {
+        let gravity = config.gravity;
         Self {
             config,
             nav_state: NavState {
@@ -32,10 +34,26 @@ impl Navigator {
                 velocity: DVec3::ZERO,
                 attitude: DQuat::IDENTITY,
             },
+            gravity_ref: DVec3::new(0.0, 0.0, gravity),
             last_timestamp_ms: None,
             last_is_static: None,
             static_position: None,
         }
+    }
+
+    /// 设置姿态零位校准后的重力参考向量。
+    ///
+    /// `quat_offset` 为姿态零位校准使用的左乘四元数，导航中应使用同一参考系
+    /// 下的重力向量，避免静止时出现伪线加速度积分。
+    pub fn set_gravity_reference(&mut self, quat_offset: DQuat) {
+        let gravity_world = DVec3::new(0.0, 0.0, self.config.gravity);
+        self.gravity_ref = quat_offset.rotate_vec3(gravity_world);
+        tracing::info!(
+            "重力参考更新 | g_ref=[{:.3}, {:.3}, {:.3}]",
+            self.gravity_ref.x,
+            self.gravity_ref.y,
+            self.gravity_ref.z
+        );
     }
 
     /// 更新一帧导航状态。
@@ -73,6 +91,7 @@ impl Navigator {
             velocity: DVec3::ZERO,
             attitude: DQuat::IDENTITY,
         };
+        self.gravity_ref = DVec3::new(0.0, 0.0, self.config.gravity);
         self.last_timestamp_ms = None;
         self.last_is_static = None;
         self.static_position = None;
@@ -94,8 +113,7 @@ impl Navigator {
 
         if dt > 0.0 {
             let a_world = attitude.rotate_vec3(sample.accel_lp);
-            let g_world = DVec3::new(0.0, 0.0, self.config.gravity);
-            let a_lin = a_world - g_world;
+            let a_lin = a_world - self.gravity_ref;
 
             self.nav_state.velocity += a_lin * dt;
             self.nav_state.position += self.nav_state.velocity * dt;
@@ -108,9 +126,8 @@ impl Navigator {
         }
 
         let gyro_norm = sample.gyro_lp.length();
-        let g_world = DVec3::new(0.0, 0.0, self.config.gravity);
         let accel_world = self.nav_state.attitude.rotate_vec3(sample.accel_lp);
-        let accel_lin = accel_world - g_world;
+        let accel_lin = accel_world - self.gravity_ref;
         let accel_norm = accel_lin.length();
         let is_static =
             gyro_norm < self.config.zupt.gyro_thresh && accel_norm < self.config.zupt.accel_thresh;
@@ -258,6 +275,52 @@ mod tests {
             gyro_lp: DVec3::new(0.01, 0.01, 0.01),
         };
         let nav = navigator.update(attitude, &static_2);
+
+        assert!(nav.velocity.length() < 1e-12);
+        assert!(nav.position.length() < 1e-12);
+    }
+
+    #[test]
+    fn gravity_reference_keeps_static_velocity_zero_after_axis_alignment() {
+        let gravity = 9.80665;
+        let mut navigator = Navigator::new(NavigatorConfig {
+            gravity,
+            trajectory: TrajectoryConfig { passby: false },
+            zupt: ZuptConfig {
+                passby: true,
+                gyro_thresh: 0.2,
+                accel_thresh: 0.2,
+            },
+        });
+
+        // 姿态零位：绕 X 轴 90°，用于模拟“校准时设备未水平放置”。
+        let q_raw_ref = DQuat {
+            w: std::f64::consts::FRAC_1_SQRT_2,
+            x: std::f64::consts::FRAC_1_SQRT_2,
+            y: 0.0,
+            z: 0.0,
+        };
+        let q_offset = q_raw_ref.inverse();
+        navigator.set_gravity_reference(q_offset);
+
+        // 校准后姿态应为单位四元数。
+        let attitude = DQuat::IDENTITY;
+        // 静止时加速度（含重力）在校准参考系下应与 gravity_ref 一致。
+        let accel_static = q_offset.rotate_vec3(DVec3::new(0.0, 0.0, gravity));
+
+        let sample_0 = ImuSampleFiltered {
+            timestamp_ms: 0,
+            accel_lp: accel_static,
+            gyro_lp: DVec3::ZERO,
+        };
+        let sample_1 = ImuSampleFiltered {
+            timestamp_ms: 20,
+            accel_lp: accel_static,
+            gyro_lp: DVec3::ZERO,
+        };
+
+        let _ = navigator.update(attitude, &sample_0);
+        let nav = navigator.update(attitude, &sample_1);
 
         assert!(nav.velocity.length() < 1e-12);
         assert!(nav.position.length() < 1e-12);
