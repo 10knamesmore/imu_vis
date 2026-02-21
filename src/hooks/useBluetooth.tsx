@@ -205,6 +205,15 @@ const useBluetoothInternal = (): BluetoothContextValue => {
 
   // 连接到指定设备
   const connect = useCallback(async (deviceId: string) => {
+    const leaveReplayModeOnConnect = () => {
+      if (!replayingRef.current) {
+        return;
+      }
+      replayingRef.current = false;
+      setReplaying(false);
+      message.info("已切换到实时模式");
+    };
+
     try {
       if (scanning) {
         await stopScan();
@@ -213,6 +222,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       const res = await imuApi.connect(deviceId);
 
       if (res.success && res.data) {
+        leaveReplayModeOnConnect();
         setConnectedDevice(res.data);
         message.success(`已连接 ${res.data.local_name || res.data.id}`);
         return true;
@@ -222,6 +232,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         if (res.success) {
           // 优先使用列表中的信息，否则仅使用 ID
           const deviceData = deviceInList || { id: deviceId, address: deviceId };
+          leaveReplayModeOnConnect();
           setConnectedDevice(deviceData);
           message.success(`已连接 ${deviceData.local_name || deviceData.id}`);
           return true;
