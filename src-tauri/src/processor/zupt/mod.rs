@@ -15,4 +15,5 @@ pub mod logic;
 /// ZUPT 相关类型。
 pub use types::ZuptConfig;
 /// ZUPT 检测器。
+#[allow(unused_imports)]
 pub use logic::ZuptDetector;

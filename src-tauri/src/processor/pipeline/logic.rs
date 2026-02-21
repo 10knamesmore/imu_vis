@@ -11,11 +11,10 @@ use crate::{
     processor::{
         calibration::{AxisCalibration, Calibration, CorrectionRequest},
         filter::LowPassFilter,
+        navigator::{Navigator, NavigatorConfig},
         output::{OutputBuilder, OutputFrame},
         parser::{ImuParser, ImuSampleRaw},
         pipeline::types::ProcessorPipelineConfig,
-        trajectory::TrajectoryCalculator,
-        zupt::ZuptDetector,
     },
     types::outputs::ResponseData,
 };
@@ -25,8 +24,7 @@ pub struct ProcessorPipeline {
     axis_calibration: AxisCalibration,
     calibration: Calibration,
     filter: LowPassFilter,
-    trajectory: TrajectoryCalculator,
-    zupt: ZuptDetector,
+    navigator: Navigator,
     latest_raw: Option<ImuSampleRaw>,
 }
 
@@ -43,12 +41,22 @@ pub struct PipelineConfigSnapshot {
 impl ProcessorPipeline {
     /// 创建处理管线。
     pub fn new(config: ProcessorPipelineConfig) -> Self {
+        let ProcessorPipelineConfig {
+            global,
+            calibration,
+            filter,
+            trajectory,
+            zupt,
+        } = config;
         Self {
             axis_calibration: AxisCalibration::new(),
-            calibration: Calibration::new(config.calibration),
-            filter: LowPassFilter::new(config.filter),
-            trajectory: TrajectoryCalculator::new(config.trajectory, config.global.gravity),
-            zupt: ZuptDetector::new(config.zupt, config.global.gravity),
+            calibration: Calibration::new(calibration),
+            filter: LowPassFilter::new(filter),
+            navigator: Navigator::new(NavigatorConfig {
+                trajectory,
+                zupt,
+                gravity: global.gravity,
+            }),
             latest_raw: None,
         }
     }
@@ -77,11 +85,10 @@ impl ProcessorPipeline {
         self.latest_raw = Some(raw);
         self.axis_calibration.apply(&mut raw);
 
-        // 处理链：标定 -> 滤波 -> 轨迹计算 -> ZUPT -> 输出
+        // 处理链：标定 -> 滤波 -> 导航融合 -> 输出
         let calibrated = self.calibration.update(&raw);
         let filtered = self.filter.apply(&calibrated);
-        let nav = self.trajectory.calculate(raw.quat, &filtered);
-        let nav = self.zupt.apply(nav, &filtered);
+        let nav = self.navigator.update(raw.quat, &filtered);
 
         let frame = OutputFrame { raw, nav };
         Some(OutputBuilder::build(&frame))
@@ -92,8 +99,7 @@ impl ProcessorPipeline {
         self.axis_calibration.reset();
         self.calibration.reset();
         self.filter.reset();
-        self.trajectory.reset();
-        self.zupt.reset();
+        self.navigator.reset();
         self.latest_raw = None;
     }
 
@@ -116,7 +122,7 @@ impl ProcessorPipeline {
                 position,
                 respond_to,
             } => {
-                self.trajectory.set_position(position);
+                self.navigator.set_position(position);
                 if respond_to.send(Ok(())).is_err() {
                     tracing::error!("位置校正 response 接受端在发送前已被丢弃");
                 };

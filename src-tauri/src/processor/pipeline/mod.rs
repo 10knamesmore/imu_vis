@@ -1,6 +1,6 @@
 //! 管线模块导出。
 //!
-//! 目的：把 parse -> calibrate -> filter -> trajectory -> zupt -> output
+//! 目的：把 parse -> calibrate -> filter -> navigator -> output
 //! 串成单线程处理链，保持外部接口不变。
 //! 原理：同一帧按固定顺序流过各模块，输出 ResponseData。
 

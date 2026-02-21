@@ -1,7 +1,7 @@
 //! IMU 数据处理器与处理链入口。
 //!
 //! 这里负责启动处理线程，并把原始数据送入 pipeline。
-//! pipeline 内部遵循固定链路：解析 → 标定 → 滤波 → 捷联 → ZUPT → 输出。
+//! pipeline 内部遵循固定链路：解析 → 标定 → 滤波 → Navigator → 输出。
 
 use std::{
     thread::{self, JoinHandle},
@@ -29,6 +29,8 @@ pub mod output;
 pub mod parser;
 /// 管线模块。
 pub mod pipeline;
+/// 导航融合模块。
+pub mod navigator;
 /// 三维轨迹计算模块。
 pub mod trajectory;
 /// ZUPT 模块。

@@ -6,6 +6,7 @@ use crate::processor::filter::ImuSampleFiltered;
 use crate::processor::trajectory::types::{NavState, TrajectoryConfig};
 
 /// 三维轨迹计算器。
+#[allow(dead_code)]
 pub struct TrajectoryCalculator {
     config: TrajectoryConfig,
     gravity: f64,
@@ -13,6 +14,7 @@ pub struct TrajectoryCalculator {
     last_timestamp_ms: Option<u64>,
 }
 
+#[allow(dead_code)]
 impl TrajectoryCalculator {
     /// 创建轨迹计算器。
     pub fn new(config: TrajectoryConfig, gravity: f64) -> Self {
@@ -99,6 +101,12 @@ impl TrajectoryCalculator {
         self.nav_state.position = position;
     }
 
+    /// 回写外部修正后的导航状态（如 ZUPT 修正），用于下一帧积分基线。
+    pub fn apply_nav_correction(&mut self, nav_state: NavState) {
+        self.nav_state = nav_state;
+        self.last_timestamp_ms = Some(nav_state.timestamp_ms);
+    }
+
     /// 重置轨迹状态（清空位置、速度、时间戳）。
     pub fn reset(&mut self) {
         self.nav_state = NavState {
@@ -108,5 +116,52 @@ impl TrajectoryCalculator {
             attitude: math_f64::DQuat::IDENTITY,
         };
         self.last_timestamp_ms = None;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use math_f64::{DQuat, DVec3};
+
+    use crate::processor::{
+        filter::ImuSampleFiltered,
+        trajectory::{NavState, TrajectoryCalculator, TrajectoryConfig},
+    };
+
+    #[test]
+    fn corrected_nav_state_is_used_as_next_integration_baseline() {
+        let gravity = 9.80665;
+        let mut calculator = TrajectoryCalculator::new(TrajectoryConfig { passby: false }, gravity);
+        let attitude = DQuat::IDENTITY;
+
+        let moving_sample_0 = ImuSampleFiltered {
+            timestamp_ms: 0,
+            accel_lp: DVec3::new(0.0, 0.0, gravity + 1.0),
+            gyro_lp: DVec3::ZERO,
+        };
+        let moving_sample_1 = ImuSampleFiltered {
+            timestamp_ms: 100,
+            accel_lp: DVec3::new(0.0, 0.0, gravity + 1.0),
+            gyro_lp: DVec3::ZERO,
+        };
+        let static_sample = ImuSampleFiltered {
+            timestamp_ms: 200,
+            accel_lp: DVec3::new(0.0, 0.0, gravity),
+            gyro_lp: DVec3::ZERO,
+        };
+
+        let _ = calculator.calculate(attitude, &moving_sample_0);
+        let nav_after_motion = calculator.calculate(attitude, &moving_sample_1);
+        assert!(nav_after_motion.velocity.z > 0.09);
+
+        let corrected = NavState {
+            velocity: DVec3::ZERO,
+            ..nav_after_motion
+        };
+        calculator.apply_nav_correction(corrected);
+
+        let nav_after_static = calculator.calculate(attitude, &static_sample);
+        assert!(nav_after_static.velocity.length() < 1e-12);
+        assert!((nav_after_static.position.z - corrected.position.z).abs() < 1e-12);
     }
 }

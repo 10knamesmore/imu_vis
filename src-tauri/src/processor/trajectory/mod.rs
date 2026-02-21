@@ -14,6 +14,7 @@ pub mod logic;
 pub mod types;
 
 /// 轨迹计算器。
+#[allow(unused_imports)]
 pub use logic::TrajectoryCalculator;
 /// 轨迹类型导出。
 pub use types::{NavState, TrajectoryConfig};
