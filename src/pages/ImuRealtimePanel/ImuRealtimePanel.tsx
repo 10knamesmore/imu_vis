@@ -17,6 +17,7 @@ export const ImuRealtimePanel: React.FC = () => {
     connectedDevice,
     recording,
     recordingStatus,
+    recordings,
     replaying,
     replaySamples,
     replaySessionId,
@@ -33,6 +34,21 @@ export const ImuRealtimePanel: React.FC = () => {
     () => replaying && (replaySamples?.length ?? 0) > 0,
     [replaying, replaySamples]
   );
+  const currentReplayMeta = useMemo(
+    () => recordings.find((item) => item.id === replaySessionId) ?? null,
+    [recordings, replaySessionId]
+  );
+  const restartReplayTooltip = useMemo(() => {
+    const name = (currentReplayMeta?.name ?? "").trim() || "未命名";
+    const startedAt = currentReplayMeta?.started_at_ms ?? replaySamples?.[0]?.raw_data.timestamp_ms ?? null;
+    const startedAtText = startedAt ? new Date(startedAt).toLocaleString() : "-";
+    return (
+      <div>
+        <div>记录: {name}</div>
+        <div>录制时间: {startedAtText}</div>
+      </div>
+    );
+  }, [currentReplayMeta?.name, currentReplayMeta?.started_at_ms, replaySamples]);
   const sourceEnabled = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
 
   // 图表数据源：回放重播时保持不重置，避免图表重新滚动。
@@ -272,6 +288,7 @@ export const ImuRealtimePanel: React.FC = () => {
           recordingStatus={recordingStatus}
           replaying={replaying}
           canRestartReplay={(replaySamples?.length ?? 0) > 0}
+          restartReplayTooltip={restartReplayTooltip}
           onRestartReplay={restartReplay}
           onExitReplay={exitReplay}
           onToggleRecording={toggleRecording}

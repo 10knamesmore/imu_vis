@@ -20,6 +20,8 @@ type ImuToolBarProps = {
   replaying: boolean;
   /** 是否允许执行“重新回放”（已加载回放数据时为 true）。 */
   canRestartReplay: boolean;
+  /** “重新回放”按钮提示文案（显示当前回放记录信息）。 */
+  restartReplayTooltip?: React.ReactNode;
   /** 点击“重新回放”时的回调。 */
   onRestartReplay: () => void;
   /** 点击“切到实时”时的回调。 */
@@ -35,6 +37,7 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
   recordingStatus,
   replaying,
   canRestartReplay,
+  restartReplayTooltip,
   onRestartReplay,
   onExitReplay,
   onToggleRecording,
@@ -70,7 +73,7 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
             </Tag>
           </div>
           <div className={styles.imuControl}>
-            <Tooltip title={canRestartReplay ? "" : "请先加载一条录制数据"}>
+            <Tooltip title={canRestartReplay ? (restartReplayTooltip ?? "重新回放当前录制") : "请先加载一条录制数据"}>
               <Button
                 icon={<ReloadOutlined />}
                 onClick={onRestartReplay}
