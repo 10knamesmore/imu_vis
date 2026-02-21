@@ -22,6 +22,8 @@ type ImuToolBarProps = {
   canRestartReplay: boolean;
   /** 点击“重新回放”时的回调。 */
   onRestartReplay: () => void;
+  /** 点击“切到实时”时的回调。 */
+  onExitReplay: () => void;
   /** 点击“开始/停止录制”时的回调。 */
   onToggleRecording: () => void;
 };
@@ -34,6 +36,7 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
   replaying,
   canRestartReplay,
   onRestartReplay,
+  onExitReplay,
   onToggleRecording,
 }) => {
   const [recordingsOpen, setRecordingsOpen] = useState(false);
@@ -76,6 +79,11 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
                 重新回放
               </Button>
             </Tooltip>
+          </div>
+          <div className={styles.imuControl}>
+            <Button onClick={onExitReplay} disabled={!replaying}>
+              切到实时
+            </Button>
           </div>
           <div className={styles.imuControl}>
             <Button type="primary" icon={<SearchOutlined />} onClick={() => setRecordingsOpen(true)}>录制记录</Button>

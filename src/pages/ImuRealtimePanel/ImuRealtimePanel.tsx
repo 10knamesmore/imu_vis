@@ -22,6 +22,7 @@ export const ImuRealtimePanel: React.FC = () => {
     replaySessionId,
     replayVersion,
     restartReplay,
+    exitReplay,
     toggleRecording,
   } = useBluetooth();
   // 控制是否显示图表, TODO: 由card内部决定
@@ -272,6 +273,7 @@ export const ImuRealtimePanel: React.FC = () => {
           replaying={replaying}
           canRestartReplay={(replaySamples?.length ?? 0) > 0}
           onRestartReplay={restartReplay}
+          onExitReplay={exitReplay}
           onToggleRecording={toggleRecording}
         />
       </Card>

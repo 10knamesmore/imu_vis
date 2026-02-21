@@ -12,6 +12,8 @@ import {
   ImuHistorySnapshot,
 } from '../types';
 
+type DataMode = 'live' | 'replay';
+
 type BluetoothContextValue = {
   /** 当前是否在扫描蓝牙设备。 */
   scanning: boolean;
@@ -35,6 +37,8 @@ type BluetoothContextValue = {
   recordingStatus: RecordingStatus | null;
   /** 录制会话列表。 */
   recordings: RecordingMeta[];
+  /** 当前全局数据模式（live/replay）。 */
+  dataMode: DataMode;
   /** 当前是否处于回放模式。 */
   replaying: boolean;
   /** 当前加载的回放样本（未加载时为 null）。 */
@@ -126,16 +130,36 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const streamStartMsRef = useRef<number | null>(null);
   // 1s 内的消息计数器（由定时器每秒读取并清零）
   const messageCountRef = useRef(0);
-  const replayingRef = useRef(false);
+  const dataModeRef = useRef<DataMode>('live');
   const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
-  const [replaying, setReplaying] = useState(false);
+  const [dataMode, setDataMode] = useState<DataMode>('live');
   const [replaySamples, setReplaySamples] = useState<ResponseData[] | null>(null);
   const [replaySessionId, setReplaySessionId] = useState<number | null>(null);
   const [replayVersion, setReplayVersion] = useState(0);
+  const replaying = dataMode === 'replay';
 
-  useEffect(() => {
-    replayingRef.current = replaying;
-  }, [replaying]);
+  const switchDataMode = useCallback((mode: DataMode) => {
+    dataModeRef.current = mode;
+    setDataMode(mode);
+  }, []);
+
+  const enterLiveMode = useCallback((notify = false) => {
+    if (dataModeRef.current === 'live') {
+      return;
+    }
+    switchDataMode('live');
+    if (notify) {
+      message.info('已切换到实时模式');
+    }
+  }, [switchDataMode]);
+
+  const enterReplayMode = useCallback(() => {
+    if (dataModeRef.current !== 'replay') {
+      switchDataMode('replay');
+      return;
+    }
+    setDataMode('replay');
+  }, [switchDataMode]);
 
   // 监听配置更新事件
   useEffect(() => {
@@ -205,15 +229,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
 
   // 连接到指定设备
   const connect = useCallback(async (deviceId: string) => {
-    const leaveReplayModeOnConnect = () => {
-      if (!replayingRef.current) {
-        return;
-      }
-      replayingRef.current = false;
-      setReplaying(false);
-      message.info("已切换到实时模式");
-    };
-
     try {
       if (scanning) {
         await stopScan();
@@ -222,7 +237,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       const res = await imuApi.connect(deviceId);
 
       if (res.success && res.data) {
-        leaveReplayModeOnConnect();
+        enterLiveMode(true);
         setConnectedDevice(res.data);
         message.success(`已连接 ${res.data.local_name || res.data.id}`);
         return true;
@@ -232,7 +247,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         if (res.success) {
           // 优先使用列表中的信息，否则仅使用 ID
           const deviceData = deviceInList || { id: deviceId, address: deviceId };
-          leaveReplayModeOnConnect();
+          enterLiveMode(true);
           setConnectedDevice(deviceData);
           message.success(`已连接 ${deviceData.local_name || deviceData.id}`);
           return true;
@@ -245,7 +260,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       console.error(e);
       return false;
     }
-  }, [scanning, stopScan, devices]);
+  }, [scanning, stopScan, devices, enterLiveMode]);
 
   useEffect(() => {
     if (!connectedDevice) return;
@@ -272,7 +287,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       setPlotRevision((rev) => (rev + 1) % 1_000_000);
     }, Math.max(16, uiRefreshMs)); // 最快 60 FPS
     channel.onmessage = (msg: ResponseData) => {
-      if (replayingRef.current) {
+      if (dataModeRef.current === 'replay') {
         return;
       }
       // 每条消息只更新缓存与计数，不触发 UI 更新
@@ -511,14 +526,14 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       streamStartMsRef.current = startMs;
       setReplaySamples(samples);
       setReplaySessionId(sessionId);
-      setReplaying(true);
+      enterReplayMode();
       setReplayVersion((version) => version + 1);
       message.success('录制数据已加载');
     } catch (e) {
       console.error(e);
       message.error('加载录制数据失败');
     }
-  }, []);
+  }, [enterReplayMode]);
 
   // 退出回放模式
   const restartReplay = useCallback(() => {
@@ -526,15 +541,14 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       message.warning('请先加载录制数据');
       return;
     }
-    setReplaying(true);
+    enterReplayMode();
     setReplayVersion((version) => version + 1);
-  }, [replaySamples]);
+  }, [enterReplayMode, replaySamples]);
 
   // 退出回放模式
   const exitReplay = useCallback(() => {
-    setReplaying(false);
-    message.info('已退出回放');
-  }, []);
+    enterLiveMode(true);
+  }, [enterLiveMode]);
 
   return {
     scanning,
@@ -548,6 +562,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     recording,
     recordingStatus,
     recordings,
+    dataMode,
     replaying,
     replaySamples,
     replaySessionId,
