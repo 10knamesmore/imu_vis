@@ -18,29 +18,6 @@
     width: 100%;
   }
 
-  .deviceOption {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    width: 100%;
-  }
-
-  .deviceIdText {
-    font-size: 12px;
-  }
-
-  .rssiWrap {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .rssiValue {
-    color: #888;
-    min-width: 30px;
-    text-align: right;
-  }
-
   .configArea {
     margin-top: 16px;
   }
@@ -139,6 +116,50 @@
     background: #171717;
     border: 1px solid #2a2a2a;
   }
+}
+
+.deviceOption {
+  display: flex;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.deviceMeta {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  gap: 2px;
+}
+
+.deviceSubLine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
+.deviceIdText {
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rssiWrap {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.rssiValue {
+  color: #888;
+  min-width: 30px;
+  text-align: right;
 }
 
 .settingsPanel {

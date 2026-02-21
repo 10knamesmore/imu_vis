@@ -109,13 +109,15 @@ export const ConnectionPanel = () => {
               const rssiColor = getRssiColor(data.rssi);
               return (
                 <div className={styles.deviceOption}>
-                  <Space direction="vertical" size={0}>
+                  <div className={styles.deviceMeta}>
                     <Text strong>{data.label}</Text>
-                    <Text type="secondary" className={styles.deviceIdText}>{data.value}</Text>
-                  </Space>
-                  <div className={styles.rssiWrap}>
-                    <SignalFilled style={{ color: rssiColor }} />
-                    <span className={styles.rssiValue}>{option.data.rssi || '-'}</span>
+                    <div className={styles.deviceSubLine}>
+                      <Text type="secondary" className={styles.deviceIdText}>{data.value}</Text>
+                      <div className={styles.rssiWrap}>
+                        <SignalFilled style={{ color: rssiColor }} />
+                        <span className={styles.rssiValue}>{option.data.rssi || '-'}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
