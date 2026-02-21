@@ -1,4 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Checkbox } from "antd";
 
 import type { ImuHistoryWindow } from "../../utils/ImuHistoryBuffer";
 
@@ -16,7 +17,51 @@ type ImuChartsCanvasProps = {
   refreshMs?: number;
   windowMs?: number;
   label: string;
+  visibilityKey: string;
   series: SeriesSpec[];
+};
+
+type SeriesVisibilityMap = Record<string, boolean>;
+
+/**
+ * 运行时缓存：在同一页面会话中记忆各图表的序列勾选状态。
+ */
+const visibilityCache = new Map<string, SeriesVisibilityMap>();
+
+/**
+ * 按当前 series 生成可见性映射，缺省值为 true。
+ *
+ * @param series - 当前图表序列定义
+ * @param cached - 历史缓存（可选）
+ * @returns 仅包含当前 series 的可见性映射
+ */
+const buildSeriesVisibilityMap = (series: SeriesSpec[], cached?: SeriesVisibilityMap): SeriesVisibilityMap => {
+  const nextVisibility: SeriesVisibilityMap = {};
+  for (const item of series) {
+    nextVisibility[item.name] = cached?.[item.name] ?? true;
+  }
+  return nextVisibility;
+};
+
+/**
+ * 判断两个可见性映射是否等价。
+ *
+ * @param left - 旧映射
+ * @param right - 新映射
+ * @returns true 表示内容一致
+ */
+const isSameVisibilityMap = (left: SeriesVisibilityMap, right: SeriesVisibilityMap) => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  for (const key of leftKeys) {
+    if (left[key] !== right[key]) {
+      return false;
+    }
+  }
+  return true;
 };
 
 /**
@@ -155,24 +200,30 @@ const drawChart = (
  * @param props.refreshMs - 刷新间隔 (毫秒)，默认 40ms
  * @param props.windowMs - 显示的时间窗口大小 (毫秒)
  * @param props.label - 纵轴单位/说明
+ * @param props.visibilityKey - 图表唯一 key，用于在同页记忆序列勾选状态
  * @param props.series - 需要绘制的数据系列配置
  */
 /**
  * IMU 数据曲线画布组件。
  */
-export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
+export const ImuChartsCanvas = ({
   source,
   enabled,
   refreshMs = 16,
   windowMs,
   label,
+  visibilityKey,
   series,
-}) => {
+}: ImuChartsCanvasProps) => {
   /** 容器 div 的引用，用于监听尺寸变化 */
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** Canvas 元素的引用，用于获取绘图上下文 */
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [latestStats, setLatestStats] = useState<Array<{ name: string; color: string; value?: number }>>([]);
+  /** 每个序列是否可见。 */
+  const [seriesVisibility, setSeriesVisibility] = useState<SeriesVisibilityMap>(() =>
+    buildSeriesVisibilityMap(series, visibilityCache.get(visibilityKey))
+  );
   const lastStatsUpdateRef = useRef(0);
 
   /** 视图状态：时间窗口长度和偏移量 */
@@ -229,6 +280,29 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
   const handlePointerUp = (e: PointerEvent) => {
     viewStateRef.current.isDragging = false;
     (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  };
+
+  /**
+   * 同步可见性状态：当图表 key 或 series 变化时，复用缓存并补齐新序列默认值。
+   */
+  useEffect(() => {
+    const nextVisibility = buildSeriesVisibilityMap(series, visibilityCache.get(visibilityKey));
+    visibilityCache.set(visibilityKey, nextVisibility);
+    setSeriesVisibility((prev) => (isSameVisibilityMap(prev, nextVisibility) ? prev : nextVisibility));
+  }, [visibilityKey, series]);
+
+  /**
+   * 切换单个序列显示状态。
+   *
+   * @param seriesName - 序列名称
+   * @param checked - 选中状态
+   */
+  const handleSeriesVisibilityChange = (seriesName: string, checked: boolean) => {
+    setSeriesVisibility((prev) => {
+      const next = { ...prev, [seriesName]: checked };
+      visibilityCache.set(visibilityKey, next);
+      return next;
+    });
   };
 
   useEffect(() => {
@@ -332,7 +406,13 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
         color: entry.color,
         buffer: entry.getBuffer(window),
       }));
-      drawChart(ctx, window, seriesBuffers, yAxisLabel, width, height);
+      const visibleSeriesBuffers = seriesBuffers.filter((entry) => seriesVisibility[entry.name] !== false);
+      if (visibleSeriesBuffers.length === 0) {
+        ctx.fillStyle = "#6b7280";
+        ctx.fillText("请选择至少一个序列", 16, 20);
+      } else {
+        drawChart(ctx, window, visibleSeriesBuffers, yAxisLabel, width, height);
+      }
 
       const now = Date.now();
       if (now - lastStatsUpdateRef.current > 200) {
@@ -353,7 +433,22 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
     return () => {
       window.clearInterval(timer);
     };
-  }, [enabled, refreshMs, source, windowMs, label, series]);
+  }, [enabled, refreshMs, source, windowMs, label, series, seriesVisibility]);
+
+  /**
+   * 以 series 定义为主，组合最新值，保证 checkbox 始终可见。
+   */
+  const statEntries = useMemo(() => {
+    const latestValueMap = new Map<string, number | undefined>();
+    for (const stat of latestStats) {
+      latestValueMap.set(stat.name, stat.value);
+    }
+    return series.map((entry) => ({
+      name: entry.name,
+      color: entry.color,
+      value: latestValueMap.get(entry.name),
+    }));
+  }, [latestStats, series]);
 
   const unit = label.includes("(")
     ? label.slice(label.indexOf("(") + 1, label.lastIndexOf(")"))
@@ -365,18 +460,30 @@ export const ImuChartsCanvas: React.FC<ImuChartsCanvasProps> = ({
         <canvas ref={canvasRef} aria-label={label} />
       </div>
       <div className={styles.statsColumn}>
-        {latestStats.map((entry) => (
-          <div key={entry.name} className={styles.statCard}>
-            <div className={styles.statHeader}>
-              <span className={styles.statLabel}>{entry.name}</span>
-              <span className={styles.colorSwatch} style={{ backgroundColor: entry.color }} />
+        {statEntries.map((entry) => {
+          const isVisible = seriesVisibility[entry.name] !== false;
+          return (
+            <div
+              key={entry.name}
+              className={`${styles.statCard} ${isVisible ? "" : styles.statCardDisabled}`.trim()}
+            >
+              <div className={styles.statHeader}>
+                <Checkbox
+                  checked={isVisible}
+                  onChange={(event) => handleSeriesVisibilityChange(entry.name, event.target.checked)}
+                  className={`${styles.seriesCheckbox} ${isVisible ? "" : styles.seriesCheckboxMuted}`.trim()}
+                >
+                  <span className={styles.statLabel}>{entry.name}</span>
+                </Checkbox>
+                <span className={styles.colorSwatch} style={{ backgroundColor: entry.color }} />
+              </div>
+              <div className={styles.statDivider} />
+              <div className={`${styles.statValue} ${isVisible ? "" : styles.statValueMuted}`.trim()}>
+                {entry.value === undefined ? "--" : `${entry.value.toFixed(3)} ${unit}`}
+              </div>
             </div>
-            <div className={styles.statDivider} />
-            <div className={styles.statValue}>
-              {entry.value === undefined ? "--" : `${entry.value.toFixed(3)} ${unit}`}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

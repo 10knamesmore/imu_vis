@@ -37,6 +37,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="加速度 (m/s^2)"
+            visibilityKey="accel"
             series={[
               { name: "X", color: "#57b2ff", getBuffer: (w) => w.builtin.accelX },
               { name: "Y", color: "#ffb74d", getBuffer: (w) => w.builtin.accelY },
@@ -75,6 +76,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="偏航 / 俯仰 / 横滚 (deg)"
+            visibilityKey="angle"
             series={[
               { name: "X", color: "#4cc9f0", getBuffer: (w) => w.builtin.angleX },
               { name: "Y", color: "#f8961e", getBuffer: (w) => w.builtin.angleY },
@@ -94,6 +96,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="Acceleration (m/s^2)"
+            visibilityKey="accel-with-g"
             series={[
               { name: "X", color: "#9ad1ff", getBuffer: (w) => w.builtin.accelWithGX },
               { name: "Y", color: "#ffda7a", getBuffer: (w) => w.builtin.accelWithGY },
@@ -133,6 +136,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="m"
+            visibilityKey="offset"
             series={[
               { name: "X", color: "#4d96ff", getBuffer: (w) => w.builtin.offsetX },
               { name: "Y", color: "#6bffb8", getBuffer: (w) => w.builtin.offsetY },
@@ -152,6 +156,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="导航加速度 (m/s^2)"
+            visibilityKey="nav"
             series={[
               { name: "X", color: "#b8c0ff", getBuffer: (w) => w.builtin.accelNavX },
               { name: "Y", color: "#ffd6a5", getBuffer: (w) => w.builtin.accelNavY },
@@ -171,6 +176,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="角度差值 (deg)"
+            visibilityKey="angle-delta"
             series={[
               { name: "偏航 Δ", color: "#57b2ff", getBuffer: (w) => w.deltaAngleX },
               { name: "俯仰 Δ", color: "#ffb74d", getBuffer: (w) => w.deltaAngleY },
@@ -190,6 +196,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="速度 (m/s)"
+            visibilityKey="velocity"
             series={[
               { name: "X", color: "#4cc9f0", getBuffer: (w) => w.calculated.velocityX },
               { name: "Y", color: "#f8961e", getBuffer: (w) => w.calculated.velocityY },
@@ -209,6 +216,7 @@ export const ImuRealtimePanel: React.FC = () => {
             enabled={showCharts}
             refreshMs={16}
             label="位置 (m)"
+            visibilityKey="position"
             series={[
               { name: "X", color: "#b8c0ff", getBuffer: (w) => w.calculated.positionX },
               { name: "Y", color: "#ffd6a5", getBuffer: (w) => w.calculated.positionY },
