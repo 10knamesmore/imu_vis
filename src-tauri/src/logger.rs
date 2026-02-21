@@ -3,11 +3,7 @@
 use tracing::level_filters::LevelFilter;
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::{
-    filter::Targets,
-    fmt::{self, format::FmtSpan},
-    layer::SubscriberExt,
-    util::SubscriberInitExt,
-    Layer,
+    filter::Targets, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, Layer,
 };
 
 /// 初始化 tracing 并返回 guard。
@@ -31,18 +27,18 @@ pub fn init_tracing() -> WorkerGuard {
     };
 
     let file_appender = tracing_appender::rolling::daily("logs", "app.jsonl");
-    let (file_writer, guard) = tracing_appender::non_blocking(file_appender);
-    let json_layer = fmt::layer()
-        .json()
-        .with_writer(file_writer)
-        .with_current_span(true)
-        .with_span_list(true)
-        .with_span_events(FmtSpan::CLOSE)
-        .with_filter(LevelFilter::INFO);
+    let (_, guard) = tracing_appender::non_blocking(file_appender);
+    // let json_layer = fmt::layer()
+    //     .json()
+    //     .with_writer(file_writer)
+    //     .with_current_span(true)
+    //     .with_span_list(true)
+    //     .with_span_events(FmtSpan::CLOSE)
+    //     .with_filter(LevelFilter::INFO);
 
     tracing_subscriber::registry()
         .with(stdout_layer)
-        .with(json_layer)
+        // .with(json_layer)
         .init();
 
     guard
