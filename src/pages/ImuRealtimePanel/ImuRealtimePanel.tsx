@@ -37,8 +37,15 @@ export const ImuRealtimePanel: React.FC<ImuRealtimePanelProps> = ({
     exitReplay,
     toggleRecording,
   } = useBluetooth();
-  // 控制是否显示图表, TODO: 由card内部决定
-  const [showCharts, _] = useState(true);
+  /** 跟踪图表区域是否折叠。 */
+  const [chartsCollapsed, setChartsCollapsed] = useState(false);
+  /** 图表展开时才驱动图表刷新，折叠时暂停绘制。 */
+  const showCharts = useMemo(() => !chartsCollapsed, [chartsCollapsed]);
+  /** 图表区域类名：折叠时让出高度给 Three 视图。 */
+  const bottomRowClassName = useMemo(
+    () => (chartsCollapsed ? `${styles.bottomRow} ${styles.bottomRowCollapsed}` : styles.bottomRow),
+    [chartsCollapsed]
+  );
   // 检查是否已连接设备
   const deviceConnected = useMemo(() => connectedDevice !== null, [connectedDevice]);
   const hasReplayData = useMemo(
@@ -61,6 +68,11 @@ export const ImuRealtimePanel: React.FC<ImuRealtimePanelProps> = ({
     );
   }, [currentReplayMeta?.name, currentReplayMeta?.started_at_ms, replaySamples]);
   const sourceAvailable = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
+
+  /** 切换图表区域折叠状态。 */
+  const handleToggleChartsCollapsed = () => {
+    setChartsCollapsed((prev) => !prev);
+  };
 
   // 图表数据源：回放重播时保持不重置，避免图表重新滚动。
   const chartSource = useImuSource({
@@ -326,9 +338,12 @@ export const ImuRealtimePanel: React.FC<ImuRealtimePanelProps> = ({
           <ImuThreeCard source={threeSource} replayTrailResetToken={replayVersion} />
         </div>
 
-        <div className={styles.bottomRow}>
-          <ImuChartTabs items={chartItems} />
-
+        <div className={bottomRowClassName}>
+          <ImuChartTabs
+            items={chartItems}
+            collapsed={chartsCollapsed}
+            onToggleCollapsed={handleToggleChartsCollapsed}
+          />
         </div>
       </div>
     </div>

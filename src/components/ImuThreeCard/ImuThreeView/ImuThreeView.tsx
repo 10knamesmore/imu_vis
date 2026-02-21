@@ -1,4 +1,4 @@
-import React from "react";
+import { Splitter } from "antd";
 import { ImuSource } from "../../../hooks/useImuSource";
 import styles from "./ImuThreeView.module.scss";
 import { ImuModelView } from "./ImuModelView";
@@ -24,15 +24,17 @@ type ImuThreeViewProps = {
 /**
  * IMU 三维视图组件：包含模型视图和轨迹视图
  */
-export const ImuThreeView: React.FC<ImuThreeViewProps> = (props) => {
+export const ImuThreeView = (props: ImuThreeViewProps) => {
   return (
     <div className={styles.imuThreeContainer}>
-      <div className={styles.leftPanel}>
-        <ImuModelView {...props} />
-      </div>
-      <div className={styles.rightPanel}>
-        <ImuTrajectoryView {...props} />
-      </div>
+      <Splitter className={styles.imuThreeSplitter}>
+        <Splitter.Panel className={styles.leftPanel} defaultSize="35%" min="20%" max="80%">
+          <ImuModelView {...props} />
+        </Splitter.Panel>
+        <Splitter.Panel className={styles.rightPanel} min="20%">
+          <ImuTrajectoryView {...props} />
+        </Splitter.Panel>
+      </Splitter>
     </div>
   );
 };
