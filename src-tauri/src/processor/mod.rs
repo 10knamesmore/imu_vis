@@ -31,10 +31,6 @@ pub mod parser;
 pub mod pipeline;
 /// 导航融合模块。
 pub mod navigator;
-/// 三维轨迹计算模块。
-pub mod trajectory;
-/// ZUPT 模块。
-pub mod zupt;
 
 /// 对外暴露的计算结果数据类型。
 pub use output::CalculatedData;

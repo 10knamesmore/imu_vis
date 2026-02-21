@@ -9,6 +9,5 @@ pub mod types;
 
 /// 导航融合器。
 pub use logic::Navigator;
-/// 导航融合配置。
-pub use types::NavigatorConfig;
-
+/// 导航融合相关类型导出。
+pub use types::{NavState, NavigatorConfig, TrajectoryConfig, ZuptConfig};

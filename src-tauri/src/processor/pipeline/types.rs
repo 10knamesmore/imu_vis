@@ -5,8 +5,7 @@ use tokio::sync::oneshot;
 
 use crate::processor::calibration::ImuCalibrationConfig;
 use crate::processor::filter::LowPassFilterConfig;
-use crate::processor::trajectory::TrajectoryConfig;
-use crate::processor::zupt::ZuptConfig;
+use crate::processor::navigator::{TrajectoryConfig, ZuptConfig};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 /// 全局配置参数。

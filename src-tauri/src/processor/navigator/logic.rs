@@ -4,8 +4,7 @@ use math_f64::{DQuat, DVec3};
 
 use crate::processor::{
     filter::ImuSampleFiltered,
-    navigator::types::NavigatorConfig,
-    trajectory::NavState,
+    navigator::types::{NavState, NavigatorConfig},
 };
 
 /// 导航融合器。
@@ -167,9 +166,7 @@ mod tests {
 
     use crate::processor::{
         filter::ImuSampleFiltered,
-        navigator::{Navigator, NavigatorConfig},
-        trajectory::TrajectoryConfig,
-        zupt::ZuptConfig,
+        navigator::{Navigator, NavigatorConfig, TrajectoryConfig, ZuptConfig},
     };
 
     #[test]
@@ -219,4 +216,3 @@ mod tests {
         assert!((nav_static_1.position.z - nav_static_0.position.z).abs() < 1e-12);
     }
 }
-
