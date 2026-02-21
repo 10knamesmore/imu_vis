@@ -12,8 +12,6 @@ type ImuTrajectoryViewProps = {
   showTrajectory: boolean;
   /** 轨迹各分量开关配置。 */
   trajectoryOption: TrajectoryOption;
-  /** 是否使用后端计算结果（位置）。 */
-  useCalculated: boolean;
   /** 轨迹重置计数器，变化时清空轨迹。 */
   trailResetToken: number;
 };
@@ -26,12 +24,10 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   source,
   showTrajectory,
   trajectoryOption,
-  useCalculated,
   trailResetToken,
 }) => {
   // 通用 Refs
   const sourceRef = useRef(source);
-  const useCalculatedRef = useRef(useCalculated);
   const showTrajectoryRef = useRef(showTrajectory);
   const trajectoryOptionRef = useRef(trajectoryOption);
 
@@ -39,7 +35,6 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
    * 同步 Props 到 Ref，确保渲染循环中能访问到最新值
    */
   useEffect(() => { sourceRef.current = source; }, [source]);
-  useEffect(() => { useCalculatedRef.current = useCalculated; }, [useCalculated]);
   useEffect(() => { showTrajectoryRef.current = showTrajectory; }, [showTrajectory]);
   useEffect(() => { trajectoryOptionRef.current = trajectoryOption; }, [trajectoryOption]);
 
@@ -72,12 +67,8 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
         const state = centerTrailStateRef.current;
         const maxPoints = maxTrailPointsRef.current;
 
-        // 获取当前中心位置
-        if (useCalculatedRef.current) {
-          tmpVec.set(latest.calculated_data.position.x, latest.calculated_data.position.y, latest.calculated_data.position.z);
-        } else {
-          tmpVec.set(latest.raw_data.offset.x, latest.raw_data.offset.y, latest.raw_data.offset.z);
-        }
+        // 获取当前中心位置（固定使用计算数据）
+        tmpVec.set(latest.calculated_data.position.x, latest.calculated_data.position.y, latest.calculated_data.position.z);
 
         if (state.count < maxPoints) {
           const i = state.count;

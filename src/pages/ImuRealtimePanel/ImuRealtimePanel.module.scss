@@ -6,6 +6,22 @@
   gap: 16px;
 }
 
+.toolbarInlineRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.toolbarCard {
+  flex: 1;
+  min-width: 0;
+}
+
+.toolbarSettingsButton {
+  flex-shrink: 0;
+}
+
 .mainGrid {
   flex: 1;
   min-height: 0;
@@ -86,5 +102,16 @@
 
   .rightColumn {
     display: none;
+  }
+}
+
+@media (max-width: 960px) {
+  .toolbarInlineRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .toolbarSettingsButton {
+    align-self: flex-end;
   }
 }

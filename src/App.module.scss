@@ -21,37 +21,7 @@
   background: #000;
 }
 
-.appTabs {
-  flex: 1;
-  min-height: 0;
-
-  :global(.ant-tabs-content-holder) {
-    height: 100%;
-  }
-
-  :global(.ant-tabs-content) {
-    height: 100%;
-  }
-
-  :global(.ant-tabs-tabpane) {
-    height: 100%;
-  }
-}
-
 .siteLayoutContent {
   max-width: 1400px;
   margin: 0 auto;
-}
-
-.deviceButtonConnected {
-  &:global(.ant-btn-primary) {
-    background-color: #2ecc71;
-    border-color: #2ecc71;
-  }
-
-  &:global(.ant-btn-primary:hover),
-  &:global(.ant-btn-primary:focus) {
-    background-color: #27ae60;
-    border-color: #27ae60;
-  }
 }

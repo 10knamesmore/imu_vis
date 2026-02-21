@@ -12,8 +12,6 @@ type ImuModelViewProps = {
   showTrajectory: boolean;
   /** 轨迹各分量开关配置。 */
   trajectoryOption: TrajectoryOption;
-  /** 是否使用后端计算姿态数据。 */
-  useCalculated: boolean;
   /** 轨迹重置计数器，变化时清空轨迹。 */
   trailResetToken: number;
 };
@@ -29,12 +27,10 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
   source,
   showTrajectory,
   trajectoryOption,
-  useCalculated,
   trailResetToken,
 }) => {
   // 通用 Refs，用于在闭包中访问最新 Props
   const sourceRef = useRef(source);
-  const useCalculatedRef = useRef(useCalculated);
   const showTrajectoryRef = useRef(showTrajectory);
   const trajectoryOptionRef = useRef(trajectoryOption);
 
@@ -42,7 +38,6 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
    * 同步 Props 到 Ref，确保渲染循环中能访问到最新值
    */
   useEffect(() => { sourceRef.current = source; }, [source]);
-  useEffect(() => { useCalculatedRef.current = useCalculated; }, [useCalculated]);
   useEffect(() => { showTrajectoryRef.current = showTrajectory; }, [showTrajectory]);
   useEffect(() => { trajectoryOptionRef.current = trajectoryOption; }, [trajectoryOption]);
 
@@ -80,10 +75,8 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
   const onRender = () => {
     const latest = sourceRef.current.latestRef.current;
     if (latest) {
-      // 选择原始或计算姿态，并转换成 Three.js 四元数
-      const attitude = useCalculatedRef.current
-        ? latest.calculated_data.attitude
-        : latest.raw_data.quat;
+      // 使用计算姿态，并转换成 Three.js 四元数
+      const attitude = latest.calculated_data.attitude;
       tmpQuat.set(attitude.x, attitude.y, attitude.z, attitude.w);
 
       // 同步模型与坐标轴姿态

@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Card } from "antd";
+import { Button, Card, Tooltip } from "antd";
+import { SettingOutlined } from "@ant-design/icons";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
@@ -9,10 +10,20 @@ import { ImuChartTabs } from "../../components/ImuChartTabs";
 import { ImuToolBar } from "../../components/ImuToolBar";
 import styles from "./ImuRealtimePanel.module.scss";
 
+type ImuRealtimePanelProps = {
+  /** 打开“设备”弹窗。 */
+  onOpenDeviceModal: () => void;
+  /** 打开“设置”弹窗。 */
+  onOpenSettingsModal: () => void;
+};
+
 /**
  * IMU 实时可视化面板组件。
  */
-export const ImuRealtimePanel: React.FC = () => {
+export const ImuRealtimePanel: React.FC<ImuRealtimePanelProps> = ({
+  onOpenDeviceModal,
+  onOpenSettingsModal,
+}) => {
   const {
     connectedDevice,
     recording,
@@ -49,11 +60,11 @@ export const ImuRealtimePanel: React.FC = () => {
       </div>
     );
   }, [currentReplayMeta?.name, currentReplayMeta?.started_at_ms, replaySamples]);
-  const sourceEnabled = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
+  const sourceAvailable = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
 
   // 图表数据源：回放重播时保持不重置，避免图表重新滚动。
   const chartSource = useImuSource({
-    enabled: sourceEnabled,
+    enabled: sourceAvailable,
     capacity: 250 * 200,
     replaying: hasReplayData,
     replaySamples,
@@ -275,25 +286,40 @@ export const ImuRealtimePanel: React.FC = () => {
 
   return (
     <div className={styles.imuRealtimePanel}>
-      <Card
-        size="small"
-        variant="outlined"
-        style={{ background: "#141414", border: "1px solid #303030" }}
-        styles={{ body: { padding: "12px 16px" } }}
-      >
-        <ImuToolBar
-          sourceEnabled={deviceConnected}
-          connectedDevice={deviceConnected}
-          recording={recording}
-          recordingStatus={recordingStatus}
-          replaying={replaying}
-          canRestartReplay={(replaySamples?.length ?? 0) > 0}
-          restartReplayTooltip={restartReplayTooltip}
-          onRestartReplay={restartReplay}
-          onExitReplay={exitReplay}
-          onToggleRecording={toggleRecording}
-        />
-      </Card>
+      <div className={styles.toolbarInlineRow}>
+        <Card
+          size="small"
+          variant="outlined"
+          className={styles.toolbarCard}
+          style={{ background: "#141414", border: "1px solid #303030" }}
+          styles={{ body: { padding: "12px 16px" } }}
+        >
+          <ImuToolBar
+            connectedDevice={deviceConnected}
+            recording={recording}
+            recordingStatus={recordingStatus}
+            replaying={replaying}
+            canRestartReplay={(replaySamples?.length ?? 0) > 0}
+            restartReplayTooltip={restartReplayTooltip}
+            onOpenDevice={onOpenDeviceModal}
+            onRestartReplay={restartReplay}
+            onExitReplay={exitReplay}
+            onToggleRecording={toggleRecording}
+          />
+        </Card>
+
+        <Tooltip title={deviceConnected ? "" : "请先连接设备"}>
+          <span>
+            <Button
+              type="default"
+              icon={<SettingOutlined />}
+              className={styles.toolbarSettingsButton}
+              onClick={onOpenSettingsModal}
+              disabled={!deviceConnected}
+            />
+          </span>
+        </Tooltip>
+      </div>
 
       <div className={styles.mainGrid}>
         <div className={styles.topRow}>

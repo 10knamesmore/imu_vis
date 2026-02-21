@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Tabs, Modal, Button, Space } from 'antd';
-import { ApiOutlined, SettingOutlined } from '@ant-design/icons';
+import { Layout, Modal } from 'antd';
 
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
@@ -20,14 +19,6 @@ const AppContent: React.FC = () => {
 
   const hasConnectedDevice = connectedDevice !== null;
   const [wasConnected, setWasConnected] = useState(hasConnectedDevice);
-
-  const items = [
-    {
-      key: '1',
-      label: '可视化',
-      children: <ImuRealtimePanel />,
-    },
-  ];
 
   // 模态框打开时：如果没有连接设备，自动开始扫描
   const handleDeviceModalOpen = async () => {
@@ -60,31 +51,9 @@ const AppContent: React.FC = () => {
   return (
     <Layout className={styles.appLayout}>
       <Content className={styles.appContent}>
-        <Tabs
-          defaultActiveKey="1"
-          items={items}
-          className={styles.appTabs}
-          tabBarExtraContent={
-            <Space>
-              <Button
-                type="primary"
-                icon={<ApiOutlined />}
-                className={hasConnectedDevice ? styles.deviceButtonConnected : undefined}
-                onClick={handleDeviceModalOpen}
-              >
-                设备
-              </Button>
-              <Button
-                disabled={!hasConnectedDevice}
-                type="default"
-                icon={<SettingOutlined />}
-                onClick={handleSettingsModalOpen}
-              >
-                设置
-              </Button>
-            </Space>
-          }
-          destroyOnHidden
+        <ImuRealtimePanel
+          onOpenDeviceModal={handleDeviceModalOpen}
+          onOpenSettingsModal={handleSettingsModalOpen}
         />
 
         <Modal

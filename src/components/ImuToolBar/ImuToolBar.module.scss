@@ -16,10 +16,6 @@
   gap: 8px;
 }
 
-.imuStatusLabel {
-  color: #c3cad5;
-}
-
 .imuControls {
   display: flex;
   flex-wrap: wrap;
@@ -34,6 +30,18 @@
   color: #c3cad5;
 }
 
+.deviceButtonConnected {
+  &:global(.ant-btn-primary) {
+    background-color: #2ecc71;
+    border-color: #2ecc71;
+  }
+
+  &:global(.ant-btn-primary:hover),
+  &:global(.ant-btn-primary:focus) {
+    background-color: #27ae60;
+    border-color: #27ae60;
+  }
+}
 
 .deviceRecording {
   &:global(.ant-btn-primary) {

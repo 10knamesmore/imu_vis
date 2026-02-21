@@ -39,9 +39,6 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source, replayTrailR
     setTrailResetToken((token) => token + 1);
   }, [replayTrailResetToken]);
 
-  // 是否使用后端计算姿态
-  const [useCalculated, setUseCalculated] = useState(true);
-
   // 位置校正输入值
   const [posX, setPosX] = useState(0);
   const [posY, setPosY] = useState(0);
@@ -171,18 +168,6 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source, replayTrailR
             </Tooltip>
           </div>
 
-          {/* 数据源切换 */}
-          <div className={styles.imuControl}>
-            <span>使用计算数据</span>
-            <Switch
-              checked={useCalculated}
-              onChange={(checked) => {
-                setUseCalculated(checked);
-                setTrailResetToken((token) => token + 1);
-              }}
-            />
-          </div>
-
           {/* 轴向量端点轨迹控制 */}
           <div className={styles.imuControl}>
             <Tooltip
@@ -243,7 +228,6 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source, replayTrailR
       <div className={styles.imuThreePanel}>
         <ImuThreeView
           source={source}
-          useCalculated={useCalculated}
           showTrajectory={showTrajectory}
           trajectoryOption={trajectoryOption}
           trailResetToken={trailResetToken}
