@@ -95,7 +95,6 @@ impl PipelineConfigHandle {
 pub struct AppState {
     imu_client: Mutex<IMUClient>,
 
-    #[allow(unused)]
     processor: Processor,
 
     /// 下游订阅通道。
@@ -178,5 +177,11 @@ impl AppState {
         let path = ProcessorPipelineConfig::default_config_path();
         std::fs::write(path, content).map_err(|_| PIPELINE_CONFIG_SAVE_ERROR)?;
         Ok(())
+    }
+}
+
+impl Drop for AppState {
+    fn drop(&mut self) {
+        self.processor.shutdown();
     }
 }

@@ -8,7 +8,7 @@ use std::{
     time::Duration,
 };
 
-use flume::Receiver;
+use flume::{Receiver, RecvTimeoutError};
 use tauri::Emitter as _;
 
 use crate::{
@@ -23,21 +23,23 @@ use crate::{
 pub mod calibration;
 /// 滤波模块。
 pub mod filter;
+/// 导航融合模块。
+pub mod navigator;
 /// 输出构建模块。
 pub mod output;
 /// 解析模块。
 pub mod parser;
 /// 管线模块。
 pub mod pipeline;
-/// 导航融合模块。
-pub mod navigator;
 
 /// 对外暴露的计算结果数据类型。
 pub use output::CalculatedData;
 
 /// 数据处理器实例，启动独立线程消费 IMU 流。
 pub struct Processor {
-    _processor_thread: JoinHandle<()>,
+    shutdown_tx: Option<flume::Sender<()>>,
+    processor_thread: Option<JoinHandle<()>>,
+    config_watcher_thread: Option<JoinHandle<()>>,
 }
 
 /// 原始 IMU 数据包枚举。
@@ -71,10 +73,12 @@ impl Processor {
         pipeline_config_rx: flume::Receiver<PipelineConfigRequest>,
         app_handle: tauri::AppHandle,
     ) -> Self {
-        let (config, config_rx) = Self::init_config_watcher();
+        let (shutdown_tx, shutdown_rx) = flume::unbounded::<()>();
+        let (config, config_rx, config_watcher_thread) =
+            Self::init_config_watcher(shutdown_rx.clone());
 
         let app_handle = app_handle.clone();
-        let _processor_thread = thread::Builder::new()
+        let processor_thread = thread::Builder::new()
             .name("DataProcessorThread".into())
             .spawn(move || {
                 let mut current_config = config.clone();
@@ -92,6 +96,7 @@ impl Processor {
                         PipelineConfigRequest(PipelineConfigRequest),
                         ConfigClosed,
                         PipelineConfigClosed,
+                        Shutdown,
                     }
 
                     let mut selector = flume::Selector::new()
@@ -112,6 +117,8 @@ impl Processor {
                                 PipelineEvent::CalibrationClosed
                             }
                         });
+
+                    selector = selector.recv(&shutdown_rx, |_result| PipelineEvent::Shutdown);
 
                     selector = selector.recv(&pipeline_config_rx, |result| match result {
                         Ok(request) => PipelineEvent::PipelineConfigRequest(request),
@@ -193,11 +200,34 @@ impl Processor {
                             tracing::error!("pipeline 配置请求通道接收失败: channel closed");
                             break;
                         }
+                        PipelineEvent::Shutdown => {
+                            tracing::info!("处理器收到关闭信号，准备退出");
+                            break;
+                        }
                     }
                 }
             })
             .unwrap_or_else(|e| panic!("创建核心处理线程失败 : {:?}", e));
-        Processor { _processor_thread }
+        Processor {
+            shutdown_tx: Some(shutdown_tx),
+            processor_thread: Some(processor_thread),
+            config_watcher_thread: Some(config_watcher_thread),
+        }
+    }
+
+    /// 关闭处理器后台线程并等待退出。
+    pub fn shutdown(&mut self) {
+        let _ = self.shutdown_tx.take();
+        if let Some(handle) = self.processor_thread.take() {
+            if let Err(err) = handle.join() {
+                tracing::error!("等待处理器线程退出失败: {:?}", err);
+            }
+        }
+        if let Some(handle) = self.config_watcher_thread.take() {
+            if let Err(err) = handle.join() {
+                tracing::error!("等待配置监听线程退出失败: {:?}", err);
+            }
+        }
     }
 
     /// 初始化配置监听器。
@@ -205,7 +235,13 @@ impl Processor {
     /// # Return:
     ///   config: 第一次默认的配置
     ///   config_rx: 配置更新通道接收端
-    fn init_config_watcher() -> (ProcessorPipelineConfig, Receiver<ProcessorPipelineConfig>) {
+    fn init_config_watcher(
+        shutdown_rx: flume::Receiver<()>,
+    ) -> (
+        ProcessorPipelineConfig,
+        Receiver<ProcessorPipelineConfig>,
+        JoinHandle<()>,
+    ) {
         let (config, initial_modified) =
             match ProcessorPipelineConfig::load_from_default_paths_with_modified() {
                 Ok(snapshot) => {
@@ -222,7 +258,7 @@ impl Processor {
                 }
             };
         let (config_tx, config_rx) = flume::unbounded::<ProcessorPipelineConfig>();
-        thread::Builder::new()
+        let config_watcher_thread = thread::Builder::new()
             .name("PipelineConfigWatcher".into())
             .spawn(move || {
                 let mut last_modified = initial_modified;
@@ -246,11 +282,21 @@ impl Processor {
                             );
                         }
                     }
-                    thread::sleep(Duration::from_secs(3));
+                    match shutdown_rx.recv_timeout(Duration::from_secs(3)) {
+                        Ok(()) => break,
+                        Err(RecvTimeoutError::Timeout) => {}
+                        Err(RecvTimeoutError::Disconnected) => break,
+                    }
                 }
             })
             .unwrap_or_else(|e| panic!("创建配置监听线程失败 : {:?}", e));
 
-        (config, config_rx)
+        (config, config_rx, config_watcher_thread)
+    }
+}
+
+impl Drop for Processor {
+    fn drop(&mut self) {
+        self.shutdown();
     }
 }
