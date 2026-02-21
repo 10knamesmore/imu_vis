@@ -25,9 +25,13 @@ type BluetoothContextValue = {
   recordingStatus: RecordingStatus | null;
   recordings: RecordingMeta[];
   replaying: boolean;
+  replaySamples: ResponseData[] | null;
+  replaySessionId: number | null;
+  replayVersion: number;
   refreshRecordings: () => Promise<void>;
   updateRecordingMeta: (sessionId: number, name?: string, tags?: string[]) => Promise<void>;
   loadRecording: (sessionId: number) => Promise<void>;
+  restartReplay: () => void;
   exitReplay: () => void;
   startScan: () => Promise<void>;
   stopScan: () => Promise<void>;
@@ -96,6 +100,9 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const replayingRef = useRef(false);
   const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
   const [replaying, setReplaying] = useState(false);
+  const [replaySamples, setReplaySamples] = useState<ResponseData[] | null>(null);
+  const [replaySessionId, setReplaySessionId] = useState<number | null>(null);
+  const [replayVersion, setReplayVersion] = useState(0);
 
   useEffect(() => {
     replayingRef.current = replaying;
@@ -462,13 +469,26 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       setPlotRevision((rev) => (rev + 1) % 1_000_000);
       setLastSecondMessageCount(0);
       streamStartMsRef.current = startMs;
+      setReplaySamples(samples);
+      setReplaySessionId(sessionId);
       setReplaying(true);
+      setReplayVersion((version) => version + 1);
       message.success('录制数据已加载');
     } catch (e) {
       console.error(e);
       message.error('加载录制数据失败');
     }
   }, []);
+
+  // 退出回放模式
+  const restartReplay = useCallback(() => {
+    if (!replaySamples || replaySamples.length === 0) {
+      message.warning('请先加载录制数据');
+      return;
+    }
+    setReplaying(true);
+    setReplayVersion((version) => version + 1);
+  }, [replaySamples]);
 
   // 退出回放模式
   const exitReplay = useCallback(() => {
@@ -489,9 +509,13 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     recordingStatus,
     recordings,
     replaying,
+    replaySamples,
+    replaySessionId,
+    replayVersion,
     refreshRecordings,
     updateRecordingMeta,
     loadRecording,
+    restartReplay,
     exitReplay,
     startScan,
     stopScan,

@@ -17,14 +17,35 @@ export const ImuRealtimePanel: React.FC = () => {
     connectedDevice,
     recording,
     recordingStatus,
+    replaying,
+    replaySamples,
+    replaySessionId,
+    replayVersion,
+    restartReplay,
     toggleRecording,
   } = useBluetooth();
   // 控制是否显示图表, TODO: 由card内部决定
   const [showCharts, _] = useState(true);
   // 检查是否已连接设备
-  const sourceEnabled = useMemo(() => connectedDevice !== null, [connectedDevice]);
+  const deviceConnected = useMemo(() => connectedDevice !== null, [connectedDevice]);
+  const hasReplayData = useMemo(
+    () => replaying && (replaySamples?.length ?? 0) > 0,
+    [replaying, replaySamples]
+  );
+  const sourceEnabled = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
+  const viewKey = useMemo(
+    () => (hasReplayData ? `replay-${replaySessionId ?? "unknown"}-${replayVersion}` : "live"),
+    [hasReplayData, replaySessionId, replayVersion]
+  );
   // 获取 IMU 数据源，缓冲区容量 4096
-  const imuSource = useImuSource({ enabled: sourceEnabled, capacity: 250 * 200 });
+  const imuSource = useImuSource({
+    enabled: sourceEnabled,
+    capacity: 250 * 200,
+    replaying: hasReplayData,
+    replaySamples,
+    replaySessionId,
+    replayVersion,
+  });
 
   const chartItems = [
     {
@@ -237,17 +258,20 @@ export const ImuRealtimePanel: React.FC = () => {
         styles={{ body: { padding: "12px 16px" } }}
       >
         <ImuToolBar
-          sourceEnabled={sourceEnabled}
-          connectedDevice={connectedDevice !== null}
+          sourceEnabled={deviceConnected}
+          connectedDevice={deviceConnected}
           recording={recording}
           recordingStatus={recordingStatus}
+          replaying={replaying}
+          canRestartReplay={(replaySamples?.length ?? 0) > 0}
+          onRestartReplay={restartReplay}
           onToggleRecording={toggleRecording}
         />
       </Card>
 
       <div className={styles.mainGrid}>
         <div className={styles.topRow}>
-          <ImuThreeCard source={imuSource} />
+          <ImuThreeCard key={viewKey} source={imuSource} />
         </div>
 
         <div className={styles.bottomRow}>
