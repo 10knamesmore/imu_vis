@@ -33,19 +33,26 @@ export const ImuRealtimePanel: React.FC = () => {
     [replaying, replaySamples]
   );
   const sourceEnabled = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
-  const viewKey = useMemo(
-    () => (hasReplayData ? `replay-${replaySessionId ?? "unknown"}-${replayVersion}` : "live"),
-    [hasReplayData, replaySessionId, replayVersion]
-  );
-  // 获取 IMU 数据源，缓冲区容量 4096
-  const imuSource = useImuSource({
+
+  // 图表数据源：回放重播时保持不重置，避免图表重新滚动。
+  const chartSource = useImuSource({
     enabled: sourceEnabled,
+    capacity: 250 * 200,
+    replaying: hasReplayData,
+    replaySamples,
+    replaySessionId,
+  });
+
+  // Three 数据源：使用 replayVersion 触发重播。
+  const replayThreeSource = useImuSource({
+    enabled: hasReplayData,
     capacity: 250 * 200,
     replaying: hasReplayData,
     replaySamples,
     replaySessionId,
     replayVersion,
   });
+  const threeSource = hasReplayData ? replayThreeSource : chartSource;
 
   const chartItems = [
     {
@@ -54,7 +61,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="加速度 (m/s^2)"
@@ -93,7 +100,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="偏航 / 俯仰 / 横滚 (deg)"
@@ -113,7 +120,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="Acceleration (m/s^2)"
@@ -153,7 +160,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="m"
@@ -173,7 +180,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="导航加速度 (m/s^2)"
@@ -193,7 +200,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="角度差值 (deg)"
@@ -213,7 +220,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="速度 (m/s)"
@@ -233,7 +240,7 @@ export const ImuRealtimePanel: React.FC = () => {
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
-            source={imuSource}
+            source={chartSource}
             enabled={showCharts}
             refreshMs={16}
             label="位置 (m)"
@@ -271,7 +278,7 @@ export const ImuRealtimePanel: React.FC = () => {
 
       <div className={styles.mainGrid}>
         <div className={styles.topRow}>
-          <ImuThreeCard key={viewKey} source={imuSource} />
+          <ImuThreeCard source={threeSource} replayTrailResetToken={replayVersion} />
         </div>
 
         <div className={styles.bottomRow}>

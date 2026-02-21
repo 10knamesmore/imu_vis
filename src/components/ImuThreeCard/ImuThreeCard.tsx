@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button, Card, Switch, Tooltip, message, InputNumber } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
@@ -11,9 +11,10 @@ import type { TrajectoryOption } from "./ImuThreeView/ImuThreeView";
 
 type ImuThreeCardProps = {
   source: ImuSource;
+  replayTrailResetToken?: number;
 };
 
-export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
+export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source, replayTrailResetToken = 0 }) => {
   const { connectedDevice } = useBluetooth();
 
   // 轨迹总开关（轴向量端点轨迹 + 未来原点轨迹）
@@ -30,6 +31,11 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source }) => {
 
   // 通过递增 token 触发子组件清空轨迹缓冲（轴向量端点轨迹 + 未来原点轨迹）
   const [trailResetToken, setTrailResetToken] = useState(0);
+
+  // 回放重播时只清空轨迹，不重置相机朝向与缩放。
+  useEffect(() => {
+    setTrailResetToken((token) => token + 1);
+  }, [replayTrailResetToken]);
 
   // 是否使用后端计算姿态
   const [useCalculated, setUseCalculated] = useState(true);
