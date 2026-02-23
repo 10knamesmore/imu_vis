@@ -138,9 +138,6 @@ export const RecordingsPanel = () => {
               退出回放
             </Button>
           </Tooltip>
-          <Tag color={replaying ? 'orange' : 'default'}>
-            {replaying ? '回放中' : '实时模式'}
-          </Tag>
         </Space>
       </div>
       <Table
