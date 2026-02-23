@@ -114,3 +114,40 @@ export interface ProcessorPipelineConfig {
     accel_thresh: number;
   };
 }
+
+// Debug 实时流中的 stage 快照
+export interface DebugStageSnapshot {
+  name: string;
+  input: unknown;
+  output: unknown;
+  duration_us?: number | null;
+}
+
+// Debug 实时流帧
+export interface DebugRealtimeFrame {
+  seq: number;
+  device_timestamp_ms: number;
+  host_timestamp_ms: number;
+  stages: DebugStageSnapshot[];
+  output: ResponseData;
+  ext?: unknown;
+}
+
+// Debug 监控流中的队列深度
+export interface QueueDepth {
+  upstream: number;
+  downstream: number;
+  record: number;
+}
+
+// Debug 监控流帧（1s）
+export interface DebugMonitorTick {
+  ts_ms: number;
+  input_hz: number;
+  pipeline_hz: number;
+  output_hz: number;
+  frontend_rx_hz: number;
+  queue_depth: QueueDepth;
+  queue_peak: QueueDepth;
+  ext?: unknown;
+}

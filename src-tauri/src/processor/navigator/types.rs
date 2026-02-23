@@ -31,7 +31,7 @@ impl Default for ZuptConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 /// 导航状态。
 pub struct NavState {
     /// 时间戳（毫秒）。

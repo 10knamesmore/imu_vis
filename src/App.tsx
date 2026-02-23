@@ -4,6 +4,7 @@ import { Layout, Modal, Tabs } from 'antd';
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { GlobalSettingFloatButton } from './components/GlobalSettingFloatButton';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
+import { DebugPanel } from "./pages/DebugPanel";
 import { useBluetooth } from './hooks/useBluetooth';
 import { useDeveloperMode } from './hooks/useDeveloperMode';
 import { AppProviders } from './providers';
@@ -83,7 +84,7 @@ const AppContent = () => {
       label: "Debug",
       children: (
         <div className={styles.tabPane}>
-          <div className={styles.debugEmptyPage} />
+          <DebugPanel />
         </div>
       ),
     },

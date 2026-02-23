@@ -8,15 +8,16 @@ use std::{
     time::Duration,
 };
 
-use flume::{Receiver, RecvTimeoutError};
+use flume::{Receiver, RecvTimeoutError, TrySendError};
 use tauri::Emitter as _;
 
 use crate::{
+    debug_monitor::DEBUG_MONITOR_TARGET,
     processor::{
         calibration::CorrectionRequest,
         pipeline::{PipelineConfigRequest, ProcessorPipeline, ProcessorPipelineConfig},
     },
-    types::outputs::ResponseData,
+    types::{debug::DebugRealtimeFrame, outputs::ResponseData},
 };
 
 /// 标定模块。
@@ -69,6 +70,7 @@ impl Processor {
         upstream_rx: flume::Receiver<RawImuData>,
         downstream_tx: flume::Sender<ResponseData>,
         record_tx: flume::Sender<ResponseData>,
+        debug_realtime_tx: flume::Sender<DebugRealtimeFrame>,
         calibration_rx: flume::Receiver<CorrectionRequest>,
         pipeline_config_rx: flume::Receiver<PipelineConfigRequest>,
         app_handle: tauri::AppHandle,
@@ -84,6 +86,7 @@ impl Processor {
                 let mut current_config = config.clone();
                 let mut pipeline = ProcessorPipeline::new(config);
                 let mut config_enabled = true;
+                let mut debug_seq: u64 = 0;
 
                 loop {
                     enum PipelineEvent {
@@ -142,14 +145,41 @@ impl Processor {
 
                     match event {
                         PipelineEvent::Packet(data) => {
-                            if let Some(response_data) = pipeline.process_packet(&data) {
+                            if let Some((response_data, debug_stages, device_timestamp_ms)) =
+                                pipeline.process_packet(&data)
+                            {
+                                tracing::trace!(target: DEBUG_MONITOR_TARGET, metric = "pipeline");
+
                                 if let Err(e) = downstream_tx.send(response_data) {
                                     tracing::error!("下游发送数据时失败: {:?}", e);
+                                } else {
+                                    tracing::trace!(target: DEBUG_MONITOR_TARGET, metric = "output");
                                 }
                                 if let Err(e) = record_tx.send(response_data) {
                                     tracing::error!("记录数据失败: {:?}", e);
                                 }
+
+                                let debug_frame = DebugRealtimeFrame {
+                                    seq: debug_seq,
+                                    device_timestamp_ms,
+                                    host_timestamp_ms: now_ms(),
+                                    stages: debug_stages,
+                                    output: response_data,
+                                    ext: None,
+                                };
+                                debug_seq = debug_seq.wrapping_add(1);
+
+                                match debug_realtime_tx.try_send(debug_frame) {
+                                    Ok(()) => {}
+                                    Err(TrySendError::Full(_)) => {
+                                        tracing::trace!("Debug 实时队列已满，丢弃当前帧");
+                                    }
+                                    Err(TrySendError::Disconnected(_)) => {
+                                        tracing::debug!("Debug 实时流接收端已关闭");
+                                    }
+                                }
                             }
+                            emit_queue_depth(upstream_rx.len(), downstream_tx.len(), record_tx.len());
                         }
                         PipelineEvent::Calibration(request) => {
                             pipeline.handle_calibration_request(request);
@@ -294,6 +324,23 @@ impl Processor {
 
         (config, config_rx, config_watcher_thread)
     }
+}
+
+fn emit_queue_depth(upstream: usize, downstream: usize, record: usize) {
+    tracing::trace!(
+        target: DEBUG_MONITOR_TARGET,
+        metric = "queue_depth",
+        upstream = upstream as u64,
+        downstream = downstream as u64,
+        record = record as u64,
+    );
+}
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or_default()
 }
 
 impl Drop for Processor {

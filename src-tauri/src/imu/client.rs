@@ -14,7 +14,10 @@ use std::{
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::OnceCell;
 
-use crate::{imu::config::IMUConfig, processor::RawImuData, types::bluetooth::PeripheralInfo};
+use crate::{
+    debug_monitor::DEBUG_MONITOR_TARGET, imu::config::IMUConfig, processor::RawImuData,
+    types::bluetooth::PeripheralInfo,
+};
 
 struct NeededCharacteristics {
     write_char: Characteristic,
@@ -197,7 +200,7 @@ impl IMUClient {
             while let Some(data) = notification_stream.next().await {
                 match tx.send_async(RawImuData::Packet(data.value)).await {
                     Ok(_) => {
-                        // debug!(uuid = %data.uuid, "received imu packet");
+                        tracing::trace!(target: DEBUG_MONITOR_TARGET, metric = "input");
                     }
                     // 当且仅当所有Receiver被drop时返回error
                     Err(e) => {

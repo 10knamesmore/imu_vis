@@ -6,6 +6,7 @@ use tauri::Manager as _;
 
 mod app_state;
 mod commands;
+mod debug_monitor;
 mod imu;
 mod logger;
 mod processor;

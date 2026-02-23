@@ -127,8 +127,7 @@ impl ImuParser {
         let (offset, l6) = Self::try_parse_vec3(buf, ctl, 0x0080, l5, Self::SCALE_OFFSET)?;
 
         // (bit 10)
-        let (accel_nav, _l_final) =
-            Self::try_parse_vec3(buf, ctl, 0x0200, l6, Self::SCALE_ACCEL)?;
+        let (accel_nav, _l_final) = Self::try_parse_vec3(buf, ctl, 0x0200, l6, Self::SCALE_ACCEL)?;
 
         Ok(ImuSampleRaw {
             timestamp_ms,

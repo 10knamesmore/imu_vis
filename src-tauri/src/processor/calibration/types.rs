@@ -50,7 +50,7 @@ impl CalibrationState {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 /// 标定后的 IMU 样本。
 pub struct ImuSampleCalibrated {
     /// 时间戳（毫秒）。

@@ -1,8 +1,6 @@
 use crate::{
-    app_state::AppState,
-    commands::response::Response as IpcResponse,
-    processor::pipeline::ProcessorPipelineConfig,
-    types::bluetooth::PeripheralInfo,
+    app_state::AppState, commands::response::Response as IpcResponse,
+    processor::pipeline::ProcessorPipelineConfig, types::bluetooth::PeripheralInfo,
 };
 use tauri::State;
 

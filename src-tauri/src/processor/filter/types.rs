@@ -21,7 +21,7 @@ impl Default for LowPassFilterConfig {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Serialize)]
 /// 低通滤波后的 IMU 样本。
 pub struct ImuSampleFiltered {
     /// 时间戳（毫秒）。

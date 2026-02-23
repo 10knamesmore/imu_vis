@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, Select, Space, Table, Tag, Tooltip } from 'antd';
+import { Button, Input, Select, Space, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import { useBluetooth } from '../../hooks/useBluetooth';

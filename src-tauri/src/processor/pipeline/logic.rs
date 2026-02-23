@@ -2,10 +2,12 @@
 
 use std::{
     path::{Path, PathBuf},
-    time::SystemTime,
+    time::{Instant, SystemTime},
 };
 
 use anyhow::Context;
+use serde::Serialize;
+use serde_json::{json, Value};
 
 use crate::{
     processor::{
@@ -16,7 +18,13 @@ use crate::{
         parser::{ImuParser, ImuSampleRaw},
         pipeline::types::ProcessorPipelineConfig,
     },
-    types::outputs::ResponseData,
+    types::{
+        debug::{
+            DebugStageSnapshot, STAGE_AXIS_CALIBRATION, STAGE_CALIBRATION, STAGE_FILTER,
+            STAGE_NAVIGATOR, STAGE_OUTPUT_BUILDER,
+        },
+        outputs::ResponseData,
+    },
 };
 
 /// IMU 处理管线。
@@ -73,8 +81,11 @@ impl ProcessorPipeline {
         }
     }
 
-    /// 处理单个原始数据包并输出响应。
-    pub fn process_packet(&mut self, packet: &[u8]) -> Option<ResponseData> {
+    /// 处理单个原始数据包并输出响应，同时返回 Debug 阶段快照。
+    pub fn process_packet(
+        &mut self,
+        packet: &[u8],
+    ) -> Option<(ResponseData, Vec<DebugStageSnapshot>, u64)> {
         // 解析原始蓝牙包
         let mut raw = match ImuParser::parse(packet) {
             Ok(sample) => sample,
@@ -84,16 +95,77 @@ impl ProcessorPipeline {
             }
         };
 
+        let mut stages = Vec::with_capacity(5);
         self.latest_raw = Some(raw);
+
+        // Stage axis_calibration:
+        // input/output 均为 ImuSampleRaw JSON 结构，区别是 output 已应用零位校正。
+        let axis_input = raw;
+        let axis_started_at = Instant::now();
         self.axis_calibration.apply(&mut raw);
+        stages.push(build_stage_snapshot(
+            STAGE_AXIS_CALIBRATION,
+            &axis_input,
+            &raw,
+            axis_started_at,
+        ));
 
         // 处理链：标定 -> 滤波 -> 导航融合 -> 输出
-        let calibrated = self.calibration.update(&raw);
-        let filtered = self.filter.apply(&calibrated);
-        let nav = self.navigator.update(raw.quat, &filtered);
+        // Stage calibration:
+        // input: ImuSampleRaw JSON；output: ImuSampleCalibrated JSON。
+        let calibration_input = raw;
+        let calibration_started_at = Instant::now();
+        let calibrated = self.calibration.update(&calibration_input);
+        stages.push(build_stage_snapshot(
+            STAGE_CALIBRATION,
+            &calibration_input,
+            &calibrated,
+            calibration_started_at,
+        ));
 
+        // Stage filter:
+        // input: ImuSampleCalibrated JSON；output: ImuSampleFiltered JSON。
+        let filter_input = calibrated;
+        let filter_started_at = Instant::now();
+        let filtered = self.filter.apply(&filter_input);
+        stages.push(build_stage_snapshot(
+            STAGE_FILTER,
+            &filter_input,
+            &filtered,
+            filter_started_at,
+        ));
+
+        // Stage navigator:
+        // input: { attitude, filtered }；output: NavState JSON。
+        let navigator_input = json!({
+            "attitude": raw.quat,
+            "filtered": to_debug_value(&filtered),
+        });
+        let navigator_started_at = Instant::now();
+        let nav = self.navigator.update(raw.quat, &filtered);
+        stages.push(DebugStageSnapshot::new(
+            STAGE_NAVIGATOR.to_string(),
+            navigator_input,
+            to_debug_value(&nav),
+            Some(duration_us(navigator_started_at)),
+        ));
+
+        // Stage output_builder:
+        // input: { raw, nav }；output: ResponseData JSON。
+        let output_input = json!({
+            "raw": to_debug_value(&raw),
+            "nav": to_debug_value(&nav),
+        });
+        let output_started_at = Instant::now();
         let frame = OutputFrame { raw, nav };
-        Some(OutputBuilder::build(&frame))
+        let response = OutputBuilder::build(&frame);
+        stages.push(DebugStageSnapshot::new(
+            STAGE_OUTPUT_BUILDER.to_string(),
+            output_input,
+            to_debug_value(&response),
+            Some(duration_us(output_started_at)),
+        ));
+        Some((response, stages, raw.timestamp_ms))
     }
 
     /// 重置内部状态
@@ -165,4 +237,33 @@ fn read_config_with_modified(path: &Path) -> anyhow::Result<(ProcessorPipelineCo
     let config = toml::from_str::<ProcessorPipelineConfig>(&content)
         .with_context(|| format!("解析 TOML 配置失败: {}", path.display()))?;
     Ok((config, modified))
+}
+
+fn build_stage_snapshot<TIn: Serialize, TOut: Serialize>(
+    stage_name: &str,
+    input: &TIn,
+    output: &TOut,
+    started_at: Instant,
+) -> DebugStageSnapshot {
+    DebugStageSnapshot::new(
+        stage_name.to_string(),
+        to_debug_value(input),
+        to_debug_value(output),
+        Some(duration_us(started_at)),
+    )
+}
+
+fn to_debug_value<T: Serialize>(data: &T) -> Value {
+    match serde_json::to_value(data) {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::warn!("序列化 Debug Stage JSON 失败: {error:#}");
+            Value::Null
+        }
+    }
+}
+
+fn duration_us(started_at: Instant) -> u64 {
+    let elapsed = started_at.elapsed().as_micros();
+    elapsed.min(u128::from(u64::MAX)) as u64
 }

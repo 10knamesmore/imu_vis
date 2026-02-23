@@ -1,5 +1,6 @@
 //! Tauri 命令路由。
 
+mod debug;
 mod imu;
 mod output;
 mod recording;
@@ -19,6 +20,8 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         imu::update_pipeline_config,
         imu::save_pipeline_config,
         output::subscribe_output,
+        debug::subscribe_debug_realtime,
+        debug::subscribe_debug_monitor,
         recording::start_recording,
         recording::stop_recording,
         recording::list_recordings,

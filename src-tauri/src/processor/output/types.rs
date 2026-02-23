@@ -3,8 +3,8 @@
 use math_f64::{DQuat, DVec3};
 use serde::Serialize;
 
-use crate::processor::parser::ImuSampleRaw;
 use crate::processor::navigator::NavState;
+use crate::processor::parser::ImuSampleRaw;
 
 #[derive(Debug, Clone, Copy, Serialize)]
 /// 计算后的状态数据。

@@ -6,6 +6,8 @@ use tracing_subscriber::{
     filter::Targets, fmt::format::FmtSpan, layer::SubscriberExt, util::SubscriberInitExt, Layer,
 };
 
+use crate::debug_monitor;
+
 /// 初始化 tracing 并返回 guard。
 pub fn init_tracing() -> WorkerGuard {
     let stdout_layer = if cfg!(debug_assertions) {
@@ -37,6 +39,7 @@ pub fn init_tracing() -> WorkerGuard {
     //     .with_filter(LevelFilter::INFO);
 
     tracing_subscriber::registry()
+        .with(debug_monitor::create_monitor_layer())
         .with(stdout_layer)
         // .with(json_layer)
         .init();
