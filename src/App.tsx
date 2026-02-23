@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Layout, Modal, Tabs } from 'antd';
 
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
+import { GlobalSettingFloatButton } from './components/GlobalSettingFloatButton';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { useBluetooth } from './hooks/useBluetooth';
 import { useDeveloperMode } from './hooks/useDeveloperMode';
@@ -72,7 +73,6 @@ const AppContent = () => {
         <div className={styles.tabPane}>
           <ImuRealtimePanel
             onOpenDeviceModal={handleDeviceModalOpen}
-            onOpenSettingsModal={handleSettingsModalOpen}
           />
         </div>
       ),
@@ -101,9 +101,9 @@ const AppContent = () => {
         ) : (
           <ImuRealtimePanel
             onOpenDeviceModal={handleDeviceModalOpen}
-            onOpenSettingsModal={handleSettingsModalOpen}
           />
         )}
+        <GlobalSettingFloatButton onOpenSettingsModal={handleSettingsModalOpen} />
 
         <Modal
           title="设备"

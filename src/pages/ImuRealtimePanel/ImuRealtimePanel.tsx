@@ -1,9 +1,7 @@
-import React, { useMemo, useState } from "react";
-import { Button, Card, Tooltip } from "antd";
-import { SettingOutlined } from "@ant-design/icons";
+import { useMemo, useState } from "react";
+import { Card } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
-import { useDeveloperMode } from "../../hooks/useDeveloperMode";
 import { useImuSource } from "../../hooks/useImuSource";
 import { ImuThreeCard } from "../../components/ImuThreeCard";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
@@ -14,17 +12,14 @@ import styles from "./ImuRealtimePanel.module.scss";
 type ImuRealtimePanelProps = {
   /** 打开“设备”弹窗。 */
   onOpenDeviceModal: () => void;
-  /** 打开“设置”弹窗。 */
-  onOpenSettingsModal: () => void;
 };
 
 /**
  * IMU 实时可视化面板组件。
  */
-export const ImuRealtimePanel: React.FC<ImuRealtimePanelProps> = ({
+export const ImuRealtimePanel = ({
   onOpenDeviceModal,
-  onOpenSettingsModal,
-}) => {
+}: ImuRealtimePanelProps) => {
   const {
     connectedDevice,
     recording,
@@ -38,7 +33,6 @@ export const ImuRealtimePanel: React.FC<ImuRealtimePanelProps> = ({
     exitReplay,
     toggleRecording,
   } = useBluetooth();
-  const { isDeveloperMode } = useDeveloperMode();
   /** 跟踪图表区域是否折叠。 */
   const [chartsCollapsed, setChartsCollapsed] = useState(false);
   /** 图表展开时才驱动图表刷新，折叠时暂停绘制。 */
@@ -321,18 +315,6 @@ export const ImuRealtimePanel: React.FC<ImuRealtimePanelProps> = ({
             onToggleRecording={toggleRecording}
           />
         </Card>
-
-        <Tooltip title={deviceConnected || isDeveloperMode ? "" : "请先连接设备"}>
-          <span>
-            <Button
-              type="default"
-              icon={<SettingOutlined />}
-              className={styles.toolbarSettingsButton}
-              onClick={onOpenSettingsModal}
-              disabled={!deviceConnected && !isDeveloperMode}
-            />
-          </span>
-        </Tooltip>
       </div>
 
       <div className={styles.mainGrid}>

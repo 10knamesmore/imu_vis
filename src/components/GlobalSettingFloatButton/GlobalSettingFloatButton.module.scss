@@ -1,0 +1,80 @@
+.floatLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.floatButton {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  touch-action: none;
+  will-change: transform, left, top;
+  transition:
+    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+    left 0.22s ease,
+    top 0.22s ease,
+    opacity 0.2s ease;
+}
+
+.floatButtonHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.floatButtonDragging {
+  transition: none;
+}
+
+.floatButtonEdgeLeft {
+  transform: translateX(-24px);
+}
+
+.floatButtonEdgeRight {
+  transform: translateX(24px);
+}
+
+.floatButtonEdgeTop {
+  transform: translateY(-24px);
+}
+
+.floatButtonEdgeBottom {
+  transform: translateY(24px);
+}
+
+.floatButtonPeekVisible {
+  transform: translate(0, 0);
+}
+
+.floatButtonEdgeLeft.floatButtonPeekVisible {
+  transform: translateX(8px);
+}
+
+.floatButtonEdgeRight.floatButtonPeekVisible {
+  transform: translateX(-8px);
+}
+
+.floatButtonEdgeTop.floatButtonPeekVisible {
+  transform: translateY(8px);
+}
+
+.floatButtonEdgeBottom.floatButtonPeekVisible {
+  transform: translateY(-8px);
+}
+
+.floatButtonInner {
+  width: 52px;
+  height: 52px;
+  min-width: 52px;
+  min-height: 52px;
+  padding: 0;
+  border-radius: 999px;
+  box-shadow: 0 8px 18px rgb(0 0 0 / 32%);
+
+  :global(.anticon) {
+    font-size: 18px;
+  }
+}

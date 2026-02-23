@@ -18,10 +18,6 @@
   min-width: 0;
 }
 
-.toolbarSettingsButton {
-  flex-shrink: 0;
-}
-
 .mainGrid {
   flex: 1;
   min-height: 0;
@@ -115,9 +111,5 @@
   .toolbarInlineRow {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .toolbarSettingsButton {
-    align-self: flex-end;
   }
 }
