@@ -1,0 +1,144 @@
+.debugSeriesCanvas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 126px;
+  gap: 12px;
+  width: 100%;
+  min-height: 0;
+  padding: 10px;
+  border: 1px solid #263347;
+  border-radius: 10px;
+  background: #0f151f;
+
+  :global(canvas) {
+    display: block;
+  }
+}
+
+.chartColumn {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chartTitle {
+  color: #d7e6f7;
+  font-size: 12px;
+  line-height: 1.2;
+  word-break: break-all;
+}
+
+.canvasArea {
+  min-width: 0;
+  min-height: 0;
+  height: 220px;
+}
+
+.timelineWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.timelineTrack {
+  position: relative;
+  height: 12px;
+  border-radius: 999px;
+  border: 1px solid #1f2a38;
+  background: #0b1119;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.timelineThumb {
+  position: absolute;
+  top: 1px;
+  left: 0;
+  height: 8px;
+  border-radius: 999px;
+  background: #3f556f;
+  cursor: grab;
+}
+
+.timelineThumb:active {
+  cursor: grabbing;
+}
+
+.timelineMeta {
+  color: #9aa5b1;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.timelineDisabled {
+  opacity: 0.6;
+
+  .timelineTrack,
+  .timelineThumb {
+    cursor: not-allowed;
+  }
+}
+
+.statsColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statCard {
+  background: #0b1119;
+  border: 1px solid #1f2a38;
+  border-radius: 6px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 56px;
+}
+
+.statHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  color: #c9d1db;
+  font-size: 12px;
+}
+
+.statLabel {
+  color: inherit;
+}
+
+.statDivider {
+  height: 1px;
+  background: #1f2a38;
+}
+
+.statValue {
+  color: #f0f4f8;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  font-size: 12px;
+}
+
+.colorSwatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 900px) {
+  .debugSeriesCanvas {
+    grid-template-columns: 1fr;
+  }
+
+  .statsColumn {
+    flex-direction: row;
+  }
+
+  .statCard {
+    flex: 1;
+  }
+}

@@ -1,24 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
-import { Card, Checkbox, Col, Empty, Row, Select, Space, Statistic, Tag } from "antd";
+import { Card, Checkbox, Col, Empty, Row, Statistic, Tag } from "antd";
+import type { TabsProps } from "antd";
 
-import { DebugStageChart, type DebugChartSeries } from "../../components/DebugStageChart";
+import { DebugSeriesCanvas, type DebugComparePoint } from "../../components/DebugSeriesCanvas";
+import { ImuChartTabs } from "../../components/ImuChartTabs";
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useDebugStreams } from "../../hooks/useDebugStreams";
 
 import styles from "./DebugPanel.module.scss";
-
-const WINDOW_MS = 10_000;
-
-const OUTPUT_COLORS = ["#5aa9ff", "#ffb454", "#7dd3a6", "#d29bff", "#f78fb3", "#8bd3ff"];
-const INPUT_COLORS = ["#9fc9ff", "#ffd38a", "#a8e8c3", "#e3c9ff", "#ffc0d4", "#b9e7ff"];
 
 type PathOption = {
   label: string;
   value: string;
 };
 
+type StageSample = {
+  /** 设备时间戳（毫秒）。 */
+  t: number;
+  /** 阶段输入 JSON。 */
+  input: unknown;
+  /** 阶段输出 JSON。 */
+  output: unknown;
+};
+
+type StageSelectionMap = Record<string, string[]>;
+
 /**
  * 收集对象中的数值叶子路径。
+ *
+ * @param value - 当前 JSON 节点
+ * @param prefix - 当前路径前缀
+ * @param output - 路径集合输出
  */
 const collectNumericPaths = (value: unknown, prefix: string, output: Set<string>) => {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -44,6 +56,10 @@ const collectNumericPaths = (value: unknown, prefix: string, output: Set<string>
 
 /**
  * 从对象中按路径读取数值。
+ *
+ * @param value - JSON 节点
+ * @param path - 路径
+ * @returns 数值或 undefined
  */
 const readNumberByPath = (value: unknown, path: string): number | undefined => {
   if (!path) {
@@ -73,6 +89,77 @@ const readNumberByPath = (value: unknown, path: string): number | undefined => {
 };
 
 /**
+ * 判断两个阶段选中映射是否一致。
+ *
+ * @param left - 旧映射
+ * @param right - 新映射
+ * @returns 是否一致
+ */
+const isSameStageSelectionMap = (left: StageSelectionMap, right: StageSelectionMap) => {
+  const leftKeys = Object.keys(left);
+  const rightKeys = Object.keys(right);
+  if (leftKeys.length !== rightKeys.length) {
+    return false;
+  }
+  for (const key of leftKeys) {
+    const leftValues = left[key] ?? [];
+    const rightValues = right[key] ?? [];
+    if (leftValues.length !== rightValues.length) {
+      return false;
+    }
+    for (let index = 0; index < leftValues.length; index += 1) {
+      if (leftValues[index] !== rightValues[index]) {
+        return false;
+      }
+    }
+  }
+  return true;
+};
+
+/**
+ * 生成阶段可选 series 列表（输入/输出路径并集）。
+ *
+ * @param input - 阶段输入 JSON
+ * @param output - 阶段输出 JSON
+ * @returns 选项列表
+ */
+const buildSeriesOptions = (input: unknown, output: unknown): PathOption[] => {
+  const paths = new Set<string>();
+  collectNumericPaths(input, "", paths);
+  collectNumericPaths(output, "", paths);
+  return Array.from(paths)
+    .sort((left, right) => left.localeCompare(right))
+    .map((path) => ({
+      label: path,
+      value: path,
+    }));
+};
+
+/**
+ * 将阶段样本转换为单系列绘图点。
+ *
+ * @param samples - 阶段样本
+ * @param path - 数值路径
+ * @returns 对比点
+ */
+const buildSeriesPoints = (samples: StageSample[], path: string): DebugComparePoint[] => {
+  const points: DebugComparePoint[] = [];
+  for (const sample of samples) {
+    const input = readNumberByPath(sample.input, path);
+    const output = readNumberByPath(sample.output, path);
+    if (input === undefined && output === undefined) {
+      continue;
+    }
+    points.push({
+      t: sample.t,
+      input,
+      output,
+    });
+  }
+  return points;
+};
+
+/**
  * Debug 双流面板。
  */
 export const DebugPanel = () => {
@@ -84,158 +171,137 @@ export const DebugPanel = () => {
     monitorTick,
     frontendRxHz,
   } = useDebugStreams();
-  /** 已选中的 stage 名称。 */
-  const [selectedStageNames, setSelectedStageNames] = useState<string[]>([]);
-  /** 已选中的 input 数值路径。 */
-  const [selectedInputPath, setSelectedInputPath] = useState<string>("");
-  /** 已选中的 output 数值路径。 */
-  const [selectedOutputPath, setSelectedOutputPath] = useState<string>("");
+  /** 图表区域折叠状态。 */
+  const [chartsCollapsed, setChartsCollapsed] = useState(false);
+  /** 每个 stage 的 series 选中状态。 */
+  const [selectedSeriesByStage, setSelectedSeriesByStage] = useState<StageSelectionMap>({});
 
-  const stageOptions = useMemo<PathOption[]>(() => {
+  /** 当前可用 stage 名称列表。 */
+  const stageNames = useMemo(() => {
     if (!latestFrame) {
-      return [];
+      return [] as string[];
     }
-    return latestFrame.stages.map((stage) => ({
-      label: stage.name,
-      value: stage.name,
-    }));
+    return latestFrame.stages.map((stage) => stage.name);
   }, [latestFrame]);
 
-  useEffect(() => {
-    if (!stageOptions.length) {
-      setSelectedStageNames([]);
-      return;
+  /** 每个 stage 的可选 series。 */
+  const stageSeriesOptions = useMemo<Record<string, PathOption[]>>(() => {
+    const optionsMap: Record<string, PathOption[]> = {};
+    if (!latestFrame) {
+      return optionsMap;
     }
-    setSelectedStageNames((previous) => {
-      const next = previous.filter((name) => stageOptions.some((option) => option.value === name));
-      if (next.length > 0) {
-        return next;
-      }
-      return [stageOptions[0].value];
-    });
-  }, [stageOptions]);
-
-  const inputPathOptions = useMemo<PathOption[]>(() => {
-    if (!latestFrame || !selectedStageNames.length) {
-      return [];
-    }
-    const paths = new Set<string>();
     for (const stage of latestFrame.stages) {
-      if (!selectedStageNames.includes(stage.name)) {
-        continue;
-      }
-      collectNumericPaths(stage.input, "", paths);
+      optionsMap[stage.name] = buildSeriesOptions(stage.input, stage.output);
     }
-    return Array.from(paths)
-      .sort((left, right) => left.localeCompare(right))
-      .map((path) => ({ label: path, value: path }));
-  }, [latestFrame, selectedStageNames]);
+    return optionsMap;
+  }, [latestFrame]);
 
-  const outputPathOptions = useMemo<PathOption[]>(() => {
-    if (!latestFrame || !selectedStageNames.length) {
-      return [];
-    }
-    const paths = new Set<string>();
-    for (const stage of latestFrame.stages) {
-      if (!selectedStageNames.includes(stage.name)) {
-        continue;
-      }
-      collectNumericPaths(stage.output, "", paths);
-    }
-    return Array.from(paths)
-      .sort((left, right) => left.localeCompare(right))
-      .map((path) => ({ label: path, value: path }));
-  }, [latestFrame, selectedStageNames]);
-
+  /**
+   * 当 stage 或可选路径变化时，同步 series 选中状态。
+   * 默认每个 stage 自动勾选第一个可选 series，便于直接看到图表。
+   */
   useEffect(() => {
-    if (!inputPathOptions.length) {
-      setSelectedInputPath("");
+    if (!stageNames.length) {
+      setSelectedSeriesByStage({});
       return;
     }
-    setSelectedInputPath((previous) => {
-      if (inputPathOptions.some((option) => option.value === previous)) {
-        return previous;
+    setSelectedSeriesByStage((previous) => {
+      const next: StageSelectionMap = {};
+      for (const stageName of stageNames) {
+        const availableSeries = stageSeriesOptions[stageName] ?? [];
+        const availableSet = new Set(availableSeries.map((option) => option.value));
+        const preserved = (previous[stageName] ?? []).filter((path) => availableSet.has(path));
+        next[stageName] = preserved.length > 0
+          ? preserved
+          : (availableSeries[0] ? [availableSeries[0].value] : []);
       }
-      return inputPathOptions[0].value;
+      return isSameStageSelectionMap(previous, next) ? previous : next;
     });
-  }, [inputPathOptions]);
+  }, [stageNames, stageSeriesOptions]);
 
-  useEffect(() => {
-    if (!outputPathOptions.length) {
-      setSelectedOutputPath("");
-      return;
-    }
-    setSelectedOutputPath((previous) => {
-      if (outputPathOptions.some((option) => option.value === previous)) {
-        return previous;
+  /** 将帧缓冲整理为按 stage 分组的样本序列。 */
+  const stageSamplesByName = useMemo<Record<string, StageSample[]>>(() => {
+    const stageMap: Record<string, StageSample[]> = {};
+    for (const frame of framesRef.current) {
+      for (const stage of frame.stages) {
+        if (!stageMap[stage.name]) {
+          stageMap[stage.name] = [];
+        }
+        stageMap[stage.name].push({
+          t: frame.device_timestamp_ms,
+          input: stage.input,
+          output: stage.output,
+        });
       }
-      return outputPathOptions[0].value;
-    });
-  }, [outputPathOptions]);
-
-  const framesInWindow = useMemo(() => {
-    const frames = framesRef.current;
-    if (!frames.length) {
-      return [] as typeof frames;
     }
-    const latestTimestamp = frames[frames.length - 1].device_timestamp_ms;
-    const startTimestamp = Math.max(0, latestTimestamp - WINDOW_MS);
-    return frames.filter((frame) => frame.device_timestamp_ms >= startTimestamp);
+    return stageMap;
   }, [framesRef, framesRevision]);
 
-  const chartSeries = useMemo<DebugChartSeries[]>(() => {
-    if (
-      !framesInWindow.length ||
-      !selectedStageNames.length ||
-      !selectedInputPath ||
-      !selectedOutputPath
-    ) {
+  /**
+   * 处理 stage 的 series 勾选变更。
+   *
+   * @param stageName - 阶段名称
+   * @param values - 勾选项
+   */
+  const handleSeriesSelectionChange = (stageName: string, values: Array<string | number | boolean>) => {
+    const nextValues = values.map((value) => String(value));
+    setSelectedSeriesByStage((previous) => ({
+      ...previous,
+      [stageName]: nextValues,
+    }));
+  };
+
+  /** stage tabs 内容。 */
+  const stageTabItems = useMemo<TabsProps["items"]>(() => {
+    if (!stageNames.length) {
       return [];
     }
+    return stageNames.map((stageName) => {
+      const options = stageSeriesOptions[stageName] ?? [];
+      const selectedSeries = selectedSeriesByStage[stageName] ?? [];
+      const samples = stageSamplesByName[stageName] ?? [];
+      const chartEntries = selectedSeries.map((path) => ({
+        path,
+        points: buildSeriesPoints(samples, path),
+      }));
 
-    const startTimestamp = framesInWindow[0].device_timestamp_ms;
-    const series: DebugChartSeries[] = [];
+      return {
+        key: stageName,
+        label: `${stageName} (${selectedSeries.length})`,
+        children: (
+          <div className={styles.stageTabPane}>
+            <div className={styles.selectorGroup}>
+              <span className={styles.selectorLabel}>Series（勾选即新增图表）</span>
+              {options.length === 0 ? (
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="当前 stage 没有可用数值路径" />
+              ) : (
+                <Checkbox.Group
+                  options={options}
+                  value={selectedSeries}
+                  onChange={(values) => handleSeriesSelectionChange(stageName, values)}
+                  className={styles.seriesSelector}
+                />
+              )}
+            </div>
 
-    selectedStageNames.forEach((stageName, index) => {
-      const inputPoints: Array<{ x: number; y: number }> = [];
-      const outputPoints: Array<{ x: number; y: number }> = [];
-
-      for (const frame of framesInWindow) {
-        const stage = frame.stages.find((item) => item.name === stageName);
-        if (!stage) {
-          continue;
-        }
-        const x = (frame.device_timestamp_ms - startTimestamp) / 1000;
-        const inputValue = readNumberByPath(stage.input, selectedInputPath);
-        if (inputValue !== undefined) {
-          inputPoints.push({ x, y: inputValue });
-        }
-        const outputValue = readNumberByPath(stage.output, selectedOutputPath);
-        if (outputValue !== undefined) {
-          outputPoints.push({ x, y: outputValue });
-        }
-      }
-
-      if (inputPoints.length >= 2) {
-        series.push({
-          name: `${stageName}.input`,
-          color: INPUT_COLORS[index % INPUT_COLORS.length],
-          dashed: true,
-          points: inputPoints,
-        });
-      }
-
-      if (outputPoints.length >= 2) {
-        series.push({
-          name: `${stageName}.output`,
-          color: OUTPUT_COLORS[index % OUTPUT_COLORS.length],
-          points: outputPoints,
-        });
-      }
+            {selectedSeries.length === 0 ? (
+              <Empty description="请选择至少一个 series" />
+            ) : (
+              <div className={styles.seriesCharts}>
+                {chartEntries.map((entry) => (
+                  <DebugSeriesCanvas
+                    key={`${stageName}:${entry.path}`}
+                    title={`${stageName} · ${entry.path}`}
+                    points={entry.points}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        ),
+      };
     });
-
-    return series;
-  }, [framesInWindow, selectedStageNames, selectedInputPath, selectedOutputPath]);
+  }, [selectedSeriesByStage, stageNames, stageSamplesByName, stageSeriesOptions]);
 
   const queueDepth = monitorTick?.queue_depth ?? { upstream: 0, downstream: 0, record: 0 };
   const queuePeak = monitorTick?.queue_peak ?? { upstream: 0, downstream: 0, record: 0 };
@@ -245,10 +311,10 @@ export const DebugPanel = () => {
   const bufferedFrames = framesRef.current.length;
 
   /**
-   * 处理 stage 多选变更。
+   * 切换图表区域折叠状态。
    */
-  const handleStageSelectionChange = (values: Array<string | number | boolean>) => {
-    setSelectedStageNames(values.map((value) => String(value)));
+  const handleToggleChartsCollapsed = () => {
+    setChartsCollapsed((previous) => !previous);
   };
 
   return (
@@ -315,55 +381,22 @@ export const DebugPanel = () => {
         {!latestFrame ? (
           <Empty description="等待 Debug 实时流..." />
         ) : (
-          <Space direction="vertical" className={styles.realtimeContent} size={12}>
-            <div className={styles.toolbar}>
-              <div className={styles.selectorGroup}>
-                <span className={styles.selectorLabel}>Stages</span>
-                <Checkbox.Group
-                  value={selectedStageNames}
-                  options={stageOptions}
-                  onChange={handleStageSelectionChange}
-                />
-              </div>
-              <div className={styles.selectorGroup}>
-                <span className={styles.selectorLabel}>Input Path</span>
-                <Select
-                  className={styles.pathSelect}
-                  value={selectedInputPath || undefined}
-                  onChange={setSelectedInputPath}
-                  options={inputPathOptions}
-                  showSearch
-                  placeholder="选择 input 数值路径"
-                />
-              </div>
-              <div className={styles.selectorGroup}>
-                <span className={styles.selectorLabel}>Output Path</span>
-                <Select
-                  className={styles.pathSelect}
-                  value={selectedOutputPath || undefined}
-                  onChange={setSelectedOutputPath}
-                  options={outputPathOptions}
-                  showSearch
-                  placeholder="选择 output 数值路径"
-                />
-              </div>
-            </div>
-
+          <div className={styles.realtimeContent}>
             <div className={styles.metaRow}>
               <Tag color={connectedDevice ? "green" : "default"}>
                 {connectedDevice ? "设备已连接" : "设备未连接"}
               </Tag>
               <Tag color="blue">缓冲帧数 {bufferedFrames}</Tag>
-              <Tag color="purple">窗口 {WINDOW_MS / 1000}s</Tag>
               <Tag color="cyan">最新序号 #{latestFrame.seq}</Tag>
             </div>
-
-            <DebugStageChart
-              series={chartSeries}
-              xLabel="Time (s)"
-              yLabel={`${selectedInputPath || selectedOutputPath || "value"}`}
-            />
-          </Space>
+            <div className={styles.tabsWrap}>
+              <ImuChartTabs
+                items={stageTabItems}
+                collapsed={chartsCollapsed}
+                onToggleCollapsed={handleToggleChartsCollapsed}
+              />
+            </div>
+          </div>
         )}
       </Card>
     </div>
