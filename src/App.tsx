@@ -25,6 +25,7 @@ const AppContent = () => {
 
 
   const hasConnectedDevice = connectedDevice !== null;
+  const showSettingsButton = hasConnectedDevice || isDeveloperMode;
   const [wasConnected, setWasConnected] = useState(hasConnectedDevice);
 
 
@@ -103,7 +104,10 @@ const AppContent = () => {
             onOpenDeviceModal={handleDeviceModalOpen}
           />
         )}
-        <GlobalSettingFloatButton onClick={handleSettingsModalOpen} />
+        <GlobalSettingFloatButton
+          onClick={handleSettingsModalOpen}
+          visible={showSettingsButton}
+        />
 
         <Modal
           title="设备"

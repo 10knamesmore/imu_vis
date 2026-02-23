@@ -9,13 +9,13 @@ import {
 import { SettingOutlined } from "@ant-design/icons";
 import { Button } from "antd";
 
-import { useBluetooth } from "../../hooks/useBluetooth";
-import { useDeveloperMode } from "../../hooks/useDeveloperMode";
 import styles from "./GlobalSettingFloatButton.module.scss";
 
 type Props = {
   /** 点击按钮后打开设置弹窗。 */
   onClick: () => void;
+  /** 是否显示悬浮按钮。 */
+  visible: boolean;
 };
 
 type HideEdge = "left" | "right" | "top" | "bottom";
@@ -105,16 +105,13 @@ const snapPositionToEdge = (
 /**
  * 全局悬浮设置按钮。
  */
-export const GlobalSettingFloatButton = ({ onClick }: Props) => {
+export const GlobalSettingFloatButton = ({ onClick, visible }: Props) => {
   const layerRef = useRef<HTMLDivElement | null>(null);
   const dragSessionRef = useRef<DragSession | null>(null);
   const initializedRef = useRef(false);
   const positionRef = useRef<FloatPosition>({ x: 0, y: 0 });
   const hideHintEdgeRef = useRef<HideEdge | null>(null);
   const suppressNextClickRef = useRef(false);
-
-  const { connectedDevice } = useBluetooth();
-  const { isDeveloperMode } = useDeveloperMode();
 
   /** 当前按钮位置。 */
   const [buttonPosition, setButtonPosition] = useState<FloatPosition>({ x: 0, y: 0 });
@@ -127,16 +124,12 @@ export const GlobalSettingFloatButton = ({ onClick }: Props) => {
   /** 当前是否处于靠近展开态。 */
   const [buttonPeekVisible, setButtonPeekVisible] = useState(false);
 
-  /** 是否允许打开设置弹窗。 */
-  const canOpenSettings = useMemo(
-    () => connectedDevice !== null || isDeveloperMode,
-    [connectedDevice, isDeveloperMode]
-  );
-
   /**
    * 初始化悬浮按钮位置，并在容器变化时自动约束。
    */
   useEffect(() => {
+    if (!visible) return;
+
     const layer = layerRef.current;
     if (!layer) return;
 
@@ -170,7 +163,7 @@ export const GlobalSettingFloatButton = ({ onClick }: Props) => {
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [visible]);
 
   /**
    * 同步按钮位置引用，供窗口级事件使用。
@@ -323,9 +316,8 @@ export const GlobalSettingFloatButton = ({ onClick }: Props) => {
    */
   const handleOpenSettingsModal = useCallback(() => {
     if (suppressNextClickRef.current || buttonDragging) return;
-    if (!canOpenSettings) return;
     onClick();
-  }, [buttonDragging, canOpenSettings, onClick]);
+  }, [buttonDragging, onClick]);
 
   /**
    * 生成按钮样式类名。
@@ -341,6 +333,13 @@ export const GlobalSettingFloatButton = ({ onClick }: Props) => {
     if (buttonPeekVisible) classNames.push(styles.floatButtonPeekVisible);
     return classNames.join(" ");
   }, [buttonDragging, buttonHiddenEdge, buttonPeekVisible, buttonReady]);
+
+  /**
+   * 无设备且非开发者模式时，不渲染设置按钮。
+   */
+  if (!visible) {
+    return null;
+  }
 
   return (
     <div className={styles.floatLayer} ref={layerRef}>
@@ -369,7 +368,6 @@ export const GlobalSettingFloatButton = ({ onClick }: Props) => {
             padding: 0,
             borderRadius: "50%",
           }}
-          disabled={!canOpenSettings}
         />
       </div>
     </div>
