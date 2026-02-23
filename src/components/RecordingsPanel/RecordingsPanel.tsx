@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Button, Card, Input, Select, Space, Table, Tag, Tooltip } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { Button, Input, Select, Space, Table, Tag, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 
 import { useBluetooth } from '../../hooks/useBluetooth';
@@ -20,15 +20,7 @@ const formatDuration = (start: number, end?: number | null) => {
   return `${seconds}s`;
 };
 
-/**
- * 录制记录管理面板组件。
- */
-type RecordingsPanelProps = {
-  /** 是否以内嵌模式渲染（用于 Modal 内显示，关闭外层 Card 容器）。 */
-  embedded?: boolean;
-};
-
-export const RecordingsPanel: React.FC<RecordingsPanelProps> = ({ embedded }) => {
+export const RecordingsPanel = () => {
   const {
     recordings,
     refreshRecordings,
@@ -134,54 +126,31 @@ export const RecordingsPanel: React.FC<RecordingsPanelProps> = ({ embedded }) =>
     [edits, loadRecording, updateRecordingMeta],
   );
 
-  const controls = (
-    <Space>
-      <Button onClick={refreshRecordings}>刷新</Button>
-      <Tooltip title="退出回放会恢复实时数据更新">
-        <Button disabled={!replaying} onClick={exitReplay}>
-          退出回放
-        </Button>
-      </Tooltip>
-      <Tag color={replaying ? 'orange' : 'default'}>
-        {replaying ? '回放中' : '实时模式'}
-      </Tag>
-    </Space>
-  );
 
-  const table = (
-    <Table
-      rowKey="id"
-      dataSource={recordings}
-      columns={columns}
-      pagination={{ pageSize: 6 }}
-      size="small"
-      className={styles.recordingsTable}
-      scroll={{ y: 240 }}
-    />
-  );
-
-  if (embedded) {
-    return (
-      <div className={styles.recordingsPanel}>
-        <div className={styles.recordingsHeader}>{controls}</div>
-        {table}
-      </div>
-    );
-  }
 
   return (
     <div className={styles.recordingsPanel}>
-      <Card
-        title="录制记录"
+      <div className={styles.recordingsHeader}>
+        <Space>
+          <Button onClick={refreshRecordings}>刷新</Button>
+          <Tooltip title="退出回放会恢复实时数据更新">
+            <Button disabled={!replaying} onClick={exitReplay}>
+              退出回放
+            </Button>
+          </Tooltip>
+          <Tag color={replaying ? 'orange' : 'default'}>
+            {replaying ? '回放中' : '实时模式'}
+          </Tag>
+        </Space>
+      </div>
+      <Table
+        rowKey="id"
+        dataSource={recordings}
+        columns={columns}
+        pagination={{ pageSize: 6 }}
         size="small"
-        variant="outlined"
-        className={styles.recordingsCard}
-        style={{ background: '#141414', border: '1px solid #303030' }}
-        styles={{ header: { color: 'white' } }}
-        extra={controls}
-      >
-        {table}
-      </Card>
+        className={styles.recordingsTable}
+        scroll={{ y: 240 }} />
     </div>
   );
 };

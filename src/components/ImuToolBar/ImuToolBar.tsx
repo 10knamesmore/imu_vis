@@ -158,7 +158,7 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
         width={960}
         destroyOnHidden
       >
-        <RecordingsPanel embedded />
+        <RecordingsPanel />
       </Modal>
     </>
   );
