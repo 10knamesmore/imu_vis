@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Layout, Modal, Tabs } from 'antd';
 
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
-import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
-import { DeveloperModeProvider, useDeveloperMode } from './hooks/useDeveloperMode';
+import { useBluetooth } from './hooks/useBluetooth';
+import { useDeveloperMode } from './hooks/useDeveloperMode';
+import { AppProviders } from './providers';
 
 import styles from "./App.module.scss";
 
@@ -13,7 +14,7 @@ const { Content } = Layout;
 /**
  * 应用主内容区域组件。
  */
-const AppContent: React.FC = () => {
+const AppContent = () => {
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   /** 当前主内容 tab key。 */
@@ -135,26 +136,14 @@ const AppContent: React.FC = () => {
   );
 };
 
-// 辅助组件：将多个 Provider 合并
-/**
- * 组合多个 Provider 的辅助组件。
- */
-const Compose = ({ providers, children }: { providers: React.FC<{ children: React.ReactNode }>[]; children: React.ReactNode }) => {
-  return (
-    <>
-      {providers.reduceRight((acc, Provider) => <Provider>{acc}</Provider>, children)}
-    </>
-  );
-};
-
 /**
  * 应用根组件。
  */
-const App: React.FC = () => {
+const App = () => {
   return (
-    <Compose providers={[DeveloperModeProvider, BluetoothProvider]}>
+    <AppProviders>
       <AppContent />
-    </Compose>
+    </AppProviders>
   );
 };
 
