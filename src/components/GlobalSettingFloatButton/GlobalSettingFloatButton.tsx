@@ -15,7 +15,7 @@ import styles from "./GlobalSettingFloatButton.module.scss";
 
 type Props = {
   /** 点击按钮后打开设置弹窗。 */
-  onOpenSettingsModal: () => void;
+  onClick: () => void;
 };
 
 type HideEdge = "left" | "right" | "top" | "bottom";
@@ -105,7 +105,7 @@ const snapPositionToEdge = (
 /**
  * 全局悬浮设置按钮。
  */
-export const GlobalSettingFloatButton = ({ onOpenSettingsModal }: Props) => {
+export const GlobalSettingFloatButton = ({ onClick }: Props) => {
   const layerRef = useRef<HTMLDivElement | null>(null);
   const dragSessionRef = useRef<DragSession | null>(null);
   const initializedRef = useRef(false);
@@ -324,8 +324,8 @@ export const GlobalSettingFloatButton = ({ onOpenSettingsModal }: Props) => {
   const handleOpenSettingsModal = useCallback(() => {
     if (suppressNextClickRef.current || buttonDragging) return;
     if (!canOpenSettings) return;
-    onOpenSettingsModal();
-  }, [buttonDragging, canOpenSettings, onOpenSettingsModal]);
+    onClick();
+  }, [buttonDragging, canOpenSettings, onClick]);
 
   /**
    * 生成按钮样式类名。

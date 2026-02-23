@@ -103,7 +103,7 @@ const AppContent = () => {
             onOpenDeviceModal={handleDeviceModalOpen}
           />
         )}
-        <GlobalSettingFloatButton onOpenSettingsModal={handleSettingsModalOpen} />
+        <GlobalSettingFloatButton onClick={handleSettingsModalOpen} />
 
         <Modal
           title="设备"
