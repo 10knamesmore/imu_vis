@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Layout, Modal } from 'antd';
+import { Layout, Modal, Tabs } from 'antd';
 
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
-import { DeveloperModeProvider } from './hooks/useDeveloperMode';
+import { DeveloperModeProvider, useDeveloperMode } from './hooks/useDeveloperMode';
 
 import styles from "./App.module.scss";
 
@@ -16,10 +16,15 @@ const { Content } = Layout;
 const AppContent: React.FC = () => {
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const { connectedDevice, startScan, stopScan } = useBluetooth()
+  /** 当前主内容 tab key。 */
+  const [activeTabKey, setActiveTabKey] = useState("realtime");
+  const { connectedDevice, startScan, stopScan } = useBluetooth();
+  const { isDeveloperMode } = useDeveloperMode();
+
 
   const hasConnectedDevice = connectedDevice !== null;
   const [wasConnected, setWasConnected] = useState(hasConnectedDevice);
+
 
   // 模态框打开时：如果没有连接设备，自动开始扫描
   const handleDeviceModalOpen = async () => {
@@ -49,13 +54,55 @@ const AppContent: React.FC = () => {
     setWasConnected(hasConnectedDevice);
   }, [hasConnectedDevice, isDeviceModalOpen, wasConnected]);
 
+  /**
+   * 非开发者模式下强制回到实时页签，避免隐藏 tab 后 key 残留。
+   */
+  useEffect(() => {
+    if (!isDeveloperMode && activeTabKey !== "realtime") {
+      setActiveTabKey("realtime");
+    }
+  }, [isDeveloperMode, activeTabKey]);
+
+  const mainTabs = [
+    {
+      key: "realtime",
+      label: "实时面板",
+      children: (
+        <div className={styles.tabPane}>
+          <ImuRealtimePanel
+            onOpenDeviceModal={handleDeviceModalOpen}
+            onOpenSettingsModal={handleSettingsModalOpen}
+          />
+        </div>
+      ),
+    },
+    {
+      key: "debug",
+      label: "Debug",
+      children: (
+        <div className={styles.tabPane}>
+          <div className={styles.debugEmptyPage} />
+        </div>
+      ),
+    },
+  ]
+
   return (
     <Layout className={styles.appLayout}>
       <Content className={styles.appContent}>
-        <ImuRealtimePanel
-          onOpenDeviceModal={handleDeviceModalOpen}
-          onOpenSettingsModal={handleSettingsModalOpen}
-        />
+        {isDeveloperMode ? (
+          <Tabs
+            className={styles.appTabs}
+            activeKey={activeTabKey}
+            onChange={setActiveTabKey}
+            items={mainTabs}
+          />
+        ) : (
+          <ImuRealtimePanel
+            onOpenDeviceModal={handleDeviceModalOpen}
+            onOpenSettingsModal={handleSettingsModalOpen}
+          />
+        )}
 
         <Modal
           title="设备"
