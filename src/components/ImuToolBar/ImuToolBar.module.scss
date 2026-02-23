@@ -30,6 +30,10 @@
   color: #c3cad5;
 }
 
+.recordingStatusTag {
+  user-select: none;
+}
+
 .deviceButtonConnected {
   &:global(.ant-btn-primary) {
     background-color: #2ecc71;

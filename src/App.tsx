@@ -4,6 +4,7 @@ import { Layout, Modal } from 'antd';
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { BluetoothProvider, useBluetooth } from './hooks/useBluetooth';
+import { DeveloperModeProvider } from './hooks/useDeveloperMode';
 
 import styles from "./App.module.scss";
 
@@ -104,7 +105,7 @@ const Compose = ({ providers, children }: { providers: React.FC<{ children: Reac
  */
 const App: React.FC = () => {
   return (
-    <Compose providers={[BluetoothProvider]}>
+    <Compose providers={[DeveloperModeProvider, BluetoothProvider]}>
       <AppContent />
     </Compose>
   );
