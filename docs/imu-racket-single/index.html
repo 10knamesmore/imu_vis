@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>羽毛球拍 IMU 安装示意（单文件）</title>
+    <style>
+      :root {
+        --bg-top: #f3f8ff;
+        --bg-bottom: #d8e7ff;
+        --panel: rgba(255, 255, 255, 0.8);
+        --text: #13233a;
+        --racket: #2f4858;
+        --imu: #4f9bff;
+      }
+
+      * { box-sizing: border-box; }
+
+      html, body, #app {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        color: var(--text);
+        font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      }
+
+      body { background: linear-gradient(160deg, var(--bg-top) 0%, var(--bg-bottom) 100%); }
+
+      .title-bar {
+        position: fixed;
+        top: 14px;
+        left: 14px;
+        z-index: 2;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: var(--panel);
+        backdrop-filter: blur(8px);
+      }
+
+      .title-bar h1 { margin: 0; font-size: 18px; }
+      .title-bar p { margin: 6px 0 0; font-size: 12px; opacity: 0.82; }
+
+      #canvas-wrap { width: 100%; height: 100%; }
+
+      .legend {
+        position: fixed;
+        right: 14px;
+        bottom: 14px;
+        z-index: 2;
+        padding: 10px 14px;
+        border-radius: 12px;
+        background: var(--panel);
+        backdrop-filter: blur(8px);
+        font-size: 13px;
+        line-height: 1.8;
+      }
+
+      .dot {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 99px;
+        margin-right: 8px;
+      }
+
+      .dot.racket { background: var(--racket); }
+      .dot.imu { background: var(--imu); }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <header class="title-bar">
+        <h1>羽毛球拍 IMU 安装示意</h1>
+        <p>拖拽旋转视角，滚轮缩放</p>
+      </header>
+      <div id="canvas-wrap"></div>
+    </div>
+
+    <script type="module">
+      import * as THREE from "https://unpkg.com/three@0.163.0/build/three.module.js?module";
+      import { OrbitControls } from "https://unpkg.com/three@0.163.0/examples/jsm/controls/OrbitControls.js?module";
+
+      const wrap = document.getElementById("canvas-wrap");
+      if (!wrap) throw new Error("missing #canvas-wrap");
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0xe7f1ff);
+
+      const camera = new THREE.PerspectiveCamera(50, wrap.clientWidth / wrap.clientHeight, 0.1, 100);
+      camera.position.set(2.2, 1.4, 3.6);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+      wrap.appendChild(renderer.domElement);
+
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.target.set(0, 1.1, 0);
+
+      const hemi = new THREE.HemisphereLight(0xffffff, 0x8ca4c5, 0.9);
+      scene.add(hemi);
+      const key = new THREE.DirectionalLight(0xffffff, 1.1);
+      key.position.set(3.5, 4, 2.5);
+      scene.add(key);
+      const fill = new THREE.DirectionalLight(0xffffff, 0.45);
+      fill.position.set(-2.5, 2, -1.5);
+      scene.add(fill);
+
+      const floor = new THREE.Mesh(
+        new THREE.CircleGeometry(3.6, 64),
+        new THREE.MeshStandardMaterial({ color: 0xdce8fb, roughness: 1.0, metalness: 0.0 })
+      );
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -0.05;
+      scene.add(floor);
+
+      const racketGroup = new THREE.Group();
+      scene.add(racketGroup);
+
+      const racketMat = new THREE.MeshStandardMaterial({ color: 0x2f4858, roughness: 0.35, metalness: 0.35 });
+      const gripMat = new THREE.MeshStandardMaterial({ color: 0x1b2633, roughness: 0.85, metalness: 0.05 });
+      const stringMat = new THREE.LineBasicMaterial({ color: 0x9fb8e6 });
+
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 0.65, 32), gripMat);
+      handle.position.y = 0.32;
+      racketGroup.add(handle);
+
+      const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.03, 0.95, 24), racketMat);
+      shaft.position.y = 1.07;
+      racketGroup.add(shaft);
+
+      const head = new THREE.Mesh(
+        new THREE.TorusGeometry(0.46, 0.03, 18, 80),
+        new THREE.MeshStandardMaterial({ color: 0x2f4858, roughness: 0.42, metalness: 0.3 })
+      );
+      head.position.y = 2;
+      head.scale.set(0.74, 1.0, 1.0);
+      racketGroup.add(head);
+
+      const stringCenterY = 2;
+      const stringA = 0.315;
+      const stringB = 0.425;
+      const verticalCount = 11;
+      const horizontalCount = 9;
+      const stringZ = 0.001;
+
+      for (let i = 0; i < verticalCount; i++) {
+        const t = i / (verticalCount - 1);
+        const x = -stringA + t * stringA * 2;
+        const ratio = x / stringA;
+        const yHalf = stringB * Math.sqrt(Math.max(0, 1 - ratio * ratio));
+        const points = [
+          new THREE.Vector3(x, stringCenterY - yHalf, stringZ),
+          new THREE.Vector3(x, stringCenterY + yHalf, stringZ),
+        ];
+        racketGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), stringMat));
+      }
+
+      for (let i = 0; i < horizontalCount; i++) {
+        const t = i / (horizontalCount - 1);
+        const y = stringCenterY - stringB + t * stringB * 2;
+        const ratio = (y - stringCenterY) / stringB;
+        const xHalf = stringA * Math.sqrt(Math.max(0, 1 - ratio * ratio));
+        const points = [
+          new THREE.Vector3(-xHalf, y, stringZ),
+          new THREE.Vector3(xHalf, y, stringZ),
+        ];
+        racketGroup.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), stringMat));
+      }
+
+      const imuBody = new THREE.Mesh(
+        new THREE.BoxGeometry(0.08, 0.18, 0.04),
+        new THREE.MeshStandardMaterial({ color: 0x4f9bff, roughness: 0.5, metalness: 0.1 })
+      );
+      imuBody.position.set(0, 1.5, 0.06);
+      racketGroup.add(imuBody);
+
+      const imuAxisLength = 0.18;
+      const axisHeadLength = 0.045;
+      const axisShaftRadius = 0.005;
+      const axisHeadRadius = 0.013;
+      const axisShaftLength = imuAxisLength - axisHeadLength;
+
+      const createAxisLabelSprite = (text, color) => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return null;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
+        ctx.fillRect(42, 74, 172, 108);
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 5;
+        ctx.strokeRect(42, 74, 172, 108);
+
+        ctx.fillStyle = color;
+        ctx.strokeStyle = "#000000";
+        ctx.lineWidth = 8;
+        ctx.font = "bold 96px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+        ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+
+        const texture = new THREE.CanvasTexture(canvas);
+        const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+        const sprite = new THREE.Sprite(material);
+        sprite.scale.set(0.1, 0.1, 0.1);
+        return sprite;
+      };
+
+      const createAxisArrow = (dir, colorHex) => {
+        const group = new THREE.Group();
+        const mat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.35, metalness: 0.15 });
+
+        const shaft = new THREE.Mesh(
+          new THREE.CylinderGeometry(axisShaftRadius, axisShaftRadius, axisShaftLength, 18),
+          mat
+        );
+        shaft.position.y = axisShaftLength / 2;
+        group.add(shaft);
+
+        const head = new THREE.Mesh(
+          new THREE.ConeGeometry(axisHeadRadius, axisHeadLength, 20),
+          mat
+        );
+        head.position.y = axisShaftLength + axisHeadLength / 2;
+        group.add(head);
+
+        group.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+        return group;
+      };
+
+      imuBody.add(createAxisArrow(new THREE.Vector3(1, 0, 0), 0xff2a2a));
+      imuBody.add(createAxisArrow(new THREE.Vector3(0, 1, 0), 0x19ff57));
+      imuBody.add(createAxisArrow(new THREE.Vector3(0, 0, 1), 0x00cfff));
+
+      const xLabel = createAxisLabelSprite("+X", "#ff4b4b");
+      if (xLabel) {
+        xLabel.position.set(imuAxisLength + 0.05, 0, 0);
+        imuBody.add(xLabel);
+      }
+      const yLabel = createAxisLabelSprite("+Y", "#44ff74");
+      if (yLabel) {
+        yLabel.position.set(0, imuAxisLength + 0.05, 0);
+        imuBody.add(yLabel);
+      }
+      const zLabel = createAxisLabelSprite("+Z", "#3cd9ff");
+      if (zLabel) {
+        zLabel.position.set(0, 0, imuAxisLength + 0.05);
+        imuBody.add(zLabel);
+      }
+
+      racketGroup.rotation.z = 0.08;
+      racketGroup.rotation.x = -0.05;
+
+      const animate = () => {
+        controls.update();
+        renderer.render(scene, camera);
+        requestAnimationFrame(animate);
+      };
+      animate();
+
+      window.addEventListener("resize", () => {
+        camera.aspect = wrap.clientWidth / wrap.clientHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(wrap.clientWidth, wrap.clientHeight);
+      });
+    </script>
+  </body>
+</html>
