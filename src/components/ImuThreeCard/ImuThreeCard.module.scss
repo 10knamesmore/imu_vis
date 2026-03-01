@@ -21,12 +21,12 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  color: #c3cad5;
+  color: var(--text-secondary);
 }
 
 .imuThreePanel {
-  background: #0c1119;
-  border: 1px solid #202a38;
+  background: var(--surface-2);
+  border: 1px solid var(--border-2);
   border-radius: 8px;
   overflow: hidden;
   min-height: 0;

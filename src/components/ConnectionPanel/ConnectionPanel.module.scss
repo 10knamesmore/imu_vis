@@ -1,7 +1,7 @@
 .connectionPanel {
   margin-bottom: 24px;
-  background: #141414;
-  border: 1px solid #303030;
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
   border-radius: 12px;
   padding: 16px;
 
@@ -59,10 +59,10 @@
   }
 
   .matrixWrap {
-    border: 1px solid #2b2b2b;
+    border: 1px solid var(--border-code);
     border-radius: 8px;
     padding: 10px;
-    background: #111;
+    background: var(--surface-code);
   }
 
   .matrixRow {
@@ -77,50 +77,12 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: rgba(255, 255, 255, 0.7);
     font-size: 12px;
     font-weight: 600;
   }
 
   .matrixRow:last-child {
     margin-bottom: 0;
-  }
-
-  :global(.ant-card-head) {
-    color: white;
-    border-bottom: 1px solid #303030;
-  }
-
-  :global(.ant-card-body) {
-    background: #141414;
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  :global(.ant-list-item) {
-    border-block-end: 1px solid #303030;
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  :global(.ant-list-item-meta-title) {
-    color: rgba(255, 255, 255, 0.85);
-  }
-
-  :global(.ant-list-item-meta-description) {
-    color: rgba(255, 255, 255, 0.45);
-  }
-
-  :global(.ant-empty-description) {
-    color: rgba(255, 255, 255, 0.45);
-  }
-
-  :global(.ant-form-item-label > label) {
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 12px;
-  }
-
-  :global(.ant-card) {
-    background: #171717;
-    border: 1px solid #2a2a2a;
   }
 }
 
@@ -163,7 +125,7 @@
 }
 
 .rssiValue {
-  color: #888;
+  color: var(--text-secondary);
   min-width: 30px;
   text-align: right;
 }

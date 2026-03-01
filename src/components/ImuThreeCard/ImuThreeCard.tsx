@@ -222,8 +222,8 @@ export const ImuThreeCard: React.FC<ImuThreeCardProps> = ({ source, replayTrailR
           </div>
         </div>
       }
-      style={{ background: "#141414", border: "1px solid #303030" }}
-      styles={{ header: { color: "white" } }}
+      style={{ background: "var(--surface-card)", border: "1px solid var(--border-card)" }}
+      styles={{ header: { color: "var(--text-secondary)" } }}
     >
       <div className={styles.imuThreePanel}>
         <ImuThreeView

@@ -3,11 +3,28 @@ import { Card } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
+import { useColorScheme } from "../../hooks/useColorScheme";
 import { ImuThreeCard } from "../../components/ImuThreeCard";
 import { ImuChartsCanvas } from "../../components/ImuChartsCanvas";
 import { ImuChartTabs } from "../../components/ImuChartTabs";
 import { ImuToolBar } from "../../components/ImuToolBar";
 import styles from "./ImuRealtimePanel.module.scss";
+
+/** 各组图表系列颜色：亮色主题下选用饱和度高的深色版本，确保在白底上清晰可读。 */
+const CHART_COLORS = {
+  dark: {
+    xyz:    ['#57b2ff', '#ffb74d', '#88e0a5'] as const,
+    angle:  ['#4cc9f0', '#f8961e', '#43aa8b'] as const,
+    offset: ['#4d96ff', '#6bffb8', '#ff6b6b'] as const,
+    nav:    ['#b8c0ff', '#ffd6a5', '#caffbf'] as const,
+  },
+  light: {
+    xyz:    ['#2196f3', '#ff9800', '#4caf50'] as const,
+    angle:  ['#00bcd4', '#ff5722', '#8e24aa'] as const,
+    offset: ['#3f51b5', '#00bfa5', '#f44336'] as const,
+    nav:    ['#9c27b0', '#ff6e40', '#8bc34a'] as const,
+  },
+} as const;
 
 type ImuRealtimePanelProps = {
   /** 打开“设备”弹窗。 */
@@ -65,6 +82,9 @@ export const ImuRealtimePanel = ({
   }, [currentReplayMeta?.name, currentReplayMeta?.started_at_ms, replaySamples]);
   const sourceAvailable = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
 
+  const { colorScheme } = useColorScheme();
+  const C = CHART_COLORS[colorScheme];
+
   /** 切换图表区域折叠状态。 */
   const handleToggleChartsCollapsed = () => {
     setChartsCollapsed((prev) => !prev);
@@ -103,33 +123,14 @@ export const ImuRealtimePanel = ({
             label="加速度 (m/s^2)"
             visibilityKey="accel"
             series={[
-              { name: "X", color: "#57b2ff", getBuffer: (w) => w.builtin.accelX },
-              { name: "Y", color: "#ffb74d", getBuffer: (w) => w.builtin.accelY },
-              { name: "Z", color: "#88e0a5", getBuffer: (w) => w.builtin.accelZ },
+              { name: "X", color: C.xyz[0], getBuffer: (w) => w.builtin.accelX },
+              { name: "Y", color: C.xyz[1], getBuffer: (w) => w.builtin.accelY },
+              { name: "Z", color: C.xyz[2], getBuffer: (w) => w.builtin.accelZ },
             ]}
           />
         </div>
       ),
     },
-    // {
-    //   key: "gyro",
-    //   label: "陀螺仪",
-    //   children: (
-    //     <div className={styles.imuChartPanel}>
-    //       <ImuChartsCanvas
-    //         source={imuSource}
-    //         enabled={showCharts}
-    //         refreshMs={16}
-    //         label="Gyroscope (deg/s)"
-    //         series={[
-    //           { name: "X", color: "#9b87ff", getBuffer: (w) => w.builtin.gyroX },
-    //           { name: "Y", color: "#ff7aa2", getBuffer: (w) => w.builtin.gyroY },
-    //           { name: "Z", color: "#ffd166", getBuffer: (w) => w.builtin.gyroZ },
-    //         ]}
-    //       />
-    //     </div>
-    //   ),
-    // },
     {
       key: "angle",
       label: "姿态角",
@@ -142,9 +143,9 @@ export const ImuRealtimePanel = ({
             label="偏航 / 俯仰 / 横滚 (deg)"
             visibilityKey="angle"
             series={[
-              { name: "X", color: "#4cc9f0", getBuffer: (w) => w.builtin.angleX },
-              { name: "Y", color: "#f8961e", getBuffer: (w) => w.builtin.angleY },
-              { name: "Z", color: "#43aa8b", getBuffer: (w) => w.builtin.angleZ },
+              { name: "X", color: C.angle[0], getBuffer: (w) => w.builtin.angleX },
+              { name: "Y", color: C.angle[1], getBuffer: (w) => w.builtin.angleY },
+              { name: "Z", color: C.angle[2], getBuffer: (w) => w.builtin.angleZ },
             ]}
           />
         </div>
@@ -162,34 +163,14 @@ export const ImuRealtimePanel = ({
             label="Acceleration (m/s^2)"
             visibilityKey="accel-with-g"
             series={[
-              { name: "X", color: "#9ad1ff", getBuffer: (w) => w.builtin.accelWithGX },
-              { name: "Y", color: "#ffda7a", getBuffer: (w) => w.builtin.accelWithGY },
-              { name: "Z", color: "#8ff0c4", getBuffer: (w) => w.builtin.accelWithGZ },
+              { name: "X", color: C.xyz[0], getBuffer: (w) => w.builtin.accelWithGX },
+              { name: "Y", color: C.xyz[1], getBuffer: (w) => w.builtin.accelWithGY },
+              { name: "Z", color: C.xyz[2], getBuffer: (w) => w.builtin.accelWithGZ },
             ]}
           />
         </div>
       ),
     },
-    // {
-    //   key: "quat",
-    //   label: "四元数",
-    //   children: (
-    //     <div className={styles.imuChartPanel}>
-    //       <ImuChartsCanvas
-    //         source={imuSource}
-    //         enabled={showCharts}
-    //         refreshMs={16}
-    //         label="Quaternion"
-    //         series={[
-    //           { name: "W", color: "#f07167", getBuffer: (w) => w.builtin.quatW },
-    //           { name: "X", color: "#00afb9", getBuffer: (w) => w.builtin.quatX },
-    //           { name: "Y", color: "#fed9b7", getBuffer: (w) => w.builtin.quatY },
-    //           { name: "Z", color: "#fdfcdc", getBuffer: (w) => w.builtin.quatZ },
-    //         ]}
-    //       />
-    //     </div>
-    //   ),
-    // },
     {
       key: "offset",
       label: "偏移",
@@ -202,9 +183,9 @@ export const ImuRealtimePanel = ({
             label="m"
             visibilityKey="offset"
             series={[
-              { name: "X", color: "#4d96ff", getBuffer: (w) => w.builtin.offsetX },
-              { name: "Y", color: "#6bffb8", getBuffer: (w) => w.builtin.offsetY },
-              { name: "Z", color: "#ff6b6b", getBuffer: (w) => w.builtin.offsetZ },
+              { name: "X", color: C.offset[0], getBuffer: (w) => w.builtin.offsetX },
+              { name: "Y", color: C.offset[1], getBuffer: (w) => w.builtin.offsetY },
+              { name: "Z", color: C.offset[2], getBuffer: (w) => w.builtin.offsetZ },
             ]}
           />
         </div>
@@ -222,9 +203,9 @@ export const ImuRealtimePanel = ({
             label="导航加速度 (m/s^2)"
             visibilityKey="nav"
             series={[
-              { name: "X", color: "#b8c0ff", getBuffer: (w) => w.builtin.accelNavX },
-              { name: "Y", color: "#ffd6a5", getBuffer: (w) => w.builtin.accelNavY },
-              { name: "Z", color: "#caffbf", getBuffer: (w) => w.builtin.accelNavZ },
+              { name: "X", color: C.nav[0], getBuffer: (w) => w.builtin.accelNavX },
+              { name: "Y", color: C.nav[1], getBuffer: (w) => w.builtin.accelNavY },
+              { name: "Z", color: C.nav[2], getBuffer: (w) => w.builtin.accelNavZ },
             ]}
           />
         </div>
@@ -242,9 +223,9 @@ export const ImuRealtimePanel = ({
             label="角度差值 (deg)"
             visibilityKey="angle-delta"
             series={[
-              { name: "偏航 Δ", color: "#57b2ff", getBuffer: (w) => w.deltaAngleX },
-              { name: "俯仰 Δ", color: "#ffb74d", getBuffer: (w) => w.deltaAngleY },
-              { name: "横滚 Δ", color: "#88e0a5", getBuffer: (w) => w.deltaAngleZ },
+              { name: "偏航 Δ", color: C.xyz[0], getBuffer: (w) => w.deltaAngleX },
+              { name: "俯仰 Δ", color: C.xyz[1], getBuffer: (w) => w.deltaAngleY },
+              { name: "横滚 Δ", color: C.xyz[2], getBuffer: (w) => w.deltaAngleZ },
             ]}
           />
         </div>
@@ -262,9 +243,9 @@ export const ImuRealtimePanel = ({
             label="速度 (m/s)"
             visibilityKey="velocity"
             series={[
-              { name: "X", color: "#4cc9f0", getBuffer: (w) => w.calculated.velocityX },
-              { name: "Y", color: "#f8961e", getBuffer: (w) => w.calculated.velocityY },
-              { name: "Z", color: "#43aa8b", getBuffer: (w) => w.calculated.velocityZ },
+              { name: "X", color: C.angle[0], getBuffer: (w) => w.calculated.velocityX },
+              { name: "Y", color: C.angle[1], getBuffer: (w) => w.calculated.velocityY },
+              { name: "Z", color: C.angle[2], getBuffer: (w) => w.calculated.velocityZ },
             ]}
           />
         </div>
@@ -282,17 +263,16 @@ export const ImuRealtimePanel = ({
             label="位置 (m)"
             visibilityKey="position"
             series={[
-              { name: "X", color: "#b8c0ff", getBuffer: (w) => w.calculated.positionX },
-              { name: "Y", color: "#ffd6a5", getBuffer: (w) => w.calculated.positionY },
-              { name: "Z", color: "#caffbf", getBuffer: (w) => w.calculated.positionZ },
+              { name: "X", color: C.nav[0], getBuffer: (w) => w.calculated.positionX },
+              { name: "Y", color: C.nav[1], getBuffer: (w) => w.calculated.positionY },
+              { name: "Z", color: C.nav[2], getBuffer: (w) => w.calculated.positionZ },
             ]}
           />
         </div>
       ),
     },
-  // chartSource 已由 useImuSource 内部 useMemo 稳定，showCharts 控制暂停/恢复
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  ], [chartSource, showCharts]);
+  ], [chartSource, showCharts, C]);
 
   return (
     <div className={styles.imuRealtimePanel}>
@@ -301,7 +281,6 @@ export const ImuRealtimePanel = ({
           size="small"
           variant="outlined"
           className={styles.toolbarCard}
-          style={{ background: "#141414", border: "1px solid #303030" }}
           styles={{ body: { padding: "12px 16px" } }}
         >
           <ImuToolBar

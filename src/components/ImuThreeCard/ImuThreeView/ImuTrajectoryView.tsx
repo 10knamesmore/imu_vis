@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { ImuSource } from "../../../hooks/useImuSource";
 import { TrajectoryOption } from "./types";
 import { useThreeBase } from "./useThreeBase";
+import { useColorScheme } from "../../../hooks/useColorScheme";
 import styles from "./ImuThreeView.module.scss";
 
 type ImuTrajectoryViewProps = {
@@ -14,6 +15,41 @@ type ImuTrajectoryViewProps = {
   trajectoryOption: TrajectoryOption;
   /** 轨迹重置计数器，变化时清空轨迹。 */
   trailResetToken: number;
+};
+
+const getAxisPalette = (scheme: "dark" | "light") => {
+  if (scheme === "dark") {
+    return {
+      x: 0xff6b6b,
+      y: 0x6bffb8,
+      z: 0x57b2ff,
+      label: ["#ff6b6b", "#6bffb8", "#57b2ff"],
+    };
+  }
+
+  return {
+    x: 0x9b3a35,
+    y: 0x2f6f3f,
+    z: 0x2e4f73,
+    label: ["#9b3a35", "#2f6f3f", "#2e4f73"],
+  };
+};
+
+const applyAxesHelperColors = (axes: THREE.AxesHelper, colors: { x: number; y: number; z: number }) => {
+  const colorAttr = axes.geometry.getAttribute("color") as THREE.BufferAttribute | undefined;
+  if (!colorAttr) return;
+
+  const tmpColor = new THREE.Color();
+  const applyPair = (startIndex: number, hex: number) => {
+    tmpColor.setHex(hex);
+    colorAttr.setXYZ(startIndex, tmpColor.r, tmpColor.g, tmpColor.b);
+    colorAttr.setXYZ(startIndex + 1, tmpColor.r, tmpColor.g, tmpColor.b);
+  };
+
+  applyPair(0, colors.x);
+  applyPair(2, colors.y);
+  applyPair(4, colors.z);
+  colorAttr.needsUpdate = true;
 };
 
 /**
@@ -42,6 +78,7 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   const axesRef = useRef<THREE.AxesHelper | null>(null);
   const gridRef = useRef<THREE.GridHelper | null>(null);
   const axisLabelsRef = useRef<THREE.Sprite[]>([]);
+  const centerTrailMaterialRef = useRef<THREE.LineBasicMaterial | null>(null);
 
   // 中心轨迹 Refs
   const centerTrailRef = useRef<THREE.Line | null>(null);
@@ -90,10 +127,12 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     }
   };
 
+  const { colorScheme } = useColorScheme();
+
   /**
    * 使用基础 Three.js Hook 创建场景
    */
-  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(1.5, onRender);
+  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(1.5, onRender, colorScheme);
 
   /**
    * 初始化场景对象（坐标轴、网格、中心轨迹线）
@@ -110,93 +149,28 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     displayGroup.add(axes);
     axesRef.current = axes;
 
-    // 网格辅助线（可选，但对观察轨迹和姿态参考非常有帮助）
-    const grid = new THREE.GridHelper(5, 10, 0x444444, 0x222222);
-
-    // Three.js 的 GridHelper 默认位于 XZ 平面（假设 Y 轴向上）
-    // 当前 displayGroup 对 X / Y 做了镜像处理，采用的是 Z 轴向上坐标系
-    // 如果希望把网格作为“地面参考平面”，就需要将其从 XZ 平面旋转到 XY 平面
-    grid.rotation.x = Math.PI / 2;
-
-    // 将旋转后的网格加入显示组，用于辅助观察 IMU 姿态与轨迹方向
-    displayGroup.add(grid);
-    gridRef.current = grid;
-    // 初始化时同步缩放
-    grid.scale.setScalar(viewScaleRef.current);
-
-    // Labels
-    const createAxisLabel = (text: string, color: string) => {
-      const canvas = document.createElement("canvas");
-      const size = 128;
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return undefined;
-      ctx.clearRect(0, 0, size, size);
-      ctx.fillStyle = color;
-      ctx.font = "bold 40px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, size / 2, size / 2);
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
-      const sprite = new THREE.Sprite(material);
-      return { sprite, material, texture };
-    };
-
-    const labelDefs = [
-      { text: "X", color: "#ff6b6b" },
-      { text: "Y", color: "#6bffb8" },
-      { text: "Z", color: "#57b2ff" },
-    ];
-    const labelResources: Array<{ material: THREE.SpriteMaterial; texture: THREE.Texture }> = [];
-    axisLabelsRef.current = labelDefs
-      .map((def) => {
-        const label = createAxisLabel(def.text, def.color);
-        if (!label) return null;
-        labelResources.push({ material: label.material, texture: label.texture });
-        displayGroup.add(label.sprite);
-        return label.sprite;
-      })
-      .filter((label): label is THREE.Sprite => label !== null);
-
-    // Initial label positioning
-    if (axisLabelsRef.current.length) {
-      const scale = viewScaleRef.current;
-      const axisLength = 0.5 * scale; // 坐标轴长度为 0.5
-      const labelOffset = 0.10 * scale;
-      const labelScale = 0.18 * scale;
-      axisLabelsRef.current[0].position.set(axisLength + labelOffset, 0, 0);
-      axisLabelsRef.current[1].position.set(0, axisLength + labelOffset, 0);
-      axisLabelsRef.current[2].position.set(0, 0, axisLength + labelOffset);
-      axisLabelsRef.current.forEach((label) => {
-        label.scale.set(-labelScale, -labelScale, labelScale);
-      });
-    }
-
     // Center Trail
     const maxPoints = maxTrailPointsRef.current;
     const centerTrailPositions = new Float32Array(maxPoints * 3);
     const centerTrailGeometry = new THREE.BufferGeometry();
     centerTrailGeometry.setAttribute("position", new THREE.BufferAttribute(centerTrailPositions, 3));
     centerTrailGeometry.setDrawRange(0, 0);
-    const centerTrailMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
+    const centerTrailMaterial = new THREE.LineBasicMaterial({
+      color: colorScheme === "dark" ? 0xffffff : 0x2f343a,
+    });
     const centerTrailLine = new THREE.Line(centerTrailGeometry, centerTrailMaterial);
-    centerTrailLine.visible = false; // Updated by effect
+    centerTrailLine.visible = false;
     centerTrailLine.frustumCulled = false;
     displayGroup.add(centerTrailLine);
 
     centerTrailRef.current = centerTrailLine;
     centerTrailGeometryRef.current = centerTrailGeometry;
     centerTrailPositionsRef.current = centerTrailPositions;
+    centerTrailMaterialRef.current = centerTrailMaterial;
 
     return () => {
       displayGroup.remove(axes);
       axes.dispose();
-      displayGroup.remove(grid);
-      labelResources.forEach((r) => { r.material.dispose(); r.texture.dispose(); });
-      axisLabelsRef.current.forEach((label) => displayGroup.remove(label));
-      axisLabelsRef.current = [];
       displayGroup.remove(centerTrailLine);
       centerTrailGeometry.dispose();
       centerTrailMaterial.dispose();
@@ -247,6 +221,92 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
       centerTrailStateRef.current = { count: 0 };
     }
   }, [trailResetToken]);
+
+  /**
+   * 主题切换时重建网格、轴标签，并更新轨迹线颜色。
+   * GridHelper 使用顶点颜色，无法原地更新，必须重建。
+   */
+  useEffect(() => {
+    const displayGroup = displayGroupRef.current;
+    if (!displayGroup) return;
+    const palette = getAxisPalette(colorScheme);
+    if (axesRef.current) {
+      applyAxesHelperColors(axesRef.current, palette);
+    }
+
+    // 1. 重建 GridHelper
+    if (gridRef.current) {
+      displayGroup.remove(gridRef.current);
+      gridRef.current.geometry.dispose();
+    }
+    const [c1, c2] = colorScheme === 'dark'
+      ? [0x444444, 0x222222]
+      : [0xaaaaaa, 0xd8d8d8];
+    const grid = new THREE.GridHelper(5, 10, c1, c2);
+    grid.rotation.x = Math.PI / 2;
+    grid.scale.setScalar(viewScaleRef.current);
+    displayGroup.add(grid);
+    gridRef.current = grid;
+
+    // 2. 更新轨迹线颜色
+    if (centerTrailMaterialRef.current) {
+      centerTrailMaterialRef.current.color.setHex(
+        colorScheme === 'dark' ? 0xffffff : 0x2f343a
+      );
+    }
+
+    // 3. 重建轴标签 Sprite
+    const oldLabels = axisLabelsRef.current;
+    oldLabels.forEach((l) => {
+      displayGroup.remove(l);
+      (l.material as THREE.SpriteMaterial).map?.dispose();
+      l.material.dispose();
+    });
+
+    const labelDefs = [
+      { text: 'X', color: palette.label[0] },
+      { text: 'Y', color: palette.label[1] },
+      { text: 'Z', color: palette.label[2] },
+    ];
+    const resources: Array<{ material: THREE.SpriteMaterial; texture: THREE.Texture }> = [];
+    const newLabels = labelDefs.map((def) => {
+      const canvas = document.createElement('canvas');
+      const size = 128;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.fillStyle = def.color;
+      ctx.font = 'bold 40px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.text, size / 2, size / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      resources.push({ material, texture });
+      return sprite;
+    }).filter((s): s is THREE.Sprite => s !== null);
+
+    const scale = viewScaleRef.current;
+    const axisLength = 0.5 * scale;
+    const labelOffset = 0.10 * scale;
+    const labelScale = 0.18 * scale;
+    if (newLabels.length === 3) {
+      newLabels[0].position.set(axisLength + labelOffset, 0, 0);
+      newLabels[1].position.set(0, axisLength + labelOffset, 0);
+      newLabels[2].position.set(0, 0, axisLength + labelOffset);
+      newLabels.forEach((l) => l.scale.set(-labelScale, -labelScale, labelScale));
+    }
+    newLabels.forEach((l) => displayGroup.add(l));
+    axisLabelsRef.current = newLabels;
+
+    return () => {
+      newLabels.forEach((l) => displayGroup.remove(l));
+      resources.forEach((r) => { r.material.dispose(); r.texture.dispose(); });
+      axisLabelsRef.current = [];
+    };
+  }, [colorScheme]);
 
   return <div className={styles.imuThreeView} ref={containerRef} />;
 };

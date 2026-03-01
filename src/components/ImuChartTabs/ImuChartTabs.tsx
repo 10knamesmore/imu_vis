@@ -28,7 +28,7 @@ export const ImuChartTabs = ({ items, collapsed, onToggleCollapsed }: ImuChartTa
       size="small"
       variant="outlined"
       className={styles.chartCard}
-      style={{ background: "#141414", border: "1px solid #303030" }}
+      style={{ background: "var(--surface-card)", border: "1px solid var(--border-card)" }}
       styles={{ body: { paddingTop: 0 } }}
     >
       <Tabs

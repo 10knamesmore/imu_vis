@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Button, Modal, Tag, Tooltip, message } from "antd";
-import { ApiOutlined, ReloadOutlined, SearchOutlined } from "@ant-design/icons";
+import { ApiOutlined, MoonOutlined, ReloadOutlined, SearchOutlined, SunOutlined } from "@ant-design/icons";
 
 import { RecordingsPanel } from "../RecordingsPanel";
 import type { RecordingStatus } from "../../types";
 import { useDeveloperMode } from "../../hooks/useDeveloperMode";
+import { useColorScheme } from "../../hooks/useColorScheme";
 
 import styles from "./ImuToolBar.module.scss";
 
@@ -47,6 +48,7 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
   onToggleRecording,
 }) => {
   const { isDeveloperMode, enableDeveloperMode } = useDeveloperMode();
+  const { colorScheme, toggleColorScheme } = useColorScheme();
   const [recordingsOpen, setRecordingsOpen] = useState(false);
   /** 录制状态连击计数器。 */
   const recordingStatusTapCountRef = useRef(0);
@@ -147,6 +149,14 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
           </div>
           <div className={styles.imuControl}>
             <Button type="primary" icon={<SearchOutlined />} onClick={() => setRecordingsOpen(true)}>录制记录</Button>
+          </div>
+          <div className={styles.imuControl}>
+            <Tooltip title={colorScheme === 'dark' ? "切换亮色" : "切换暗色"}>
+              <Button
+                icon={colorScheme === 'dark' ? <SunOutlined /> : <MoonOutlined />}
+                onClick={toggleColorScheme}
+              />
+            </Tooltip>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { ImuSource } from "../../../hooks/useImuSource";
 import { TrajectoryOption } from "./types";
 import { useThreeBase } from "./useThreeBase";
+import { useColorScheme } from "../../../hooks/useColorScheme";
 import styles from "./ImuThreeView.module.scss";
 
 type ImuModelViewProps = {
@@ -18,6 +19,45 @@ type ImuModelViewProps = {
 
 type AxisKey = "x" | "y" | "z";
 const axisKeys: AxisKey[] = ["x", "y", "z"];
+
+const getAxisPalette = (scheme: "dark" | "light") => {
+  if (scheme === "dark") {
+    return {
+      x: 0xff6b6b,
+      y: 0x6bffb8,
+      z: 0x57b2ff,
+      label: ["#ff6b6b", "#6bffb8", "#57b2ff"],
+    };
+  }
+
+  return {
+    x: 0x9b3a35,
+    y: 0x2f6f3f,
+    z: 0x2e4f73,
+    label: ["#9b3a35", "#2f6f3f", "#2e4f73"],
+  };
+};
+
+const getBodyColor = (scheme: "dark" | "light") => {
+  return scheme === "dark" ? 0x4f9bff : 0x6eb7fa
+};
+
+const applyAxesHelperColors = (axes: THREE.AxesHelper, colors: Pick<Record<AxisKey, number>, AxisKey>) => {
+  const colorAttr = axes.geometry.getAttribute("color") as THREE.BufferAttribute | undefined;
+  if (!colorAttr) return;
+
+  const tmpColor = new THREE.Color();
+  const applyPair = (startIndex: number, hex: number) => {
+    tmpColor.setHex(hex);
+    colorAttr.setXYZ(startIndex, tmpColor.r, tmpColor.g, tmpColor.b);
+    colorAttr.setXYZ(startIndex + 1, tmpColor.r, tmpColor.g, tmpColor.b);
+  };
+
+  applyPair(0, colors.x);
+  applyPair(2, colors.y);
+  applyPair(4, colors.z);
+  colorAttr.needsUpdate = true;
+};
 
 /**
  * IMU 模型视图组件
@@ -52,6 +92,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
   const trailRefs = useRef<Record<AxisKey, THREE.Line | null>>({ x: null, y: null, z: null });
   const trailGeometryRefs = useRef<Record<AxisKey, THREE.BufferGeometry | null>>({ x: null, y: null, z: null });
   const trailPositionsRefs = useRef<Record<AxisKey, Float32Array | null>>({ x: null, y: null, z: null });
+  const trailMaterialRefs = useRef<Record<AxisKey, THREE.LineBasicMaterial | null>>({ x: null, y: null, z: null });
   const maxTrailPointsRef = useRef(300);
   const trailStateRef = useRef<Record<AxisKey, { count: number }>>({
     x: { count: 0 }, y: { count: 0 }, z: { count: 0 },
@@ -117,10 +158,12 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
     }
   };
 
+  const { colorScheme } = useColorScheme();
+
   /**
    * 使用基础 Three.js Hook 创建场景
    */
-  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(0.8, onRender);
+  const { containerRef, displayGroupRef, viewScaleRef } = useThreeBase(0.8, onRender, colorScheme);
 
   /**
    * 初始化场景对象（模型、坐标轴、标签、轨迹线）
@@ -133,7 +176,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
     // Body
     const bodyGeometry = new THREE.BoxGeometry(0.4, 0.6, 0.13);
     const bodyMaterial = new THREE.MeshStandardMaterial({
-      color: 0x4f9bff,
+      color: getBodyColor(colorScheme),
       metalness: 0.1,
       roughness: 0.5,
       side: THREE.DoubleSide,
@@ -154,47 +197,12 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
     axisGroupRef.current = axisGroup;
     axesRef.current = axes;
 
-    // Labels
-    const createAxisLabel = (text: string, color: string) => {
-      const canvas = document.createElement("canvas");
-      const size = 128;
-      canvas.width = size;
-      canvas.height = size;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return undefined;
-      ctx.clearRect(0, 0, size, size);
-      ctx.fillStyle = color;
-      ctx.font = "bold 72px sans-serif";
-      ctx.textAlign = "center";
-      ctx.textBaseline = "middle";
-      ctx.fillText(text, size / 2, size / 2);
-      const texture = new THREE.CanvasTexture(canvas);
-      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
-      const sprite = new THREE.Sprite(material);
-      return { sprite, material, texture };
-    };
-
-    const labelDefs = [
-      { text: "X", color: "#ff6b6b" },
-      { text: "Y", color: "#6bffb8" },
-      { text: "Z", color: "#57b2ff" },
-    ];
-    const labelResources: Array<{ material: THREE.SpriteMaterial; texture: THREE.Texture }> = [];
-    axisLabelsRef.current = labelDefs
-      .map((def) => {
-        const label = createAxisLabel(def.text, def.color);
-        if (!label) return null;
-        labelResources.push({ material: label.material, texture: label.texture });
-        axisGroup.add(label.sprite);
-        return label.sprite;
-      })
-      .filter((label): label is THREE.Sprite => label !== null);
-
     // Trails
+    const palette = getAxisPalette(colorScheme);
     const trailMaterials: Record<AxisKey, THREE.LineBasicMaterial> = {
-      x: new THREE.LineBasicMaterial({ color: 0xff6b6b }),
-      y: new THREE.LineBasicMaterial({ color: 0x6bffb8 }),
-      z: new THREE.LineBasicMaterial({ color: 0x57b2ff }),
+      x: new THREE.LineBasicMaterial({ color: palette.x }),
+      y: new THREE.LineBasicMaterial({ color: palette.y }),
+      z: new THREE.LineBasicMaterial({ color: palette.z }),
     };
     axisKeys.forEach((axis) => {
       const trailPositions = new Float32Array(maxTrailPointsRef.current * 3);
@@ -208,6 +216,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
       trailRefs.current[axis] = trailLine;
       trailGeometryRefs.current[axis] = trailGeometry;
       trailPositionsRefs.current[axis] = trailPositions;
+      trailMaterialRefs.current[axis] = trailMaterials[axis];
     });
 
     return () => {
@@ -216,12 +225,11 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
       bodyMaterial.dispose();
       displayGroup.remove(axisGroup);
       axes.dispose();
-      labelResources.forEach((r) => { r.material.dispose(); r.texture.dispose(); });
-      axisLabelsRef.current = [];
       axisKeys.forEach(axis => {
         if (trailRefs.current[axis]) displayGroup.remove(trailRefs.current[axis]!);
         if (trailGeometryRefs.current[axis]) trailGeometryRefs.current[axis]!.dispose();
         if (trailMaterials[axis]) trailMaterials[axis].dispose();
+        trailMaterialRefs.current[axis] = null;
       });
     };
   }, []); // Setup once
@@ -272,6 +280,74 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
       trailStateRef.current[axis] = { count: 0 };
     });
   }, [trailResetToken]);
+
+  /**
+   * 主题切换时重建轴标签 Sprite（颜色随主题变化）。
+   */
+  useEffect(() => {
+    const axisGroup = axisGroupRef.current;
+    if (!axisGroup) return;
+
+    if (bodyRef.current) {
+      const material = bodyRef.current.material as THREE.MeshStandardMaterial;
+      material.color.setHex(getBodyColor(colorScheme));
+    }
+
+    const palette = getAxisPalette(colorScheme);
+    if (axesRef.current) {
+      applyAxesHelperColors(axesRef.current, palette);
+    }
+    axisKeys.forEach((axis) => {
+      if (trailMaterialRefs.current[axis]) {
+        trailMaterialRefs.current[axis]!.color.setHex(palette[axis]);
+      }
+    });
+
+    const labelDefs = [
+      { text: 'X', color: palette.label[0] },
+      { text: 'Y', color: palette.label[1] },
+      { text: 'Z', color: palette.label[2] },
+    ];
+
+    const resources: Array<{ material: THREE.SpriteMaterial; texture: THREE.Texture }> = [];
+    const newLabels = labelDefs.map((def) => {
+      const canvas = document.createElement('canvas');
+      const size = 128;
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+      ctx.fillStyle = def.color;
+      ctx.font = 'bold 72px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(def.text, size / 2, size / 2);
+      const texture = new THREE.CanvasTexture(canvas);
+      const material = new THREE.SpriteMaterial({ map: texture, transparent: true });
+      const sprite = new THREE.Sprite(material);
+      resources.push({ material, texture });
+      return sprite;
+    }).filter((s): s is THREE.Sprite => s !== null);
+
+    const scale = viewScaleRef.current;
+    const axisLength = axisLengthRef.current * scale;
+    const labelOffset = 0.12 * scale;
+    const labelScale = 0.18 * scale;
+    if (newLabels.length === 3) {
+      newLabels[0].position.set(axisLength + labelOffset, 0, 0);
+      newLabels[1].position.set(0, axisLength + labelOffset, 0);
+      newLabels[2].position.set(0, 0, axisLength + labelOffset);
+      newLabels.forEach((l) => l.scale.set(-labelScale, -labelScale, labelScale));
+    }
+    newLabels.forEach((l) => axisGroup.add(l));
+    axisLabelsRef.current = newLabels;
+
+    return () => {
+      newLabels.forEach((l) => axisGroup.remove(l));
+      resources.forEach((r) => { r.material.dispose(); r.texture.dispose(); });
+      axisLabelsRef.current = [];
+    };
+  }, [colorScheme]);
 
   return <div className={styles.imuThreeView} ref={containerRef} />;
 };

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import type { ColorScheme } from "../../../providers/theme";
 
 const MAX_PITCH = THREE.MathUtils.degToRad(89);
 
@@ -18,9 +19,15 @@ const MAX_PITCH = THREE.MathUtils.degToRad(89);
  * @param onRender 每帧渲染前的回调函数，用于更新模型/轨迹数据
  * @returns 包含容器 Ref、显示分组 Ref、当前缩放 Ref 和场景 Ref
  */
+const SCENE_BG: Record<ColorScheme, number> = {
+  dark: 0x0c1119,
+  light: 0xf5f7fa,
+};
+
 export const useThreeBase = (
   scale: number,
-  onRender?: () => void
+  onRender?: () => void,
+  colorScheme: ColorScheme = 'dark'
 ) => {
   /** DOM 容器引用 */
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -61,7 +68,7 @@ export const useThreeBase = (
 
     // 场景设置
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x0b0f14);
+    scene.background = new THREE.Color(SCENE_BG[colorScheme]);
     sceneRef.current = scene;
 
     const camera = new THREE.PerspectiveCamera(55, 1, 0.01, 100);
@@ -188,6 +195,13 @@ export const useThreeBase = (
       }
     };
   }, []); // 仅在挂载时运行一次
+
+  /** 主题切换时更新场景背景色。 */
+  useEffect(() => {
+    if (sceneRef.current) {
+      sceneRef.current.background = new THREE.Color(SCENE_BG[colorScheme]);
+    }
+  }, [colorScheme]);
 
   return {
     containerRef,

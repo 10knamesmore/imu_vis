@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { Checkbox } from "antd";
 
 import type { ImuHistoryWindow } from "../../utils/ImuHistoryBuffer";
+import { useColorScheme } from "../../hooks/useColorScheme";
 
 import styles from "./ImuChartsCanvas.module.scss";
 
@@ -191,6 +192,35 @@ const formatSeconds = (valueMs: number) => {
   return `${(Math.max(0, valueMs) / 1000).toFixed(1)}s`;
 };
 
+type ChartColors = {
+  /** 背景色 */
+  bg: string;
+  /** 网格线颜色 */
+  grid: string;
+  /** 坐标轴颜色 */
+  axis: string;
+  /** 坐标轴标注文字颜色 */
+  label: string;
+  /** 无数据/暂停提示文字颜色 */
+  hint: string;
+};
+
+const DARK_CHART_COLORS: ChartColors = {
+  bg: '#0c1119',
+  grid: '#1a1f29',
+  axis: '#2a3342',
+  label: '#9aa5b1',
+  hint: '#6b7280',
+};
+
+const LIGHT_CHART_COLORS: ChartColors = {
+  bg: '#f5f7fa',
+  grid: '#c4cdd6',
+  axis: '#7a8fa0',
+  label: '#2e3f4f',
+  hint: '#6b7a86',
+};
+
 /**
  * 在 Canvas 上绘制折线图。
  *
@@ -200,6 +230,7 @@ const formatSeconds = (valueMs: number) => {
  * @param series - 要绘制的数据系列数组 (包含值、颜色、名称)
  * @param width - 绘图区域宽度
  * @param height - 绘图区域高度
+ * @param colors - 颜色主题配置
  */
 const drawChart = (
   ctx: CanvasRenderingContext2D,
@@ -207,7 +238,8 @@ const drawChart = (
   series: Array<{ color: string; name: string; buffer: Float32Array | Float64Array }>,
   yAxisLabel: string,
   width: number,
-  height: number
+  height: number,
+  colors: ChartColors
 ) => {
   const yPaddingRatio = 0.1;
   const padding = {
@@ -219,7 +251,7 @@ const drawChart = (
   const plotHeight = height - padding.top - padding.bottom;
   const plotWidth = width - padding.left - padding.right;
   if (window.count < 2) {
-    ctx.fillStyle = "#7b8591";
+    ctx.fillStyle = colors.hint;
     ctx.fillText("等待数据...", padding.left, 20);
     return;
   }
@@ -250,7 +282,7 @@ const drawChart = (
   const yTicks = 5;
 
   ctx.save();
-  ctx.strokeStyle = "#1a1f29";
+  ctx.strokeStyle = colors.grid;
   ctx.lineWidth = 1;
 
   for (let i = 0; i <= xTicks; i += 1) {
@@ -269,7 +301,7 @@ const drawChart = (
     ctx.stroke();
   }
 
-  ctx.strokeStyle = "#2a3342";
+  ctx.strokeStyle = colors.axis;
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(padding.left, padding.top);
@@ -277,7 +309,7 @@ const drawChart = (
   ctx.lineTo(padding.left + plotWidth, padding.top + plotHeight);
   ctx.stroke();
 
-  ctx.fillStyle = "#9aa5b1";
+  ctx.fillStyle = colors.label;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
   for (let i = 0; i <= yTicks; i += 1) {
@@ -346,6 +378,7 @@ export const ImuChartsCanvas = ({
   visibilityKey,
   series,
 }: ImuChartsCanvasProps) => {
+  const { colorScheme } = useColorScheme();
   /** 容器 div 的引用，用于监听尺寸变化 */
   const containerRef = useRef<HTMLDivElement | null>(null);
   /** Canvas 元素的引用，用于获取绘图上下文 */
@@ -666,9 +699,10 @@ export const ImuChartsCanvas = ({
      * 4. 调用 drawChart 进行实际绘制
      */
     const draw = () => {
+      const colors = colorScheme === 'dark' ? DARK_CHART_COLORS : LIGHT_CHART_COLORS;
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = "#0c1119";
+      ctx.fillStyle = colors.bg;
       ctx.fillRect(0, 0, width, height);
 
       const fullHistoryWindow = source.bufferRef.current.getWindow(Number.MAX_SAFE_INTEGER, 0);
@@ -694,7 +728,7 @@ export const ImuChartsCanvas = ({
       syncTimelineView(historySpanMs, durationMs, viewStateRef.current.offset);
 
       if (!enabled) {
-        ctx.fillStyle = "#6b7280";
+        ctx.fillStyle = colors.hint;
         ctx.fillText("图表已暂停", 16, 20);
         return;
       }
@@ -702,7 +736,7 @@ export const ImuChartsCanvas = ({
       // 获取当前窗口数据
       const window = source.bufferRef.current.getWindow(durationMs, viewStateRef.current.offset);
       if (window.count < 2) {
-        ctx.fillStyle = "#6b7280";
+        ctx.fillStyle = colors.hint;
         ctx.fillText("等待 IMU 数据流...", 16, 20);
         return;
       }
@@ -717,10 +751,10 @@ export const ImuChartsCanvas = ({
       }));
       const visibleSeriesBuffers = seriesBuffers.filter((entry) => seriesVisibility[entry.name] !== false);
       if (visibleSeriesBuffers.length === 0) {
-        ctx.fillStyle = "#6b7280";
+        ctx.fillStyle = colors.hint;
         ctx.fillText("请选择至少一个序列", 16, 20);
       } else {
-        drawChart(ctx, window, visibleSeriesBuffers, yAxisLabel, width, height);
+        drawChart(ctx, window, visibleSeriesBuffers, yAxisLabel, width, height, colors);
       }
 
       const now = Date.now();
@@ -742,7 +776,7 @@ export const ImuChartsCanvas = ({
     return () => {
       window.clearInterval(timer);
     };
-  }, [enabled, refreshMs, source, label, series, seriesVisibility, syncTimelineView]);
+  }, [enabled, refreshMs, source, label, series, seriesVisibility, syncTimelineView, colorScheme]);
 
   /**
    * 以 series 定义为主，组合最新值，保证 checkbox 始终可见。

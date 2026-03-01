@@ -1,3 +1,31 @@
+:global(:root) {
+  --chart-card-bg: #0b1119;
+  --chart-card-bg-disabled: #090d13;
+  --chart-border: #1f2a38;
+  --chart-border-disabled: #1a2431;
+  --chart-timeline-thumb: #3f556f;
+  --chart-legend-text: #9aa5b1;
+  --chart-legend-text-muted: #6f7a86;
+  --chart-header-text: #c9d1db;
+  --chart-value-text: #f0f4f8;
+  --chart-value-text-muted: #7b8591;
+  --chart-divider: #1f2a38;
+}
+
+:global([data-color-scheme='light']) {
+  --chart-card-bg: #ffffff;
+  --chart-card-bg-disabled: #f0f2f5;
+  --chart-border: #c4cdd6;
+  --chart-border-disabled: #dde3ea;
+  --chart-timeline-thumb: #1677ff;
+  --chart-legend-text: #3d4f5e;
+  --chart-legend-text-muted: #7a8fa0;
+  --chart-header-text: #1a2b38;
+  --chart-value-text: #0d1a24;
+  --chart-value-text-muted: #6b7a86;
+  --chart-divider: #c4cdd6;
+}
+
 .imuChartsCanvas {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 132px;
@@ -35,8 +63,8 @@
   position: relative;
   height: 12px;
   border-radius: 999px;
-  border: 1px solid #1f2a38;
-  background: #0b1119;
+  border: 1px solid var(--chart-border);
+  background: var(--chart-card-bg);
   cursor: pointer;
   overflow: hidden;
 }
@@ -47,7 +75,7 @@
   left: 0;
   height: 8px;
   border-radius: 999px;
-  background: #3f556f;
+  background: var(--chart-timeline-thumb);
   cursor: grab;
 }
 
@@ -56,7 +84,7 @@
 }
 
 .timelineMeta {
-  color: #9aa5b1;
+  color: var(--chart-legend-text);
   font-size: 12px;
   line-height: 1.2;
 }
@@ -77,8 +105,8 @@
 }
 
 .statCard {
-  background: #0b1119;
-  border: 1px solid #1f2a38;
+  background: var(--chart-card-bg);
+  border: 1px solid var(--chart-border);
   border-radius: 6px;
   padding: 6px;
   display: flex;
@@ -92,7 +120,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  color: #c9d1db;
+  color: var(--chart-header-text);
   font-size: 12px;
 }
 
@@ -104,24 +132,24 @@
   min-width: 0;
 
   :global(.ant-checkbox + span) {
-    color: #9aa5b1;
+    color: var(--chart-legend-text);
     font-size: 12px;
   }
 }
 
 .seriesCheckboxMuted {
   :global(.ant-checkbox + span) {
-    color: #6f7a86;
+    color: var(--chart-legend-text-muted);
   }
 }
 
 .statDivider {
   height: 1px;
-  background: #1f2a38;
+  background: var(--chart-divider);
 }
 
 .statValue {
-  color: #f0f4f8;
+  color: var(--chart-value-text);
   font-variant-numeric: tabular-nums;
   text-align: center;
   font-size: 12px;
@@ -135,10 +163,10 @@
 }
 
 .statCardDisabled {
-  background: #090d13;
-  border-color: #1a2431;
+  background: var(--chart-card-bg-disabled);
+  border-color: var(--chart-border-disabled);
 }
 
 .statValueMuted {
-  color: #7b8591;
+  color: var(--chart-value-text-muted);
 }
