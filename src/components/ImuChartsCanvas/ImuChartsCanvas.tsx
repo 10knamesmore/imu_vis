@@ -543,7 +543,12 @@ export const ImuChartsCanvas = ({
   const lastStatsUpdateRef = useRef(0);
   const lastTimelineUpdateRef = useRef(0);
   const latestTimeRef = useRef<number | null>(null);
+  const lastDrawSignatureRef = useRef<string | null>(null);
   const historySpanRef = useRef(0);
+  const [inViewport, setInViewport] = useState(true);
+  const [documentVisible, setDocumentVisible] = useState(
+    () => typeof document === "undefined" || document.visibilityState !== "hidden"
+  );
   const timelineDragRef = useRef<TimelineDragState>({
     active: false,
     pointerId: null,
@@ -570,6 +575,7 @@ export const ImuChartsCanvas = ({
     durationMs: ZOOM_ANIMATION_MS,
     rafId: null,
   });
+  const renderActive = inViewport && documentVisible;
 
   /** 视图状态：时间窗口长度和偏移量 */
   const viewStateRef = useRef({
@@ -841,6 +847,47 @@ export const ImuChartsCanvas = ({
   }, []);
 
   /**
+   * Effect: 页面可见性变化时暂停/恢复绘制。
+   */
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      const visible = document.visibilityState !== "hidden";
+      setDocumentVisible(visible);
+      if (visible) {
+        lastDrawSignatureRef.current = null;
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
+
+  /**
+   * Effect: 画布离开视口时暂停绘制，回到视口时恢复。
+   */
+  useEffect(() => {
+    const target = containerRef.current;
+    if (!target) {
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.some((entry) => entry.isIntersecting);
+        setInViewport(visible);
+        if (visible) {
+          lastDrawSignatureRef.current = null;
+        }
+      },
+      { threshold: 0.01 }
+    );
+    observer.observe(target);
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  /**
    * Effect: 同步时间进度条轨道宽度。
    */
   useEffect(() => {
@@ -898,7 +945,7 @@ export const ImuChartsCanvas = ({
    */
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) {
+    if (!canvas || !renderActive) {
       return undefined;
     }
     const ctx = canvas.getContext("2d");
@@ -916,13 +963,12 @@ export const ImuChartsCanvas = ({
      * 4. 调用 drawChart 进行实际绘制
      */
     const draw = () => {
+      if (!renderActive) {
+        return;
+      }
       const frameNow = performance.now();
       const colors = colorScheme === 'dark' ? DARK_CHART_COLORS : LIGHT_CHART_COLORS;
       const { width, height } = canvas;
-      ctx.clearRect(0, 0, width, height);
-      ctx.fillStyle = colors.bg;
-      ctx.fillRect(0, 0, width, height);
-
       const fullHistoryWindow = source.bufferRef.current.getWindow(Number.MAX_SAFE_INTEGER, 0);
       const historySpanMs = fullHistoryWindow.count >= 2
         ? fullHistoryWindow.getTime(fullHistoryWindow.count - 1) - fullHistoryWindow.getTime(0)
@@ -944,6 +990,34 @@ export const ImuChartsCanvas = ({
       latestTimeRef.current = latestHistoryTime;
       viewStateRef.current.offset = clampOffsetMs(viewStateRef.current.offset, historySpanMs, durationMs);
       syncTimelineView(historySpanMs, durationMs, viewStateRef.current.offset);
+
+      const visibleSeriesSignature = series
+        .map((entry) => `${entry.name}:${seriesVisibility[entry.name] !== false ? 1 : 0}`)
+        .join("|");
+      const drawSignature = [
+        width,
+        height,
+        colorScheme,
+        enabled ? 1 : 0,
+        fullHistoryWindow.count,
+        latestHistoryTime ?? -1,
+        durationMs.toFixed(3),
+        viewStateRef.current.offset.toFixed(3),
+        visibleSeriesSignature,
+      ].join("::");
+      const hasActiveAnimation =
+        zoomAnimRef.current.active ||
+        yRangeAnimRef.current.active ||
+        viewStateRef.current.isDragging ||
+        timelineDragRef.current.active;
+      if (!hasActiveAnimation && lastDrawSignatureRef.current === drawSignature) {
+        return;
+      }
+      lastDrawSignatureRef.current = drawSignature;
+
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = colors.bg;
+      ctx.fillRect(0, 0, width, height);
 
       if (!enabled) {
         yRangeAnimRef.current.initialized = false;
@@ -1008,7 +1082,7 @@ export const ImuChartsCanvas = ({
     return () => {
       window.clearInterval(timer);
     };
-  }, [enabled, refreshMs, source, label, series, seriesVisibility, syncTimelineView, colorScheme]);
+  }, [enabled, refreshMs, source, label, series, seriesVisibility, syncTimelineView, colorScheme, renderActive]);
 
   /**
    * 以 series 定义为主，组合最新值，保证 checkbox 始终可见。

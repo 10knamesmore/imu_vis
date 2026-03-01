@@ -8,29 +8,8 @@ import {
   ResponseData,
   RecordingMeta,
   RecordingStatus,
-  ImuHistorySnapshot,
 } from '../../types';
 import { BluetoothContext, type BluetoothContextValue, type DataMode } from './bluetooth-context';
-
-const createEmptyHistory = (): ImuHistorySnapshot => ({
-  time: [],
-  builtin: {
-    accel: { x: [], y: [], z: [] },
-    accelWithG: { x: [], y: [], z: [] },
-    gyro: { x: [], y: [], z: [] },
-    angle: { x: [], y: [], z: [] },
-    quat: { w: [], x: [], y: [], z: [] },
-    offset: { x: [], y: [], z: [] },
-    accelNav: { x: [], y: [], z: [] },
-  },
-  calculated: {
-    angle: { x: [], y: [], z: [] },
-    attitude: { w: [], x: [], y: [], z: [] },
-    velocity: { x: [], y: [], z: [] },
-    position: { x: [], y: [], z: [] },
-  },
-  deltaAngle: { x: [], y: [], z: [] },
-});
 
 const useBluetoothInternal = (): BluetoothContextValue => {
   const { message } = AntdApp.useApp();
@@ -42,16 +21,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const [connectedDevice, setConnectedDevice] = useState<PeripheralInfo | null>(null);
   // 是否需要显示标定向导
   const [needsCalibration, setNeedsCalibration] = useState(false);
-  // 原始数据回调（供标定向导采集数据）
-  const rawDataCallbackRef = useRef<((data: ResponseData) => void) | null>(null);
-  // 对外提供的 IMU 数据历史
-  const [dataHistory, setDataHistory] = useState<ImuHistorySnapshot>(createEmptyHistory);
-  // 表示图重绘的版本号，每次更新加一
-  const [plotRevision, setPlotRevision] = useState(0);
-  // UI 刷新间隔（ms），只影响图表渲染频率，不影响数据接收频率
-  const [uiRefreshMs, setUiRefreshMs] = useState(33);
-  // 上一秒收到的消息数（用于展示/监控输入频率）
-  const [lastSecondMessageCount, setLastSecondMessageCount] = useState(0);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
   const [recording, setRecording] = useState(false);
   const dataModeRef = useRef<DataMode>('live');
@@ -251,11 +220,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       setConnectedDevice(null);
       setDevices([]);
       setScanning(false);
-      // 断开时清空 UI 数据与缓存
-      setDataHistory(createEmptyHistory());
-      setPlotRevision((rev) => (rev + 1) % 1_000_000);
-      // 断开时清空上一秒计数显示
-      setLastSecondMessageCount(0);
       message.info("已断开连接");
     } catch (e) {
       console.error(e);
@@ -397,37 +361,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         message.warning('该录制没有数据');
         return;
       }
-      const startMs = samples[0].raw_data.timestamp_ms;
-      const history = createEmptyHistory();
-      for (const sample of samples) {
-        const imuData = sample.raw_data;
-        history.time.push(imuData.timestamp_ms - startMs);
-        history.builtin.accel.x.push(imuData.accel_no_g.x);
-        history.builtin.accel.y.push(imuData.accel_no_g.y);
-        history.builtin.accel.z.push(imuData.accel_no_g.z);
-        history.builtin.accelWithG.x.push(imuData.accel_with_g.x);
-        history.builtin.accelWithG.y.push(imuData.accel_with_g.y);
-        history.builtin.accelWithG.z.push(imuData.accel_with_g.z);
-        history.builtin.gyro.x.push(imuData.gyro.x);
-        history.builtin.gyro.y.push(imuData.gyro.y);
-        history.builtin.gyro.z.push(imuData.gyro.z);
-        history.builtin.angle.x.push(imuData.angle.x);
-        history.builtin.angle.y.push(imuData.angle.y);
-        history.builtin.angle.z.push(imuData.angle.z);
-        history.builtin.quat.w.push(imuData.quat.w);
-        history.builtin.quat.x.push(imuData.quat.x);
-        history.builtin.quat.y.push(imuData.quat.y);
-        history.builtin.quat.z.push(imuData.quat.z);
-        history.builtin.offset.x.push(imuData.offset.x);
-        history.builtin.offset.y.push(imuData.offset.y);
-        history.builtin.offset.z.push(imuData.offset.z);
-        history.builtin.accelNav.x.push(imuData.accel_nav.x);
-        history.builtin.accelNav.y.push(imuData.accel_nav.y);
-        history.builtin.accelNav.z.push(imuData.accel_nav.z);
-      }
-      setDataHistory(history);
-      setPlotRevision((rev) => (rev + 1) % 1_000_000);
-      setLastSecondMessageCount(0);
       setReplaySamples(samples);
       setReplaySessionId(sessionId);
       enterReplayMode();
@@ -454,22 +387,10 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     enterLiveMode(true);
   }, [enterLiveMode]);
 
-  const registerRawDataCallback = useCallback(
-    (cb: ((data: ResponseData) => void) | null) => {
-      rawDataCallbackRef.current = cb;
-    },
-    [],
-  );
-
   return {
     scanning,
     devices,
     connectedDevice,
-    dataHistory,
-    plotRevision,
-    uiRefreshMs,
-    setUiRefreshMs,
-    lastSecondMessageCount,
     recording,
     recordingStatus,
     recordings,
@@ -494,7 +415,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     savePipelineConfig,
     needsCalibration,
     setNeedsCalibration,
-    registerRawDataCallback,
   };
 };
 

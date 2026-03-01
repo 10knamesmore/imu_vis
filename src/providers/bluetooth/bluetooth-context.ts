@@ -1,7 +1,6 @@
-import { createContext, type Dispatch, type SetStateAction } from 'react';
+import { createContext } from 'react';
 
 import type {
-  ImuHistorySnapshot,
   PeripheralInfo,
   ProcessorPipelineConfig,
   RecordingMeta,
@@ -19,16 +18,6 @@ export type BluetoothContextValue = {
   devices: PeripheralInfo[];
   /** 当前已连接设备信息；未连接时为 null。 */
   connectedDevice: PeripheralInfo | null;
-  /** 给旧图表链路使用的历史数据快照。 */
-  dataHistory: ImuHistorySnapshot;
-  /** 图表重绘版本号（每次刷新递增）。 */
-  plotRevision: number;
-  /** UI 刷新间隔（毫秒）。 */
-  uiRefreshMs: number;
-  /** 更新 UI 刷新间隔的方法。 */
-  setUiRefreshMs: Dispatch<SetStateAction<number>>;
-  /** 最近 1 秒接收到的数据条数。 */
-  lastSecondMessageCount: number;
   /** 当前是否正在录制。 */
   recording: boolean;
   /** 当前录制状态详情。 */
@@ -77,8 +66,6 @@ export type BluetoothContextValue = {
   needsCalibration: boolean;
   /** 设置标定向导显示状态。 */
   setNeedsCalibration: (v: boolean) => void;
-  /** 注册原始数据回调（用于标定向导采集数据），传 null 解注册。 */
-  registerRawDataCallback: (cb: ((data: ResponseData) => void) | null) => void;
 };
 
 export const BluetoothContext = createContext<BluetoothContextValue | null>(null);
