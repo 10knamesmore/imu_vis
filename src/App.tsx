@@ -93,7 +93,11 @@ const AppContent = () => {
 
   // 首次连接未标定设备时全页替换为标定向导
   if (needsCalibration && connectedDevice) {
-    return <CalibrationWizard deviceId={connectedDevice.id} />;
+    return (
+      <CalibrationWizard
+        deviceAddress={connectedDevice.address}
+      />
+    );
   }
 
   return (

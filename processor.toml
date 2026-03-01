@@ -38,11 +38,24 @@ alpha = 0.9             # 滤波系数（0~1），越大越平滑但延迟越高
 [trajectory]
 passby = false          # true = 跳过轨迹计算，不进行位置推算
                         # false = 启用轨迹计算（注意：长时间会漂移，需配合 ZUPT）
+integrator = "trapezoid" # legacy_euler | trapezoid
+dt_min_ms = 1
+dt_max_ms = 50
 
 # --- 零速修正模块 (ZUPT) ---
 # 作用：检测静止状态并修正速度漂移
 [zupt]
 passby = false          # true = 跳过零速检测
                         # false = 启用零速修正（适用于挥拍间歇等间歇运动）
+impl_type = "smooth_hysteresis" # legacy_hard_lock | smooth_hysteresis
 gyro_thresh = 0.15      # 陀螺仪静止阈值（rad/s）- 稍放宽以适应握拍轻微晃动
 accel_thresh = 0.3      # 加速度静止阈值（m/s²）- 稍放宽以容忍小幅晃动
+gyro_enter_thresh = 0.12
+accel_enter_thresh = 0.18
+gyro_exit_thresh = 0.2
+accel_exit_thresh = 0.3
+enter_frames = 6
+exit_frames = 3
+vel_decay_tau_ms = 120.0
+pos_lock_tau_ms = 180.0
+vel_zero_eps = 0.02

@@ -11,6 +11,7 @@ import {
   Row,
   Col,
   Card,
+  message,
 } from 'antd';
 import { imuApi } from '../../services/imu';
 import { useBluetooth } from '../../hooks/useBluetooth';
@@ -48,10 +49,10 @@ const COLLECT_DURATION_MS = 3000;
 const COUNTDOWN_DURATION_MS = 2000;
 
 interface Props {
-  deviceId: string;
+  deviceAddress: string;
 }
 
-export const CalibrationWizard = ({ deviceId }: Props) => {
+export const CalibrationWizard = ({ deviceAddress }: Props) => {
   const { setNeedsCalibration, registerRawDataCallback, getPipelineConfig, updatePipelineConfig } =
     useBluetooth();
 
@@ -206,7 +207,7 @@ export const CalibrationWizard = ({ deviceId }: Props) => {
       // 1. 应用到 pipeline
       const config = await getPipelineConfig();
       if (config) {
-        await updatePipelineConfig({
+        const updated = await updatePipelineConfig({
           ...config,
           calibration: {
             ...config.calibration,
@@ -218,16 +219,29 @@ export const CalibrationWizard = ({ deviceId }: Props) => {
             ],
           },
         });
+        if (!updated) {
+          throw new Error('应用标定到流水线失败');
+        }
       }
-      // 2. 持久化
-      await imuApi.saveDeviceCalibration(deviceId, result.bias, result.scale, result.qualityError);
+      // 2. 持久化：仅使用稳定 key(address)。
+      const calibrationKey = (deviceAddress || '').trim();
+      if (!calibrationKey) {
+        throw new Error('设备地址为空，无法保存标定');
+      }
+      const savePrimary = await imuApi.saveDeviceCalibration(calibrationKey, result.bias, result.scale, result.qualityError);
+      if (!savePrimary.success) {
+        throw new Error(savePrimary.message || `保存标定失败，key=${calibrationKey}`);
+      }
+
+      message.success('标定结果已保存并应用');
       setNeedsCalibration(false);
     } catch (e) {
       console.error('保存标定结果失败:', e);
+      message.error(`保存标定结果失败: ${e instanceof Error ? e.message : '未知错误'}`);
     } finally {
       setSaving(false);
     }
-  }, [result, deviceId, getPipelineConfig, updatePipelineConfig, setNeedsCalibration]);
+  }, [result, deviceAddress, getPipelineConfig, updatePipelineConfig, setNeedsCalibration]);
 
   // 跳过
   const handleSkip = useCallback(() => {

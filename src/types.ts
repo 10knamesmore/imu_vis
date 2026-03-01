@@ -107,11 +107,24 @@ export interface ProcessorPipelineConfig {
   };
   trajectory: {
     passby: boolean;
+    integrator: 'legacy_euler' | 'trapezoid';
+    dt_min_ms: number;
+    dt_max_ms: number;
   };
   zupt: {
     passby: boolean;
+    impl_type: 'legacy_hard_lock' | 'smooth_hysteresis';
     gyro_thresh: number;
     accel_thresh: number;
+    gyro_enter_thresh: number;
+    accel_enter_thresh: number;
+    gyro_exit_thresh: number;
+    accel_exit_thresh: number;
+    enter_frames: number;
+    exit_frames: number;
+    vel_decay_tau_ms: number;
+    pos_lock_tau_ms: number;
+    vel_zero_eps: number;
   };
 }
 

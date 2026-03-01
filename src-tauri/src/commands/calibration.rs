@@ -33,6 +33,7 @@ pub async fn save_device_calibration(
     quality_error: f64,
 ) -> Response<()> {
     let result: anyhow::Result<()> = async {
+        let key = device_id.clone();
         let db_path = db::recording_db_path()?;
         let conn = db::connect(&db_path).await?;
         db::ensure_schema(&conn).await?;
@@ -64,6 +65,7 @@ pub async fn save_device_calibration(
         ))
         .await
         .context("save device calibration")?;
+        tracing::info!("device calibration saved | key={}", key);
 
         Ok(())
     }
@@ -79,6 +81,7 @@ pub async fn get_device_calibration(
     device_id: String,
 ) -> Response<Option<DeviceCalibrationData>> {
     let result: anyhow::Result<Option<DeviceCalibrationData>> = async {
+        let key = device_id.clone();
         let db_path = db::recording_db_path()?;
         let conn = db::connect(&db_path).await?;
         db::ensure_schema(&conn).await?;
@@ -87,6 +90,12 @@ pub async fn get_device_calibration(
             .one(&conn)
             .await
             .context("query device calibration")?;
+
+        if model.is_some() {
+            tracing::info!("device calibration hit | key={}", key);
+        } else {
+            tracing::info!("device calibration miss | key={}", key);
+        }
 
         Ok(model.map(|m| DeviceCalibrationData {
             device_id: m.device_id,

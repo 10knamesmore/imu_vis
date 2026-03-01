@@ -4,7 +4,7 @@ use math_f64::{DQuat, DVec3};
 
 use crate::processor::{
     filter::ImuSampleFiltered,
-    navigator::types::{NavState, NavigatorConfig},
+    navigator::types::{IntegratorImpl, NavState, NavigatorConfig, ZuptImpl},
 };
 
 /// 导航融合器。
@@ -18,7 +18,11 @@ pub struct Navigator {
     nav_state: NavState,
     gravity_ref: DVec3,
     last_timestamp_ms: Option<u64>,
+    current_dt_s: f64,
+    last_accel_lin: Option<DVec3>,
     last_is_static: Option<bool>,
+    static_enter_count: u32,
+    static_exit_count: u32,
     static_position: Option<DVec3>,
 }
 
@@ -36,7 +40,11 @@ impl Navigator {
             },
             gravity_ref: DVec3::new(0.0, 0.0, gravity),
             last_timestamp_ms: None,
+            current_dt_s: 0.0,
+            last_accel_lin: None,
             last_is_static: None,
+            static_enter_count: 0,
+            static_exit_count: 0,
             static_position: None,
         }
     }
@@ -93,7 +101,11 @@ impl Navigator {
         };
         self.gravity_ref = DVec3::new(0.0, 0.0, self.config.gravity);
         self.last_timestamp_ms = None;
+        self.current_dt_s = 0.0;
+        self.last_accel_lin = None;
         self.last_is_static = None;
+        self.static_enter_count = 0;
+        self.static_exit_count = 0;
         self.static_position = None;
     }
 
@@ -107,17 +119,33 @@ impl Navigator {
 
         let dt = self
             .last_timestamp_ms
-            .map(|ts| (sample.timestamp_ms.saturating_sub(ts)) as f64 / 1000.0)
+            .map(|ts| clamp_dt_s(sample.timestamp_ms.saturating_sub(ts), self.config.trajectory.dt_min_ms, self.config.trajectory.dt_max_ms))
             .unwrap_or(0.0);
+        self.current_dt_s = dt;
         self.last_timestamp_ms = Some(sample.timestamp_ms);
 
-        if dt > 0.0 {
-            let a_world = attitude.rotate_vec3(sample.accel_lp);
-            let a_lin = a_world - self.gravity_ref;
+        let a_world = attitude.rotate_vec3(sample.accel_lp);
+        let a_lin = a_world - self.gravity_ref;
 
-            self.nav_state.velocity += a_lin * dt;
-            self.nav_state.position += self.nav_state.velocity * dt;
+        if dt <= 0.0 {
+            self.last_accel_lin = Some(a_lin);
+            return;
         }
+
+        match self.config.trajectory.integrator {
+            IntegratorImpl::LegacyEuler => {
+                self.nav_state.velocity += a_lin * dt;
+                self.nav_state.position += self.nav_state.velocity * dt;
+            }
+            IntegratorImpl::Trapezoid => {
+                let v_prev = self.nav_state.velocity;
+                let a_prev = self.last_accel_lin.unwrap_or(a_lin);
+                let v_next = v_prev + (a_prev + a_lin) * (0.5 * dt);
+                self.nav_state.velocity = v_next;
+                self.nav_state.position += (v_prev + v_next) * (0.5 * dt);
+            }
+        }
+        self.last_accel_lin = Some(a_lin);
     }
 
     fn apply_zupt(&mut self, sample: &ImuSampleFiltered) {
@@ -129,58 +157,153 @@ impl Navigator {
         let accel_world = self.nav_state.attitude.rotate_vec3(sample.accel_lp);
         let accel_lin = accel_world - self.gravity_ref;
         let accel_norm = accel_lin.length();
-        let is_static =
-            gyro_norm < self.config.zupt.gyro_thresh && accel_norm < self.config.zupt.accel_thresh;
+        let dt = self.current_dt_s;
 
-        if self.last_is_static != Some(is_static) {
-            if is_static {
-                self.static_position = Some(self.nav_state.position);
-                tracing::info!(
-                    "ZUPT: 进入静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s² | vel=[{:.3}, {:.3}, {:.3}]",
-                    gyro_norm,
-                    accel_norm,
-                    self.nav_state.velocity.x,
-                    self.nav_state.velocity.y,
-                    self.nav_state.velocity.z
-                );
-            } else {
-                self.static_position = None;
-                tracing::info!(
-                    "ZUPT: 退出静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s²",
-                    gyro_norm,
-                    accel_norm
-                );
+        match self.config.zupt.impl_type {
+            ZuptImpl::LegacyHardLock => {
+                let is_static =
+                    gyro_norm < self.config.zupt.gyro_thresh && accel_norm < self.config.zupt.accel_thresh;
+                self.apply_static_transition(is_static, gyro_norm, accel_norm);
+                if is_static {
+                    self.apply_hard_lock(accel_lin, sample.timestamp_ms);
+                }
             }
-            self.last_is_static = Some(is_static);
-        }
+            ZuptImpl::SmoothHysteresis => {
+                let entering = gyro_norm < self.config.zupt.gyro_enter_thresh
+                    && accel_norm < self.config.zupt.accel_enter_thresh;
+                let exiting = gyro_norm > self.config.zupt.gyro_exit_thresh
+                    || accel_norm > self.config.zupt.accel_exit_thresh;
 
-        if is_static {
-            let vel_before = self.nav_state.velocity;
-            let pos_before = self.nav_state.position;
-            self.nav_state.velocity = DVec3::ZERO;
-            if let Some(static_position) = self.static_position {
-                self.nav_state.position = static_position;
-            }
+                let prev_is_static = self.last_is_static.unwrap_or(false);
+                let mut is_static = prev_is_static;
+                if prev_is_static {
+                    if exiting {
+                        self.static_exit_count = self.static_exit_count.saturating_add(1);
+                    } else {
+                        self.static_exit_count = 0;
+                    }
+                    if self.static_exit_count >= self.config.zupt.exit_frames.max(1) {
+                        is_static = false;
+                        self.static_exit_count = 0;
+                    }
+                } else {
+                    if entering {
+                        self.static_enter_count = self.static_enter_count.saturating_add(1);
+                    } else {
+                        self.static_enter_count = 0;
+                    }
+                    if self.static_enter_count >= self.config.zupt.enter_frames.max(1) {
+                        is_static = true;
+                        self.static_enter_count = 0;
+                    }
+                }
 
-            if sample.timestamp_ms % 1000 < 4 {
-                tracing::info!(
-                    "ZUPT 静止修正 | vel_before=[{:.3}, {:.3}, {:.3}] → [0, 0, 0] | pos_before=[{:.3}, {:.3}, {:.3}] | pos_locked=[{:.3}, {:.3}, {:.3}] | a_lin=[{:.3}, {:.3}, {:.3}]",
-                    vel_before.x,
-                    vel_before.y,
-                    vel_before.z,
-                    pos_before.x,
-                    pos_before.y,
-                    pos_before.z,
-                    self.nav_state.position.x,
-                    self.nav_state.position.y,
-                    self.nav_state.position.z,
-                    accel_lin.x,
-                    accel_lin.y,
-                    accel_lin.z
-                );
+                self.apply_static_transition(is_static, gyro_norm, accel_norm);
+                if is_static {
+                    self.apply_smooth_static(dt, accel_lin, sample.timestamp_ms);
+                }
             }
         }
     }
+
+    fn apply_static_transition(&mut self, is_static: bool, gyro_norm: f64, accel_norm: f64) {
+        if self.last_is_static == Some(is_static) {
+            return;
+        }
+
+        if is_static {
+            self.static_position = Some(self.nav_state.position);
+            tracing::info!(
+                "ZUPT: 进入静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s² | vel=[{:.3}, {:.3}, {:.3}]",
+                gyro_norm,
+                accel_norm,
+                self.nav_state.velocity.x,
+                self.nav_state.velocity.y,
+                self.nav_state.velocity.z
+            );
+        } else {
+            self.static_position = None;
+            tracing::info!(
+                "ZUPT: 退出静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s²",
+                gyro_norm,
+                accel_norm
+            );
+        }
+        self.last_is_static = Some(is_static);
+    }
+
+    fn apply_hard_lock(&mut self, accel_lin: DVec3, timestamp_ms: u64) {
+        let vel_before = self.nav_state.velocity;
+        let pos_before = self.nav_state.position;
+        self.nav_state.velocity = DVec3::ZERO;
+        if let Some(static_position) = self.static_position {
+            self.nav_state.position = static_position;
+        }
+
+        if timestamp_ms % 1000 < 4 {
+            tracing::info!(
+                "ZUPT 硬修正 | vel_before=[{:.3}, {:.3}, {:.3}] → [0, 0, 0] | pos_before=[{:.3}, {:.3}, {:.3}] | pos_locked=[{:.3}, {:.3}, {:.3}] | a_lin=[{:.3}, {:.3}, {:.3}]",
+                vel_before.x,
+                vel_before.y,
+                vel_before.z,
+                pos_before.x,
+                pos_before.y,
+                pos_before.z,
+                self.nav_state.position.x,
+                self.nav_state.position.y,
+                self.nav_state.position.z,
+                accel_lin.x,
+                accel_lin.y,
+                accel_lin.z
+            );
+        }
+    }
+
+    fn apply_smooth_static(&mut self, dt: f64, accel_lin: DVec3, timestamp_ms: u64) {
+        let vel_before = self.nav_state.velocity;
+        let pos_before = self.nav_state.position;
+
+        let tau_v_s = (self.config.zupt.vel_decay_tau_ms.max(1.0)) / 1000.0;
+        let alpha_v = 1.0 - f64::exp(-dt / tau_v_s);
+        self.nav_state.velocity *= 1.0 - alpha_v;
+        if self.nav_state.velocity.length() < self.config.zupt.vel_zero_eps {
+            self.nav_state.velocity = DVec3::ZERO;
+        }
+
+        if let Some(static_position) = self.static_position {
+            let tau_p_s = (self.config.zupt.pos_lock_tau_ms.max(1.0)) / 1000.0;
+            let alpha_p = 1.0 - f64::exp(-dt / tau_p_s);
+            self.nav_state.position += (static_position - self.nav_state.position) * alpha_p;
+        }
+
+        if timestamp_ms % 1000 < 4 {
+            tracing::info!(
+                "ZUPT 平滑修正 | vel_before=[{:.3}, {:.3}, {:.3}] | vel_after=[{:.3}, {:.3}, {:.3}] | pos_before=[{:.3}, {:.3}, {:.3}] | pos_after=[{:.3}, {:.3}, {:.3}] | a_lin=[{:.3}, {:.3}, {:.3}]",
+                vel_before.x,
+                vel_before.y,
+                vel_before.z,
+                self.nav_state.velocity.x,
+                self.nav_state.velocity.y,
+                self.nav_state.velocity.z,
+                pos_before.x,
+                pos_before.y,
+                pos_before.z,
+                self.nav_state.position.x,
+                self.nav_state.position.y,
+                self.nav_state.position.z,
+                accel_lin.x,
+                accel_lin.y,
+                accel_lin.z
+            );
+        }
+    }
+}
+
+fn clamp_dt_s(delta_ms: u64, dt_min_ms: u64, dt_max_ms: u64) -> f64 {
+    let lower = dt_min_ms.max(1);
+    let upper = dt_max_ms.max(lower);
+    let clamped = delta_ms.clamp(lower, upper);
+    clamped as f64 / 1000.0
 }
 
 #[cfg(test)]
@@ -189,7 +312,7 @@ mod tests {
 
     use crate::processor::{
         filter::ImuSampleFiltered,
-        navigator::{Navigator, NavigatorConfig, TrajectoryConfig, ZuptConfig},
+        navigator::{types::ZuptImpl, Navigator, NavigatorConfig, TrajectoryConfig, ZuptConfig},
     };
 
     #[test]
@@ -197,11 +320,17 @@ mod tests {
         let gravity = 9.80665;
         let mut navigator = Navigator::new(NavigatorConfig {
             gravity,
-            trajectory: TrajectoryConfig { passby: false },
+            trajectory: TrajectoryConfig {
+                passby: false,
+                dt_max_ms: 1000,
+                ..TrajectoryConfig::default()
+            },
             zupt: ZuptConfig {
                 passby: false,
                 gyro_thresh: 0.2,
                 accel_thresh: 0.2,
+                impl_type: ZuptImpl::LegacyHardLock,
+                ..ZuptConfig::default()
             },
         });
 
@@ -244,11 +373,17 @@ mod tests {
         let gravity = 9.80665;
         let mut navigator = Navigator::new(NavigatorConfig {
             gravity,
-            trajectory: TrajectoryConfig { passby: false },
+            trajectory: TrajectoryConfig {
+                passby: false,
+                dt_max_ms: 1000,
+                ..TrajectoryConfig::default()
+            },
             zupt: ZuptConfig {
                 passby: false,
                 gyro_thresh: 0.2,
                 accel_thresh: 0.2,
+                impl_type: ZuptImpl::LegacyHardLock,
+                ..ZuptConfig::default()
             },
         });
 
@@ -285,11 +420,16 @@ mod tests {
         let gravity = 9.80665;
         let mut navigator = Navigator::new(NavigatorConfig {
             gravity,
-            trajectory: TrajectoryConfig { passby: false },
+            trajectory: TrajectoryConfig {
+                passby: false,
+                dt_max_ms: 1000,
+                ..TrajectoryConfig::default()
+            },
             zupt: ZuptConfig {
                 passby: true,
                 gyro_thresh: 0.2,
                 accel_thresh: 0.2,
+                ..ZuptConfig::default()
             },
         });
 

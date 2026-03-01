@@ -22,8 +22,27 @@ const DEFAULT_CONFIG: ProcessorPipelineConfig = {
     gyro_matrix: [[1, 0, 0], [0, 1, 0], [0, 0, 1]],
   },
   filter: { passby: false, alpha: 0.9 },
-  trajectory: { passby: false },
-  zupt: { passby: false, gyro_thresh: 0.1, accel_thresh: 0.2 },
+  trajectory: {
+    passby: false,
+    integrator: 'trapezoid',
+    dt_min_ms: 1,
+    dt_max_ms: 50,
+  },
+  zupt: {
+    passby: false,
+    impl_type: 'smooth_hysteresis',
+    gyro_thresh: 0.1,
+    accel_thresh: 0.2,
+    gyro_enter_thresh: 0.12,
+    accel_enter_thresh: 0.18,
+    gyro_exit_thresh: 0.2,
+    accel_exit_thresh: 0.3,
+    enter_frames: 6,
+    exit_frames: 3,
+    vel_decay_tau_ms: 120,
+    pos_lock_tau_ms: 180,
+    vel_zero_eps: 0.02,
+  },
 };
 
 const getRssiColor = (rssi?: number) => {
@@ -179,6 +198,8 @@ export const SettingsPanel = () => {
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const autoApplyTimerRef = useRef<number | undefined>(undefined);
+  const integrator = Form.useWatch(['trajectory', 'integrator'], form);
+  const zuptImplType = Form.useWatch(['zupt', 'impl_type'], form);
 
   /**
    * 切换开发者模式开关。
@@ -196,6 +217,7 @@ export const SettingsPanel = () => {
 
   /** 渲染开发者模式开关区域。 */
   const renderDeveloperModeControl = () => (
+    isDeveloperMode &&
     <div className={styles.developerModeBar}>
       <Tag color={isDeveloperMode ? 'geekblue' : 'default'}>开发者模式</Tag>
       <Switch
@@ -328,12 +350,43 @@ export const SettingsPanel = () => {
                         <Form.Item label="跳过处理" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
                           <Switch />
                         </Form.Item>
+                        <Form.Item label="积分实现" name={['trajectory', 'integrator']} rules={numberRules} className={styles.compactItem}>
+                          <Select
+                            options={[
+                              { label: '欧拉积分', value: 'legacy_euler' },
+                              { label: '梯形积分', value: 'trapezoid' },
+                            ]}
+                          />
+                        </Form.Item>
+                        <Row gutter={12}>
+                          <Col xs={24} md={12}>
+                            <Form.Item label="最小步长 dt_min_ms" name={['trajectory', 'dt_min_ms']} rules={numberRules} className={styles.compactItem}>
+                              <InputNumber className={styles.numberInput} />
+                            </Form.Item>
+                          </Col>
+                          <Col xs={24} md={12}>
+                            <Form.Item label="最大步长 dt_max_ms" name={['trajectory', 'dt_max_ms']} rules={numberRules} className={styles.compactItem}>
+                              <InputNumber className={styles.numberInput} />
+                            </Form.Item>
+                          </Col>
+                        </Row>
+                        <Text type="secondary" style={{ fontSize: 12 }}>
+                          当前: {integrator === 'legacy_euler' ? '旧版一阶欧拉积分' : '梯形积分'}
+                        </Text>
                       </Card>
                     </Col>
                     <Col xs={24} lg={12}>
                       <Card size="small" title="ZUPT(零速更新)" className={styles.sectionCard}>
                         <Form.Item label="跳过处理" name={['zupt', 'passby']} valuePropName="checked">
                           <Switch />
+                        </Form.Item>
+                        <Form.Item label="ZUPT 实现" name={['zupt', 'impl_type']} rules={numberRules} className={styles.compactItem}>
+                          <Select
+                            options={[
+                              { label: '硬锁定', value: 'legacy_hard_lock' },
+                              { label: '平滑滞回', value: 'smooth_hysteresis' },
+                            ]}
+                          />
                         </Form.Item>
                         <Row gutter={12}>
                           <Col xs={24} md={8}>
@@ -347,6 +400,63 @@ export const SettingsPanel = () => {
                             </Form.Item>
                           </Col>
                         </Row>
+                        {zuptImplType === 'smooth_hysteresis' && (
+                          <>
+                            <Row gutter={12}>
+                              <Col xs={24} md={12}>
+                                <Form.Item label="进入角速度阈值" name={['zupt', 'gyro_enter_thresh']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} md={12}>
+                                <Form.Item label="进入加速度阈值" name={['zupt', 'accel_enter_thresh']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                            <Row gutter={12}>
+                              <Col xs={24} md={12}>
+                                <Form.Item label="退出角速度阈值" name={['zupt', 'gyro_exit_thresh']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} md={12}>
+                                <Form.Item label="退出加速度阈值" name={['zupt', 'accel_exit_thresh']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                            <Row gutter={12}>
+                              <Col xs={24} md={8}>
+                                <Form.Item label="进入帧数" name={['zupt', 'enter_frames']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} md={8}>
+                                <Form.Item label="退出帧数" name={['zupt', 'exit_frames']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} md={8}>
+                                <Form.Item label="速度归零阈值" name={['zupt', 'vel_zero_eps']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                            <Row gutter={12}>
+                              <Col xs={24} md={12}>
+                                <Form.Item label="速度衰减tau(ms)" name={['zupt', 'vel_decay_tau_ms']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                              <Col xs={24} md={12}>
+                                <Form.Item label="位置锁定tau(ms)" name={['zupt', 'pos_lock_tau_ms']} rules={numberRules} className={styles.compactItem}>
+                                  <InputNumber className={styles.numberInput} />
+                                </Form.Item>
+                              </Col>
+                            </Row>
+                          </>
+                        )}
                       </Card>
                     </Col>
                     <Col xs={24} lg={6}>

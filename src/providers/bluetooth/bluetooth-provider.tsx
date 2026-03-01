@@ -167,20 +167,33 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   }, [scanning, startScan, stopScan]);
 
   // 连接成功后检查标定，并在有历史标定时自动应用
-  const checkAndApplyCalibration = useCallback(async (deviceId: string) => {
+  const checkAndApplyCalibration = useCallback(async (device: { id: string; address?: string }) => {
     try {
-      const calibRes = await imuApi.getDeviceCalibration(deviceId);
-      if (!calibRes.success || !calibRes.data) {
+      const calibrationKey = (device.address || '').trim();
+      if (!calibrationKey) {
+        throw new Error('设备地址为空，无法查询标定');
+      }
+      console.info('[Calibration] query key:', calibrationKey);
+
+      const calibRes = await imuApi.getDeviceCalibration(calibrationKey);
+      if (!calibRes.success) {
+        throw new Error(calibRes.message || `查询标定失败(key=${calibrationKey})`);
+      }
+      const calibrationData = calibRes.data;
+
+      if (!calibrationData) {
+        console.info('[Calibration] miss, require calibration. key=', calibrationKey);
         // 没有标定数据 → 弹出向导
         setNeedsCalibration(true);
         return;
       }
+      console.info('[Calibration] hit key:', calibrationKey);
       // 有历史标定 → 自动应用到 pipeline
-      const { accel_bias, accel_scale } = calibRes.data;
+      const { accel_bias, accel_scale } = calibrationData;
       const configRes = await imuApi.getPipelineConfig();
       if (configRes.success && configRes.data) {
         const config = configRes.data;
-        await imuApi.updatePipelineConfig({
+        const updateRes = await imuApi.updatePipelineConfig({
           ...config,
           calibration: {
             ...config.calibration,
@@ -192,6 +205,9 @@ const useBluetoothInternal = (): BluetoothContextValue => {
             ],
           },
         });
+        if (!updateRes.success) {
+          throw new Error(updateRes.message || '应用历史标定到流水线失败');
+        }
       }
       setNeedsCalibration(false);
     } catch (e) {
@@ -214,7 +230,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         enterLiveMode(true);
         setConnectedDevice(res.data);
         message.success(`已连接 ${res.data.local_name || res.data.id}`);
-        await checkAndApplyCalibration(deviceId);
+        await checkAndApplyCalibration(res.data);
         return true;
       } else {
         // 如果API没有返回完整数据，尝试从已扫描列表中查找
@@ -225,7 +241,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
           enterLiveMode(true);
           setConnectedDevice(deviceData);
           message.success(`已连接 ${deviceData.local_name || deviceData.id}`);
-          await checkAndApplyCalibration(deviceId);
+          await checkAndApplyCalibration(deviceData);
           return true;
         }
 
