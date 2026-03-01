@@ -56,6 +56,18 @@ type ZoomAnimationState = {
   durationMs: number;
   rafId: number | null;
 };
+type YRangeAnimationState = {
+  initialized: boolean;
+  displayMin: number;
+  displayMax: number;
+  fromMin: number;
+  fromMax: number;
+  toMin: number;
+  toMax: number;
+  startAtMs: number;
+  durationMs: number;
+  active: boolean;
+};
 
 /**
  * 运行时缓存：在同一页面会话中记忆各图表的序列勾选状态。
@@ -233,6 +245,8 @@ const X_GRID_MIN_PX = 78;
 const Y_GRID_MIN_PX = 42;
 const MAX_GRID_LINES = 12;
 const ZOOM_ANIMATION_MS = 180;
+const Y_RANGE_ANIMATION_MS = 220;
+const Y_RANGE_TARGET_EPS = 1e-6;
 
 const getNiceStep = (rawStep: number) => {
   if (!Number.isFinite(rawStep) || rawStep <= 0) {
@@ -293,6 +307,16 @@ const getValueTickPrecision = (step: number) => {
   return 3;
 };
 
+const cubicBezierPoint = (t: number, p0: number, p1: number, p2: number, p3: number) => {
+  const u = 1 - t;
+  return (u ** 3) * p0 + 3 * (u ** 2) * t * p1 + 3 * u * (t ** 2) * p2 + (t ** 3) * p3;
+};
+
+const bezierEaseOut = (t: number) => {
+  // 1D cubic-bezier-like easing: starts fast, then gently settles.
+  return cubicBezierPoint(clamp(t, 0, 1), 0, 0.12, 0.82, 1);
+};
+
 /**
  * 在 Canvas 上绘制折线图。
  *
@@ -311,7 +335,10 @@ const drawChart = (
   yAxisLabel: string,
   width: number,
   height: number,
-  colors: ChartColors
+  colors: ChartColors,
+  viewDurationMs: number,
+  yRangeAnimState: YRangeAnimationState,
+  nowMs: number
 ) => {
   const yPaddingRatio = 0.1;
   const padding = {
@@ -329,8 +356,8 @@ const drawChart = (
   }
 
   const latestTime = window.getTime(window.count - 1);
-  const earliestTime = window.getTime(0);
-  const timeSpan = latestTime - earliestTime || 1;
+  const windowStartTime = latestTime - viewDurationMs;
+  const timeSpan = Math.max(1, viewDurationMs);
 
   let min = Infinity;
   let max = -Infinity;
@@ -346,8 +373,45 @@ const drawChart = (
     max += 1;
   }
   const yPadding = (max - min) * yPaddingRatio;
-  const displayMin = min - yPadding;
-  const displayMax = max + yPadding;
+  const targetDisplayMin = min - yPadding;
+  const targetDisplayMax = max + yPadding;
+  if (!yRangeAnimState.initialized) {
+    yRangeAnimState.initialized = true;
+    yRangeAnimState.displayMin = targetDisplayMin;
+    yRangeAnimState.displayMax = targetDisplayMax;
+    yRangeAnimState.fromMin = targetDisplayMin;
+    yRangeAnimState.fromMax = targetDisplayMax;
+    yRangeAnimState.toMin = targetDisplayMin;
+    yRangeAnimState.toMax = targetDisplayMax;
+    yRangeAnimState.startAtMs = nowMs;
+    yRangeAnimState.durationMs = Y_RANGE_ANIMATION_MS;
+    yRangeAnimState.active = false;
+  } else {
+    if (yRangeAnimState.active) {
+      const t = clamp((nowMs - yRangeAnimState.startAtMs) / yRangeAnimState.durationMs, 0, 1);
+      const eased = bezierEaseOut(t);
+      yRangeAnimState.displayMin = yRangeAnimState.fromMin + (yRangeAnimState.toMin - yRangeAnimState.fromMin) * eased;
+      yRangeAnimState.displayMax = yRangeAnimState.fromMax + (yRangeAnimState.toMax - yRangeAnimState.fromMax) * eased;
+      if (t >= 1) {
+        yRangeAnimState.active = false;
+      }
+    }
+
+    const needRetarget =
+      Math.abs(targetDisplayMin - yRangeAnimState.toMin) > Y_RANGE_TARGET_EPS ||
+      Math.abs(targetDisplayMax - yRangeAnimState.toMax) > Y_RANGE_TARGET_EPS;
+    if (needRetarget) {
+      yRangeAnimState.fromMin = yRangeAnimState.displayMin;
+      yRangeAnimState.fromMax = yRangeAnimState.displayMax;
+      yRangeAnimState.toMin = targetDisplayMin;
+      yRangeAnimState.toMax = targetDisplayMax;
+      yRangeAnimState.startAtMs = nowMs;
+      yRangeAnimState.durationMs = Y_RANGE_ANIMATION_MS;
+      yRangeAnimState.active = true;
+    }
+  }
+  const displayMin = yRangeAnimState.displayMin;
+  const displayMax = yRangeAnimState.displayMax;
   const range = displayMax - displayMin;
 
   const xTickValues = buildGridTicks(0, timeSpan, plotWidth, X_GRID_MIN_PX);
@@ -419,7 +483,7 @@ const drawChart = (
     for (let i = 0; i < window.count; i += 1) {
       const t = window.getTime(i);
       const v = window.getValue(s.buffer, i);
-      const x = padding.left + ((t - earliestTime) / timeSpan) * plotWidth;
+      const x = padding.left + ((t - windowStartTime) / timeSpan) * plotWidth;
       const y = padding.top + plotHeight - ((v - displayMin) / range) * plotHeight;
       if (i === 0) {
         ctx.moveTo(x, y);
@@ -485,6 +549,18 @@ export const ImuChartsCanvas = ({
     pointerId: null,
     startX: 0,
     startThumbLeft: 0,
+  });
+  const yRangeAnimRef = useRef<YRangeAnimationState>({
+    initialized: false,
+    displayMin: 0,
+    displayMax: 1,
+    fromMin: 0,
+    fromMax: 1,
+    toMin: 0,
+    toMax: 1,
+    startAtMs: 0,
+    durationMs: Y_RANGE_ANIMATION_MS,
+    active: false,
   });
   const zoomAnimRef = useRef<ZoomAnimationState>({
     active: false,
@@ -840,6 +916,7 @@ export const ImuChartsCanvas = ({
      * 4. 调用 drawChart 进行实际绘制
      */
     const draw = () => {
+      const frameNow = performance.now();
       const colors = colorScheme === 'dark' ? DARK_CHART_COLORS : LIGHT_CHART_COLORS;
       const { width, height } = canvas;
       ctx.clearRect(0, 0, width, height);
@@ -869,6 +946,7 @@ export const ImuChartsCanvas = ({
       syncTimelineView(historySpanMs, durationMs, viewStateRef.current.offset);
 
       if (!enabled) {
+        yRangeAnimRef.current.initialized = false;
         ctx.fillStyle = colors.hint;
         ctx.fillText("图表已暂停", 16, 20);
         return;
@@ -877,6 +955,7 @@ export const ImuChartsCanvas = ({
       // 获取当前窗口数据
       const window = source.bufferRef.current.getWindow(durationMs, viewStateRef.current.offset);
       if (window.count < 2) {
+        yRangeAnimRef.current.initialized = false;
         ctx.fillStyle = colors.hint;
         ctx.fillText("等待 IMU 数据流...", 16, 20);
         return;
@@ -892,10 +971,22 @@ export const ImuChartsCanvas = ({
       }));
       const visibleSeriesBuffers = seriesBuffers.filter((entry) => seriesVisibility[entry.name] !== false);
       if (visibleSeriesBuffers.length === 0) {
+        yRangeAnimRef.current.initialized = false;
         ctx.fillStyle = colors.hint;
         ctx.fillText("请选择至少一个序列", 16, 20);
       } else {
-        drawChart(ctx, window, visibleSeriesBuffers, yAxisLabel, width, height, colors);
+        drawChart(
+          ctx,
+          window,
+          visibleSeriesBuffers,
+          yAxisLabel,
+          width,
+          height,
+          colors,
+          durationMs,
+          yRangeAnimRef.current,
+          frameNow
+        );
       }
 
       const now = Date.now();
