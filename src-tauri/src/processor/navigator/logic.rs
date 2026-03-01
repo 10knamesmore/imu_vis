@@ -144,6 +144,21 @@ impl Navigator {
                 self.nav_state.velocity = v_next;
                 self.nav_state.position += (v_prev + v_next) * (0.5 * dt);
             }
+            IntegratorImpl::Rk4 => {
+                // 离散两点近似下的 RK4（a_k 与 a_{k+1}）：
+                // k1=a_k, k2=(a_k+a_{k+1})/2, k3=(a_k+a_{k+1})/2, k4=a_{k+1}
+                // v_{k+1}=v_k + (k1+2k2+2k3+k4)/6 * dt
+                let v_prev = self.nav_state.velocity;
+                let a_prev = self.last_accel_lin.unwrap_or(a_lin);
+                let k1 = a_prev;
+                let mid = (a_prev + a_lin) * 0.5;
+                let k2 = mid;
+                let k3 = mid;
+                let k4 = a_lin;
+                let v_next = v_prev + (k1 + k2 * 2.0 + k3 * 2.0 + k4) * (dt / 6.0);
+                self.nav_state.velocity = v_next;
+                self.nav_state.position += (v_prev + v_next) * (0.5 * dt);
+            }
         }
         self.last_accel_lin = Some(a_lin);
     }

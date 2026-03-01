@@ -133,12 +133,10 @@
 .settingsPanel {
   padding: 12px;
   margin-bottom: 0;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+  display: block;
 
   .sectionCard {
-    height: 100%;
+    height: auto;
   }
 
   .configHeader {
@@ -159,32 +157,36 @@
   }
 
   :global(.ant-card-body) {
-    padding: 10px 12px;
+    padding: 8px 10px;
   }
 
   :global(.ant-form-item) {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
+  }
+
+  :global(.ant-form-item-label > label) {
+    white-space: nowrap;
+    word-break: keep-all;
   }
 
   .settingsForm {
-    flex: 1;
-    min-height: 0;
-    overflow: hidden;
+    min-height: auto;
+    overflow: visible;
   }
 
   .settingsTabs {
-    height: 100%;
+    height: auto;
   }
 
   .tabPane {
-    height: 100%;
-    overflow: hidden;
+    height: auto;
+    overflow: visible;
   }
 
   :global(.ant-tabs-content-holder),
   :global(.ant-tabs-content),
   :global(.ant-tabs-tabpane) {
-    height: 100%;
-    overflow: hidden;
+    height: auto;
+    overflow: visible;
   }
 }

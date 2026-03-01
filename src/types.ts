@@ -107,7 +107,7 @@ export interface ProcessorPipelineConfig {
   };
   trajectory: {
     passby: boolean;
-    integrator: 'legacy_euler' | 'trapezoid';
+    integrator: 'legacy_euler' | 'trapezoid' | 'rk4';
     dt_min_ms: number;
     dt_max_ms: number;
   };

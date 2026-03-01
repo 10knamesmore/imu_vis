@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Card, Col, Empty, Form, InputNumber, Row, Select, Space, Switch, Tabs, Tag, message } from 'antd';
+import { Button, Card, Col, Empty, Form, InputNumber, Row, Select, Space, Switch, Tag, message } from 'antd';
 import { ReloadOutlined, PoweroffOutlined, CheckCircleOutlined, SignalFilled } from '@ant-design/icons';
 import Text from "antd/es/typography/Text";
 
@@ -198,6 +198,7 @@ export const SettingsPanel = () => {
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const autoApplyTimerRef = useRef<number | undefined>(undefined);
+  const latestFullConfigRef = useRef<ProcessorPipelineConfig | null>(null);
   const integrator = Form.useWatch(['trajectory', 'integrator'], form);
   const zuptImplType = Form.useWatch(['zupt', 'impl_type'], form);
 
@@ -237,6 +238,7 @@ export const SettingsPanel = () => {
       try {
         const config = await getPipelineConfig();
         if (config) {
+          latestFullConfigRef.current = config;
           form.setFieldsValue(config);
         }
       } finally {
@@ -260,9 +262,22 @@ export const SettingsPanel = () => {
     }
     autoApplyTimerRef.current = window.setTimeout(async () => {
       try {
-        const config = await form.validateFields();
+        await form.validateFields();
+        const formValues = form.getFieldsValue(true) as Partial<ProcessorPipelineConfig>;
+        const baseConfig = latestFullConfigRef.current ?? await getPipelineConfig();
+        if (!baseConfig) return;
+        const config: ProcessorPipelineConfig = {
+          global: formValues.global ?? baseConfig.global,
+          calibration: formValues.calibration ?? baseConfig.calibration,
+          filter: formValues.filter ?? baseConfig.filter,
+          trajectory: formValues.trajectory ?? baseConfig.trajectory,
+          zupt: formValues.zupt ?? baseConfig.zupt,
+        };
         console.info('[SettingsPanel] apply pipeline config:', JSON.stringify(config, null, 2));
-        await updatePipelineConfig(config);
+        const updated = await updatePipelineConfig(config);
+        if (updated) {
+          latestFullConfigRef.current = config;
+        }
       } catch {
         // ignore invalid intermediate input
       }
@@ -294,11 +309,19 @@ export const SettingsPanel = () => {
         <Space wrap>
           {renderDeveloperModeControl()}
           <Button
+            type="primary"
+            block
+            onClick={() => setNeedsCalibration(true)}
+          >
+            加速度计标定
+          </Button>
+          <Button
             onClick={async () => {
               setLoadingConfig(true);
               try {
                 const config = await getPipelineConfig();
                 if (config) {
+                  latestFullConfigRef.current = config;
                   form.setFieldsValue(config);
                 }
               } finally {
@@ -319,167 +342,148 @@ export const SettingsPanel = () => {
       </div>
 
       <Form form={form} layout="vertical" initialValues={DEFAULT_CONFIG} onValuesChange={scheduleAutoApply} className={styles.settingsForm}>
-        <Tabs
-          className={styles.settingsTabs}
-          items={[
-            {
-              key: 'base',
-              label: '基础配置',
-              children: (
-                <div className={styles.tabPane}>
-                  <Row gutter={[12, 12]}>
-                    <Col xs={24} lg={6}>
-                      <Card size="small" title="全局" className={styles.sectionCard}>
-                        <Form.Item label="重力加速度" name={['global', 'gravity']} rules={numberRules} className={styles.compactItem}>
-                          <InputNumber className={styles.numberInput} />
-                        </Form.Item>
-                      </Card>
+        <Row gutter={[12, 12]}>
+          <Col xs={24} lg={6}>
+            <Card size="small" title="全局" className={styles.sectionCard}>
+              <Form.Item label="重力加速度" tooltip="全局重力常数（m/s²），用于线加速度计算。" name={['global', 'gravity']} rules={numberRules} className={styles.compactItem}>
+                <InputNumber className={styles.numberInput} />
+              </Form.Item>
+            </Card>
+          </Col>
+          <Col xs={24} lg={6}>
+            <Card size="small" title="滤波" className={styles.sectionCard}>
+              <Form.Item label="跳过处理" tooltip="开启后将跳过滤波模块，直接使用标定后的原始数据。" name={['filter', 'passby']} valuePropName="checked">
+                <Switch />
+              </Form.Item>
+              <Form.Item label="平滑系数(alpha)" tooltip="低通滤波系数，越大越平滑但响应越慢。" name={['filter', 'alpha']} rules={numberRules} className={styles.compactItem}>
+                <InputNumber className={styles.numberInput} />
+              </Form.Item>
+            </Card>
+          </Col>
+          <Col xs={24} lg={12}>
+            <Card size="small" title="轨迹计算" className={styles.sectionCard}>
+              <Row gutter={12}>
+                <Col xs={24} md={8}>
+                  <Form.Item label="跳过处理" tooltip="开启后将关闭轨迹积分与位置计算。" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
+                    <Switch />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={16}>
+                  <Form.Item label="积分实现" tooltip="选择轨迹积分算法：旧版欧拉、梯形积分或 RK4。" name={['trajectory', 'integrator']} rules={numberRules} className={styles.compactItem}>
+                    <Select
+                      options={[
+                        { label: '欧拉积分', value: 'legacy_euler' },
+                        { label: '梯形积分', value: 'trapezoid' },
+                        { label: 'RK4', value: 'rk4' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={12}>
+                <Col xs={24} md={12}>
+                  <Form.Item label="最小步长 dt_min_ms" tooltip="积分步长下限（ms），防止时间间隔过小带来噪声放大。" name={['trajectory', 'dt_min_ms']} rules={numberRules} className={styles.compactItem}>
+                    <InputNumber className={styles.numberInput} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12}>
+                  <Form.Item label="最大步长 dt_max_ms" tooltip="积分步长上限（ms），防止时间戳跳变导致积分发散。" name={['trajectory', 'dt_max_ms']} rules={numberRules} className={styles.compactItem}>
+                    <InputNumber className={styles.numberInput} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                当前: {integrator === 'legacy_euler' ? '旧版一阶欧拉积分' : integrator === 'rk4' ? 'RK4' : '梯形积分'}
+              </Text>
+            </Card>
+          </Col>
+          <Col xs={24}>
+            <Card size="small" title="ZUPT（零速更新）" className={styles.sectionCard}>
+              <Row gutter={12}>
+                <Col xs={24} md={8}>
+                  <Form.Item label="跳过处理" tooltip="开启后将关闭 ZUPT 零速修正。" name={['zupt', 'passby']} valuePropName="checked">
+                    <Switch />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={16}>
+                  <Form.Item label="ZUPT 实现" tooltip="选择 ZUPT 算法实现：旧版硬锁定或平滑滞回。" name={['zupt', 'impl_type']} rules={numberRules} className={styles.compactItem}>
+                    <Select
+                      options={[
+                        { label: '硬锁定', value: 'legacy_hard_lock' },
+                        { label: '平滑滞回', value: 'smooth_hysteresis' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Row gutter={12}>
+                <Col xs={24} md={12} lg={6}>
+                  <Form.Item label="角速度阈值(gyro_thresh)" tooltip="旧版硬锁定模式的角速度静止阈值（rad/s）。" name={['zupt', 'gyro_thresh']} rules={numberRules} className={styles.compactItem}>
+                    <InputNumber className={styles.numberInput} />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={12} lg={6}>
+                  <Form.Item label="加速度阈值(accel_thresh)" tooltip="旧版硬锁定模式的线加速度静止阈值（m/s²）。" name={['zupt', 'accel_thresh']} rules={numberRules} className={styles.compactItem}>
+                    <InputNumber className={styles.numberInput} />
+                  </Form.Item>
+                </Col>
+              </Row>
+              {zuptImplType === 'smooth_hysteresis' && (
+                <>
+                  <Row gutter={12}>
+                    <Col xs={24} md={12} lg={6}>
+                      <Form.Item label="进入角速度阈值" tooltip="平滑滞回模式：判定进入静止的角速度阈值（rad/s）。" name={['zupt', 'gyro_enter_thresh']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
                     </Col>
-                    <Col xs={24} lg={6}>
-                      <Card size="small" title="滤波" className={styles.sectionCard}>
-                        <Form.Item label="跳过处理" name={['filter', 'passby']} valuePropName="checked">
-                          <Switch />
-                        </Form.Item>
-                        <Form.Item label="平滑系数(alpha)" name={['filter', 'alpha']} rules={numberRules} className={styles.compactItem}>
-                          <InputNumber className={styles.numberInput} />
-                        </Form.Item>
-                      </Card>
+                    <Col xs={24} md={12} lg={6}>
+                      <Form.Item label="进入加速度阈值" tooltip="平滑滞回模式：判定进入静止的线加速度阈值（m/s²）。" name={['zupt', 'accel_enter_thresh']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
                     </Col>
-                    <Col xs={24} lg={6}>
-                      <Card size="small" title="轨迹计算" className={styles.sectionCard}>
-                        <Form.Item label="跳过处理" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
-                          <Switch />
-                        </Form.Item>
-                        <Form.Item label="积分实现" name={['trajectory', 'integrator']} rules={numberRules} className={styles.compactItem}>
-                          <Select
-                            options={[
-                              { label: '欧拉积分', value: 'legacy_euler' },
-                              { label: '梯形积分', value: 'trapezoid' },
-                            ]}
-                          />
-                        </Form.Item>
-                        <Row gutter={12}>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="最小步长 dt_min_ms" name={['trajectory', 'dt_min_ms']} rules={numberRules} className={styles.compactItem}>
-                              <InputNumber className={styles.numberInput} />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={24} md={12}>
-                            <Form.Item label="最大步长 dt_max_ms" name={['trajectory', 'dt_max_ms']} rules={numberRules} className={styles.compactItem}>
-                              <InputNumber className={styles.numberInput} />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                          当前: {integrator === 'legacy_euler' ? '旧版一阶欧拉积分' : '梯形积分'}
-                        </Text>
-                      </Card>
+                    <Col xs={24} md={12} lg={6}>
+                      <Form.Item label="退出角速度阈值" tooltip="平滑滞回模式：判定退出静止的角速度阈值（rad/s）。" name={['zupt', 'gyro_exit_thresh']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
                     </Col>
-                    <Col xs={24} lg={12}>
-                      <Card size="small" title="ZUPT(零速更新)" className={styles.sectionCard}>
-                        <Form.Item label="跳过处理" name={['zupt', 'passby']} valuePropName="checked">
-                          <Switch />
-                        </Form.Item>
-                        <Form.Item label="ZUPT 实现" name={['zupt', 'impl_type']} rules={numberRules} className={styles.compactItem}>
-                          <Select
-                            options={[
-                              { label: '硬锁定', value: 'legacy_hard_lock' },
-                              { label: '平滑滞回', value: 'smooth_hysteresis' },
-                            ]}
-                          />
-                        </Form.Item>
-                        <Row gutter={12}>
-                          <Col xs={24} md={8}>
-                            <Form.Item label="角速度阈值(gyro_thresh)" name={['zupt', 'gyro_thresh']} rules={numberRules} className={styles.compactItem}>
-                              <InputNumber className={styles.numberInput} />
-                            </Form.Item>
-                          </Col>
-                          <Col xs={24} md={8}>
-                            <Form.Item label="加速度阈值(accel_thresh)" name={['zupt', 'accel_thresh']} rules={numberRules} className={styles.compactItem}>
-                              <InputNumber className={styles.numberInput} />
-                            </Form.Item>
-                          </Col>
-                        </Row>
-                        {zuptImplType === 'smooth_hysteresis' && (
-                          <>
-                            <Row gutter={12}>
-                              <Col xs={24} md={12}>
-                                <Form.Item label="进入角速度阈值" name={['zupt', 'gyro_enter_thresh']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} md={12}>
-                                <Form.Item label="进入加速度阈值" name={['zupt', 'accel_enter_thresh']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                            </Row>
-                            <Row gutter={12}>
-                              <Col xs={24} md={12}>
-                                <Form.Item label="退出角速度阈值" name={['zupt', 'gyro_exit_thresh']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} md={12}>
-                                <Form.Item label="退出加速度阈值" name={['zupt', 'accel_exit_thresh']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                            </Row>
-                            <Row gutter={12}>
-                              <Col xs={24} md={8}>
-                                <Form.Item label="进入帧数" name={['zupt', 'enter_frames']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} md={8}>
-                                <Form.Item label="退出帧数" name={['zupt', 'exit_frames']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} md={8}>
-                                <Form.Item label="速度归零阈值" name={['zupt', 'vel_zero_eps']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                            </Row>
-                            <Row gutter={12}>
-                              <Col xs={24} md={12}>
-                                <Form.Item label="速度衰减tau(ms)" name={['zupt', 'vel_decay_tau_ms']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                              <Col xs={24} md={12}>
-                                <Form.Item label="位置锁定tau(ms)" name={['zupt', 'pos_lock_tau_ms']} rules={numberRules} className={styles.compactItem}>
-                                  <InputNumber className={styles.numberInput} />
-                                </Form.Item>
-                              </Col>
-                            </Row>
-                          </>
-                        )}
-                      </Card>
-                    </Col>
-                    <Col xs={24} lg={6}>
-                      <Card size="small" title="加速度计标定" className={styles.sectionCard}>
-                        <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
-                          标定参数由向导采集并自动应用，无需手动调整。
-                        </Text>
-                        <Button
-                          type="primary"
-                          danger
-                          block
-                          onClick={() => setNeedsCalibration(true)}
-                        >
-                          重新标定
-                        </Button>
-                      </Card>
+                    <Col xs={24} md={12} lg={6}>
+                      <Form.Item label="退出加速度阈值" tooltip="平滑滞回模式：判定退出静止的线加速度阈值（m/s²）。" name={['zupt', 'accel_exit_thresh']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
                     </Col>
                   </Row>
-                </div>
-              ),
-            },
-          ]}
-        />
+                  <Row gutter={12}>
+                    <Col xs={24} sm={12} lg={5}>
+                      <Form.Item label="进入帧数" tooltip="连续满足进入阈值多少帧后切换为静止。" name={['zupt', 'enter_frames']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} lg={5}>
+                      <Form.Item label="退出帧数" tooltip="连续满足退出阈值多少帧后切换为运动。" name={['zupt', 'exit_frames']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} lg={4}>
+                      <Form.Item label="速度归零阈值" tooltip="速度低于该阈值（m/s）时直接置零。" name={['zupt', 'vel_zero_eps']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} lg={5}>
+                      <Form.Item label="速度衰减 tau(ms)" tooltip="静止期间速度指数衰减时间常数，越小衰减越快。" name={['zupt', 'vel_decay_tau_ms']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                    <Col xs={24} sm={12} lg={5}>
+                      <Form.Item label="位置锁定 tau(ms)" tooltip="静止期间位置回锁时间常数，越小回锁越快。" name={['zupt', 'pos_lock_tau_ms']} rules={numberRules} className={styles.compactItem}>
+                        <InputNumber className={styles.numberInput} />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </>
+              )}
+            </Card>
+          </Col>
+        </Row>
       </Form>
     </div>
   );

@@ -12,6 +12,8 @@ pub enum IntegratorImpl {
     /// 梯形积分（新实现，默认）。
     #[default]
     Trapezoid,
+    /// 四阶 Runge-Kutta（RK4）积分。
+    Rk4,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize, Serialize)]

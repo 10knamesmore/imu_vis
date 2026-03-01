@@ -135,11 +135,9 @@ const AppContent = () => {
           open={isSettingsModalOpen}
           onCancel={handleSettingsModalClose}
           footer={null}
-          width={1360}
+          width={1500}
           styles={{
             body: {
-              height: '74vh',
-              overflow: 'hidden',
               padding: 12,
             },
           }}
