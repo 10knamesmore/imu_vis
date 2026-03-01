@@ -13,6 +13,7 @@ import {
   Card,
   message,
 } from 'antd';
+import { Channel } from '@tauri-apps/api/core';
 import { imuApi } from '../../services/imu';
 import { useBluetooth } from '../../hooks/useBluetooth';
 import type { ResponseData, Vector3 } from '../../types';
@@ -53,7 +54,7 @@ interface Props {
 }
 
 export const CalibrationWizard = ({ deviceAddress }: Props) => {
-  const { setNeedsCalibration, registerRawDataCallback, getPipelineConfig, updatePipelineConfig } =
+  const { setNeedsCalibration, getPipelineConfig, updatePipelineConfig } =
     useBluetooth();
 
   // 当前步骤索引（0-5 为采集步骤，6 为结果页）
@@ -75,19 +76,22 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
   const phaseRef = useRef<CollectionPhase>('idle');
   phaseRef.current = phase;
 
-  // 注册数据回调
+  // 标定向导期间直接订阅实时输出，避免额外全局订阅造成双重消息分发开销。
   useEffect(() => {
-    registerRawDataCallback((data: ResponseData) => {
+    const channel = new Channel<ResponseData>();
+    channel.onmessage = (data: ResponseData) => {
       const v = data.raw_data.accel_with_g;
       setLiveAccel({ x: v.x, y: v.y, z: v.z });
       if (phaseRef.current === 'collecting') {
         samplesRef.current.push({ x: v.x, y: v.y, z: v.z });
       }
-    });
-    return () => {
-      registerRawDataCallback(null);
     };
-  }, [registerRawDataCallback]);
+    imuApi.subscribeOutput(channel);
+
+    return () => {
+      channel.onmessage = () => {};
+    };
+  }, []);
 
   const currentStep = STEPS[stepIndex];
 

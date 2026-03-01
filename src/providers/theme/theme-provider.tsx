@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
-import { ConfigProvider, theme } from 'antd';
+import { App as AntdApp, ConfigProvider, theme } from 'antd';
 
 import { ThemeContext, type ColorScheme } from './theme-context';
 
@@ -66,7 +66,9 @@ export const ThemeProvider = ({ children }: Props) => {
 
   return (
     <ThemeContext.Provider value={{ colorScheme, toggleColorScheme }}>
-      <ConfigProvider theme={antdTheme}>{children}</ConfigProvider>
+      <ConfigProvider theme={antdTheme}>
+        <AntdApp>{children}</AntdApp>
+      </ConfigProvider>
     </ThemeContext.Provider>
   );
 };

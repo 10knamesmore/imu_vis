@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
-import { message } from 'antd';
-import { Channel } from '@tauri-apps/api/core';
+import { App as AntdApp } from 'antd';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { imuApi } from '../../services/imu';
 import {
@@ -33,16 +32,8 @@ const createEmptyHistory = (): ImuHistorySnapshot => ({
   deltaAngle: { x: [], y: [], z: [] },
 });
 
-const MAX_POINTS = 1000;
-
-const pushCapped = (arr: number[], value: number, cap = MAX_POINTS) => {
-  arr.push(value);
-  if (arr.length > cap) {
-    arr.splice(0, arr.length - cap);
-  }
-};
-
 const useBluetoothInternal = (): BluetoothContextValue => {
+  const { message } = AntdApp.useApp();
   // 是否在扫描中
   const [scanning, setScanning] = useState(false);
   // 扫描到的设备列表
@@ -63,12 +54,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const [lastSecondMessageCount, setLastSecondMessageCount] = useState(0);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
   const [recording, setRecording] = useState(false);
-  // 高频数据缓存：onmessage 只更新这里，避免每条消息都触发 React 重渲染
-  const dataHistoryRef = useRef<ImuHistorySnapshot>(createEmptyHistory());
-  // 记录数据流起始时间（ms），用于生成相对时间轴
-  const streamStartMsRef = useRef<number | null>(null);
-  // 1s 内的消息计数器（由定时器每秒读取并清零）
-  const messageCountRef = useRef(0);
   const dataModeRef = useRef<DataMode>('live');
   const [recordings, setRecordings] = useState<RecordingMeta[]>([]);
   const [dataMode, setDataMode] = useState<DataMode>('live');
@@ -254,79 +239,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, [scanning, stopScan, devices, enterLiveMode, checkAndApplyCalibration]);
 
-  useEffect(() => {
-    if (!connectedDevice) return;
-
-    const channel = new Channel<ResponseData>();
-    // 连接时重置数据缓存与计数器
-    dataHistoryRef.current = createEmptyHistory();
-    messageCountRef.current = 0;
-    streamStartMsRef.current = null;
-    // 每秒统计一次接收消息数
-    const messageRateTimer = setInterval(() => {
-      setLastSecondMessageCount(messageCountRef.current);
-      messageCountRef.current = 0;
-    }, 1000);
-    // 按 UI 刷新频率将缓存快照推入 state，触发图表重绘
-    const uiRefreshTimer = setInterval(() => {
-      const snapshot = dataHistoryRef.current;
-      setDataHistory({
-        time: snapshot.time,
-        builtin: snapshot.builtin,
-        calculated: snapshot.calculated,
-        deltaAngle: snapshot.deltaAngle,
-      });
-      setPlotRevision((rev) => (rev + 1) % 1_000_000);
-    }, Math.max(16, uiRefreshMs)); // 最快 60 FPS
-    channel.onmessage = (msg: ResponseData) => {
-      if (dataModeRef.current === 'replay') {
-        return;
-      }
-      // 触发原始数据回调（供标定向导采集）
-      if (rawDataCallbackRef.current) {
-        rawDataCallbackRef.current(msg);
-      }
-      // 每条消息只更新缓存与计数，不触发 UI 更新
-      messageCountRef.current += 1;
-      // console.log('Received IMU data:', msg);
-      const imuData = msg.raw_data;
-      const history = dataHistoryRef.current;
-      if (streamStartMsRef.current === null) {
-        streamStartMsRef.current = imuData.timestamp_ms;
-      }
-      pushCapped(history.time, imuData.timestamp_ms - (streamStartMsRef.current ?? 0));
-      pushCapped(history.builtin.accel.x, imuData.accel_no_g.x);
-      pushCapped(history.builtin.accel.y, imuData.accel_no_g.y);
-      pushCapped(history.builtin.accel.z, imuData.accel_no_g.z);
-      pushCapped(history.builtin.accelWithG.x, imuData.accel_with_g.x);
-      pushCapped(history.builtin.accelWithG.y, imuData.accel_with_g.y);
-      pushCapped(history.builtin.accelWithG.z, imuData.accel_with_g.z);
-      pushCapped(history.builtin.gyro.x, imuData.gyro.x);
-      pushCapped(history.builtin.gyro.y, imuData.gyro.y);
-      pushCapped(history.builtin.gyro.z, imuData.gyro.z);
-      pushCapped(history.builtin.angle.x, imuData.angle.x);
-      pushCapped(history.builtin.angle.y, imuData.angle.y);
-      pushCapped(history.builtin.angle.z, imuData.angle.z);
-      pushCapped(history.builtin.quat.w, imuData.quat.w);
-      pushCapped(history.builtin.quat.x, imuData.quat.x);
-      pushCapped(history.builtin.quat.y, imuData.quat.y);
-      pushCapped(history.builtin.quat.z, imuData.quat.z);
-      pushCapped(history.builtin.offset.x, imuData.offset.x);
-      pushCapped(history.builtin.offset.y, imuData.offset.y);
-      pushCapped(history.builtin.offset.z, imuData.offset.z);
-      pushCapped(history.builtin.accelNav.x, imuData.accel_nav.x);
-      pushCapped(history.builtin.accelNav.y, imuData.accel_nav.y);
-      pushCapped(history.builtin.accelNav.z, imuData.accel_nav.z);
-    };
-
-    imuApi.subscribeOutput(channel);
-    return () => {
-      // 断开/切换设备时清理定时器，避免泄漏
-      clearInterval(messageRateTimer);
-      clearInterval(uiRefreshTimer);
-    };
-  }, [connectedDevice, uiRefreshMs]);
-
   // 断开设备连接
   const disconnect = useCallback(async () => {
     try {
@@ -342,8 +254,6 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       // 断开时清空 UI 数据与缓存
       setDataHistory(createEmptyHistory());
       setPlotRevision((rev) => (rev + 1) % 1_000_000);
-      dataHistoryRef.current = createEmptyHistory();
-      streamStartMsRef.current = null;
       // 断开时清空上一秒计数显示
       setLastSecondMessageCount(0);
       message.info("已断开连接");
@@ -491,35 +401,33 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       const history = createEmptyHistory();
       for (const sample of samples) {
         const imuData = sample.raw_data;
-        pushCapped(history.time, imuData.timestamp_ms - startMs, samples.length + 1);
-        pushCapped(history.builtin.accel.x, imuData.accel_no_g.x, samples.length + 1);
-        pushCapped(history.builtin.accel.y, imuData.accel_no_g.y, samples.length + 1);
-        pushCapped(history.builtin.accel.z, imuData.accel_no_g.z, samples.length + 1);
-        pushCapped(history.builtin.accelWithG.x, imuData.accel_with_g.x, samples.length + 1);
-        pushCapped(history.builtin.accelWithG.y, imuData.accel_with_g.y, samples.length + 1);
-        pushCapped(history.builtin.accelWithG.z, imuData.accel_with_g.z, samples.length + 1);
-        pushCapped(history.builtin.gyro.x, imuData.gyro.x, samples.length + 1);
-        pushCapped(history.builtin.gyro.y, imuData.gyro.y, samples.length + 1);
-        pushCapped(history.builtin.gyro.z, imuData.gyro.z, samples.length + 1);
-        pushCapped(history.builtin.angle.x, imuData.angle.x, samples.length + 1);
-        pushCapped(history.builtin.angle.y, imuData.angle.y, samples.length + 1);
-        pushCapped(history.builtin.angle.z, imuData.angle.z, samples.length + 1);
-        pushCapped(history.builtin.quat.w, imuData.quat.w, samples.length + 1);
-        pushCapped(history.builtin.quat.x, imuData.quat.x, samples.length + 1);
-        pushCapped(history.builtin.quat.y, imuData.quat.y, samples.length + 1);
-        pushCapped(history.builtin.quat.z, imuData.quat.z, samples.length + 1);
-        pushCapped(history.builtin.offset.x, imuData.offset.x, samples.length + 1);
-        pushCapped(history.builtin.offset.y, imuData.offset.y, samples.length + 1);
-        pushCapped(history.builtin.offset.z, imuData.offset.z, samples.length + 1);
-        pushCapped(history.builtin.accelNav.x, imuData.accel_nav.x, samples.length + 1);
-        pushCapped(history.builtin.accelNav.y, imuData.accel_nav.y, samples.length + 1);
-        pushCapped(history.builtin.accelNav.z, imuData.accel_nav.z, samples.length + 1);
+        history.time.push(imuData.timestamp_ms - startMs);
+        history.builtin.accel.x.push(imuData.accel_no_g.x);
+        history.builtin.accel.y.push(imuData.accel_no_g.y);
+        history.builtin.accel.z.push(imuData.accel_no_g.z);
+        history.builtin.accelWithG.x.push(imuData.accel_with_g.x);
+        history.builtin.accelWithG.y.push(imuData.accel_with_g.y);
+        history.builtin.accelWithG.z.push(imuData.accel_with_g.z);
+        history.builtin.gyro.x.push(imuData.gyro.x);
+        history.builtin.gyro.y.push(imuData.gyro.y);
+        history.builtin.gyro.z.push(imuData.gyro.z);
+        history.builtin.angle.x.push(imuData.angle.x);
+        history.builtin.angle.y.push(imuData.angle.y);
+        history.builtin.angle.z.push(imuData.angle.z);
+        history.builtin.quat.w.push(imuData.quat.w);
+        history.builtin.quat.x.push(imuData.quat.x);
+        history.builtin.quat.y.push(imuData.quat.y);
+        history.builtin.quat.z.push(imuData.quat.z);
+        history.builtin.offset.x.push(imuData.offset.x);
+        history.builtin.offset.y.push(imuData.offset.y);
+        history.builtin.offset.z.push(imuData.offset.z);
+        history.builtin.accelNav.x.push(imuData.accel_nav.x);
+        history.builtin.accelNav.y.push(imuData.accel_nav.y);
+        history.builtin.accelNav.z.push(imuData.accel_nav.z);
       }
-      dataHistoryRef.current = history;
       setDataHistory(history);
       setPlotRevision((rev) => (rev + 1) % 1_000_000);
       setLastSecondMessageCount(0);
-      streamStartMsRef.current = startMs;
       setReplaySamples(samples);
       setReplaySessionId(sessionId);
       enterReplayMode();
