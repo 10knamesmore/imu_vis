@@ -48,6 +48,14 @@ type TimelineMetrics = {
   movablePx: number;
   maxOffsetMs: number;
 };
+type ZoomAnimationState = {
+  active: boolean;
+  fromDuration: number;
+  toDuration: number;
+  startAtMs: number;
+  durationMs: number;
+  rafId: number | null;
+};
 
 /**
  * 运行时缓存：在同一页面会话中记忆各图表的序列勾选状态。
@@ -221,6 +229,70 @@ const LIGHT_CHART_COLORS: ChartColors = {
   hint: '#6b7a86',
 };
 
+const X_GRID_MIN_PX = 78;
+const Y_GRID_MIN_PX = 42;
+const MAX_GRID_LINES = 12;
+const ZOOM_ANIMATION_MS = 180;
+
+const getNiceStep = (rawStep: number) => {
+  if (!Number.isFinite(rawStep) || rawStep <= 0) {
+    return 1;
+  }
+  const exponent = Math.floor(Math.log10(rawStep));
+  const magnitude = 10 ** exponent;
+  const fraction = rawStep / magnitude;
+  if (fraction <= 1) return magnitude;
+  if (fraction <= 2) return 2 * magnitude;
+  if (fraction <= 5) return 5 * magnitude;
+  return 10 * magnitude;
+};
+
+const buildGridTicks = (
+  min: number,
+  max: number,
+  pxLength: number,
+  minPx: number,
+  maxLines = MAX_GRID_LINES
+) => {
+  const span = max - min;
+  if (!Number.isFinite(span) || span <= 0 || pxLength <= 0) {
+    return [min, max];
+  }
+
+  const idealLines = clamp(Math.floor(pxLength / minPx), 2, maxLines);
+  const rawStep = span / idealLines;
+  const step = getNiceStep(rawStep);
+  const start = Math.ceil(min / step) * step;
+  const end = Math.floor(max / step) * step;
+  const eps = step * 1e-6;
+  const ticks: number[] = [];
+
+  for (let value = start; value <= end + eps; value += step) {
+    ticks.push(Number(value.toFixed(10)));
+  }
+
+  if (ticks.length === 0) {
+    return [min, max];
+  }
+  return ticks;
+};
+
+const getTimeTickPrecision = (stepMs: number) => {
+  const stepSeconds = stepMs / 1000;
+  if (stepSeconds >= 10) return 0;
+  if (stepSeconds >= 1) return 1;
+  if (stepSeconds >= 0.1) return 2;
+  return 3;
+};
+
+const getValueTickPrecision = (step: number) => {
+  const absStep = Math.abs(step);
+  if (absStep >= 100) return 0;
+  if (absStep >= 10) return 1;
+  if (absStep >= 1) return 2;
+  return 3;
+};
+
 /**
  * 在 Canvas 上绘制折线图。
  *
@@ -278,23 +350,29 @@ const drawChart = (
   const displayMax = max + yPadding;
   const range = displayMax - displayMin;
 
-  const xTicks = 5;
-  const yTicks = 5;
+  const xTickValues = buildGridTicks(0, timeSpan, plotWidth, X_GRID_MIN_PX);
+  const yTickValues = buildGridTicks(displayMin, displayMax, plotHeight, Y_GRID_MIN_PX);
+  const xStepMs = xTickValues.length >= 2 ? xTickValues[1] - xTickValues[0] : timeSpan;
+  const yStep = yTickValues.length >= 2 ? yTickValues[1] - yTickValues[0] : range;
+  const xPrecision = getTimeTickPrecision(xStepMs);
+  const yPrecision = getValueTickPrecision(yStep);
 
   ctx.save();
   ctx.strokeStyle = colors.grid;
   ctx.lineWidth = 1;
 
-  for (let i = 0; i <= xTicks; i += 1) {
-    const x = padding.left + (i / xTicks) * plotWidth;
+  for (const tick of xTickValues) {
+    const ratio = timeSpan > 0 ? tick / timeSpan : 0;
+    const x = padding.left + ratio * plotWidth;
     ctx.beginPath();
     ctx.moveTo(x, padding.top);
     ctx.lineTo(x, padding.top + plotHeight);
     ctx.stroke();
   }
 
-  for (let i = 0; i <= yTicks; i += 1) {
-    const y = padding.top + (i / yTicks) * plotHeight;
+  for (const tick of yTickValues) {
+    const ratio = range > 0 ? (displayMax - tick) / range : 0;
+    const y = padding.top + ratio * plotHeight;
     ctx.beginPath();
     ctx.moveTo(padding.left, y);
     ctx.lineTo(padding.left + plotWidth, y);
@@ -312,18 +390,18 @@ const drawChart = (
   ctx.fillStyle = colors.label;
   ctx.textAlign = "right";
   ctx.textBaseline = "middle";
-  for (let i = 0; i <= yTicks; i += 1) {
-    const value = displayMax - (i / yTicks) * range;
-    const y = padding.top + (i / yTicks) * plotHeight;
-    ctx.fillText(value.toFixed(2), padding.left - 6, y);
+  for (const tick of yTickValues) {
+    const ratio = range > 0 ? (displayMax - tick) / range : 0;
+    const y = padding.top + ratio * plotHeight;
+    ctx.fillText(tick.toFixed(yPrecision), padding.left - 6, y);
   }
 
   ctx.textAlign = "center";
   ctx.textBaseline = "top";
-  for (let i = 0; i <= xTicks; i += 1) {
-    const t = (i / xTicks) * timeSpan;
-    const label = `${(t / 1000).toFixed(1)}`;
-    const x = padding.left + (i / xTicks) * plotWidth;
+  for (const tick of xTickValues) {
+    const ratio = timeSpan > 0 ? tick / timeSpan : 0;
+    const x = padding.left + ratio * plotWidth;
+    const label = `${(tick / 1000).toFixed(xPrecision)}`;
     ctx.fillText(label, x, padding.top + plotHeight + 8);
   }
 
@@ -408,6 +486,14 @@ export const ImuChartsCanvas = ({
     startX: 0,
     startThumbLeft: 0,
   });
+  const zoomAnimRef = useRef<ZoomAnimationState>({
+    active: false,
+    fromDuration: 0,
+    toDuration: 0,
+    startAtMs: 0,
+    durationMs: ZOOM_ANIMATION_MS,
+    rafId: null,
+  });
 
   /** 视图状态：时间窗口长度和偏移量 */
   const viewStateRef = useRef({
@@ -453,22 +539,69 @@ export const ImuChartsCanvas = ({
     []
   );
 
+  const stopZoomAnimation = () => {
+    if (zoomAnimRef.current.rafId !== null) {
+      window.cancelAnimationFrame(zoomAnimRef.current.rafId);
+      zoomAnimRef.current.rafId = null;
+    }
+    zoomAnimRef.current.active = false;
+  };
+
+  const runZoomAnimation = () => {
+    const step = (nowMs: number) => {
+      const anim = zoomAnimRef.current;
+      if (!anim.active) {
+        anim.rafId = null;
+        return;
+      }
+
+      const elapsed = nowMs - anim.startAtMs;
+      const progress = clamp(elapsed / anim.durationMs, 0, 1);
+      const eased = 1 - ((1 - progress) ** 3);
+      const interpolatedDuration = anim.fromDuration + (anim.toDuration - anim.fromDuration) * eased;
+      const nextDuration = clampDurationMs(interpolatedDuration);
+      viewStateRef.current.duration = nextDuration;
+      viewStateRef.current.offset = clampOffsetMs(viewStateRef.current.offset, historySpanRef.current, nextDuration);
+      syncTimelineView(historySpanRef.current, nextDuration, viewStateRef.current.offset, true);
+
+      if (progress >= 1) {
+        anim.active = false;
+        anim.rafId = null;
+        return;
+      }
+      anim.rafId = window.requestAnimationFrame(step);
+    };
+
+    if (zoomAnimRef.current.rafId !== null) {
+      window.cancelAnimationFrame(zoomAnimRef.current.rafId);
+    }
+    zoomAnimRef.current.rafId = window.requestAnimationFrame(step);
+  };
+
   /**
    * 监听滚轮事件：缩放时间窗口
    */
   const handleWheel = (e: WheelEvent) => {
     e.preventDefault();
     const zoomFactor = e.deltaY > 0 ? 1.1 : 0.9;
-    const nextDuration = clampDurationMs(viewStateRef.current.duration * zoomFactor);
-    viewStateRef.current.duration = nextDuration;
-    viewStateRef.current.offset = clampOffsetMs(viewStateRef.current.offset, historySpanRef.current, nextDuration);
-    syncTimelineView(historySpanRef.current, nextDuration, viewStateRef.current.offset, true);
+    const baseDuration = zoomAnimRef.current.active ? zoomAnimRef.current.toDuration : viewStateRef.current.duration;
+    const nextDuration = clampDurationMs(baseDuration * zoomFactor);
+    if (Math.abs(nextDuration - viewStateRef.current.duration) < 0.001) {
+      return;
+    }
+    zoomAnimRef.current.active = true;
+    zoomAnimRef.current.fromDuration = viewStateRef.current.duration;
+    zoomAnimRef.current.toDuration = nextDuration;
+    zoomAnimRef.current.startAtMs = performance.now();
+    zoomAnimRef.current.durationMs = ZOOM_ANIMATION_MS;
+    runZoomAnimation();
   };
 
   /**
    * 监听指针按下：开始拖动
    */
   const handlePointerDown = (e: PointerEvent) => {
+    stopZoomAnimation();
     viewStateRef.current.isDragging = true;
     viewStateRef.current.lastX = e.clientX;
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
@@ -537,6 +670,7 @@ export const ImuChartsCanvas = ({
    * @param event - PointerEvent
    */
   const handleTimelineTrackPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    stopZoomAnimation();
     if (timelineMetrics.trackWidthPx <= 0) {
       return;
     }
@@ -560,6 +694,7 @@ export const ImuChartsCanvas = ({
    * @param event - PointerEvent
    */
   const handleTimelineThumbPointerDown = (event: React.PointerEvent<HTMLDivElement>) => {
+    stopZoomAnimation();
     event.stopPropagation();
     event.preventDefault();
     event.currentTarget.setPointerCapture(event.pointerId);
@@ -620,6 +755,12 @@ export const ImuChartsCanvas = ({
       canvas.removeEventListener("pointermove", handlePointerMove);
       canvas.removeEventListener("pointerup", handlePointerUp);
       canvas.removeEventListener("pointerleave", handlePointerUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      stopZoomAnimation();
     };
   }, []);
 
