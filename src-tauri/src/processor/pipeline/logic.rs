@@ -110,6 +110,9 @@ impl ProcessorPipeline {
             axis_started_at,
         ));
 
+        // 对 accel_no_g 应用加速度计偏置修正（IMU 固件输出的去重力加速度仍含偏置）
+        raw.accel_no_g -= self.calibration.accel_bias();
+
         // 处理链：标定 -> 滤波 -> 导航融合 -> 输出
         // Stage calibration:
         // input: ImuSampleRaw JSON；output: ImuSampleCalibrated JSON。

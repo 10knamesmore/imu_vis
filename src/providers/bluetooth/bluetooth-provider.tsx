@@ -49,6 +49,10 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const [devices, setDevices] = useState<PeripheralInfo[]>([]);
   // 是否已连接设备
   const [connectedDevice, setConnectedDevice] = useState<PeripheralInfo | null>(null);
+  // 是否需要显示标定向导
+  const [needsCalibration, setNeedsCalibration] = useState(false);
+  // 原始数据回调（供标定向导采集数据）
+  const rawDataCallbackRef = useRef<((data: ResponseData) => void) | null>(null);
   // 对外提供的 IMU 数据历史
   const [dataHistory, setDataHistory] = useState<ImuHistorySnapshot>(createEmptyHistory);
   // 表示图重绘的版本号，每次更新加一
@@ -162,6 +166,41 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
   }, [scanning, startScan, stopScan]);
 
+  // 连接成功后检查标定，并在有历史标定时自动应用
+  const checkAndApplyCalibration = useCallback(async (deviceId: string) => {
+    try {
+      const calibRes = await imuApi.getDeviceCalibration(deviceId);
+      if (!calibRes.success || !calibRes.data) {
+        // 没有标定数据 → 弹出向导
+        setNeedsCalibration(true);
+        return;
+      }
+      // 有历史标定 → 自动应用到 pipeline
+      const { accel_bias, accel_scale } = calibRes.data;
+      const configRes = await imuApi.getPipelineConfig();
+      if (configRes.success && configRes.data) {
+        const config = configRes.data;
+        await imuApi.updatePipelineConfig({
+          ...config,
+          calibration: {
+            ...config.calibration,
+            accel_bias: { x: accel_bias[0], y: accel_bias[1], z: accel_bias[2] },
+            accel_matrix: [
+              [accel_scale[0], 0, 0],
+              [0, accel_scale[1], 0],
+              [0, 0, accel_scale[2]],
+            ],
+          },
+        });
+      }
+      setNeedsCalibration(false);
+    } catch (e) {
+      console.error('检查标定状态失败:', e);
+      // 出错时不强制弹向导，避免影响正常使用
+      setNeedsCalibration(false);
+    }
+  }, []);
+
   // 连接到指定设备
   const connect = useCallback(async (deviceId: string) => {
     try {
@@ -175,6 +214,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
         enterLiveMode(true);
         setConnectedDevice(res.data);
         message.success(`已连接 ${res.data.local_name || res.data.id}`);
+        await checkAndApplyCalibration(deviceId);
         return true;
       } else {
         // 如果API没有返回完整数据，尝试从已扫描列表中查找
@@ -185,6 +225,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
           enterLiveMode(true);
           setConnectedDevice(deviceData);
           message.success(`已连接 ${deviceData.local_name || deviceData.id}`);
+          await checkAndApplyCalibration(deviceId);
           return true;
         }
 
@@ -195,7 +236,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       console.error(e);
       return false;
     }
-  }, [scanning, stopScan, devices, enterLiveMode]);
+  }, [scanning, stopScan, devices, enterLiveMode, checkAndApplyCalibration]);
 
   useEffect(() => {
     if (!connectedDevice) return;
@@ -224,6 +265,10 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     channel.onmessage = (msg: ResponseData) => {
       if (dataModeRef.current === 'replay') {
         return;
+      }
+      // 触发原始数据回调（供标定向导采集）
+      if (rawDataCallbackRef.current) {
+        rawDataCallbackRef.current(msg);
       }
       // 每条消息只更新缓存与计数，不触发 UI 更新
       messageCountRef.current += 1;
@@ -485,6 +530,13 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     enterLiveMode(true);
   }, [enterLiveMode]);
 
+  const registerRawDataCallback = useCallback(
+    (cb: ((data: ResponseData) => void) | null) => {
+      rawDataCallbackRef.current = cb;
+    },
+    [],
+  );
+
   return {
     scanning,
     devices,
@@ -516,6 +568,9 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     getPipelineConfig,
     updatePipelineConfig,
     savePipelineConfig,
+    needsCalibration,
+    setNeedsCalibration,
+    registerRawDataCallback,
   };
 };
 

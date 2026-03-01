@@ -140,6 +140,19 @@ export interface QueueDepth {
   record: number;
 }
 
+// 设备标定数据
+export interface DeviceCalibrationData {
+  device_id: string;
+  /** 加速度计偏置 [b_x, b_y, b_z]（m/s²） */
+  accel_bias: [number, number, number];
+  /** 加速度计比例因子 [s_x, s_y, s_z] */
+  accel_scale: [number, number, number];
+  /** 标定质量误差（max |‖a_cal‖ - g|）*/
+  quality_error: number;
+  /** 标定时间戳（ms）*/
+  created_at_ms: number;
+}
+
 // Debug 监控流帧（1s）
 export interface DebugMonitorTick {
   ts_ms: number;

@@ -10,8 +10,6 @@ import { ProcessorPipelineConfig } from '../../types';
 import styles from "./ConnectionPanel.module.scss";
 
 const DEFAULT_SEARCH_VALUE = "im";
-const MATRIX_INDEX = [0, 1, 2] as const;
-const AXIS_LABELS = ['X', 'Y', 'Z'] as const;
 const numberRules = [{ required: true, message: '必填' }];
 
 const DEFAULT_CONFIG: ProcessorPipelineConfig = {
@@ -27,8 +25,6 @@ const DEFAULT_CONFIG: ProcessorPipelineConfig = {
   trajectory: { passby: false },
   zupt: { passby: false, gyro_thresh: 0.1, accel_thresh: 0.2 },
 };
-
-type MatrixField = 'accel_matrix' | 'gyro_matrix';
 
 const getRssiColor = (rssi?: number) => {
   if (!rssi) return '#d9d9d9';
@@ -177,6 +173,7 @@ export const SettingsPanel = () => {
     getPipelineConfig,
     updatePipelineConfig,
     savePipelineConfig,
+    setNeedsCalibration,
   } = useBluetooth();
   const { isDeveloperMode, enableDeveloperMode, disableDeveloperMode } = useDeveloperMode();
   const [loadingConfig, setLoadingConfig] = useState(false);
@@ -258,57 +255,6 @@ export const SettingsPanel = () => {
       setSavingConfig(false);
     }
   };
-
-  const renderVec3Fields = (label: string, basePath: (string | number)[]) => (
-    <Form.Item label={label} className={styles.formBlock}>
-      <Row gutter={12}>
-        <Col xs={24} md={8}>
-          <Form.Item name={[...basePath, 'x']} rules={numberRules} label="X" className={styles.compactItem}>
-            <InputNumber className={styles.numberInput} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name={[...basePath, 'y']} rules={numberRules} label="Y" className={styles.compactItem}>
-            <InputNumber className={styles.numberInput} />
-          </Form.Item>
-        </Col>
-        <Col xs={24} md={8}>
-          <Form.Item name={[...basePath, 'z']} rules={numberRules} label="Z" className={styles.compactItem}>
-            <InputNumber className={styles.numberInput} />
-          </Form.Item>
-        </Col>
-      </Row>
-    </Form.Item>
-  );
-
-  const renderMatrixField = (label: string, field: MatrixField) => (
-    <Form.Item label={label} className={styles.formBlock}>
-      <div className={styles.matrixWrap}>
-        <Row gutter={8} className={styles.matrixHeaderRow}>
-          <Col span={3} />
-          {MATRIX_INDEX.map((col) => (
-            <Col span={7} key={`${field}-header-${col}`} className={styles.matrixAxisLabel}>
-              {AXIS_LABELS[col]}
-            </Col>
-          ))}
-        </Row>
-        {MATRIX_INDEX.map((row) => (
-          <Row gutter={8} key={`${field}-${row}`} className={styles.matrixRow}>
-            <Col span={3} className={styles.matrixAxisLabel}>
-              {AXIS_LABELS[row]}
-            </Col>
-            {MATRIX_INDEX.map((col) => (
-              <Col span={7} key={`${field}-${row}-${col}`}>
-                <Form.Item name={['calibration', field, row, col]} rules={numberRules} className={styles.compactItem}>
-                  <InputNumber className={styles.numberInput} />
-                </Form.Item>
-              </Col>
-            ))}
-          </Row>
-        ))}
-      </div>
-    </Form.Item>
-  );
 
   if (!connectedDevice) {
     return (
@@ -403,49 +349,19 @@ export const SettingsPanel = () => {
                         </Row>
                       </Card>
                     </Col>
-                  </Row>
-                </div>
-              ),
-            },
-            {
-              key: 'bias',
-              label: '标定偏置',
-              children: (
-                <div className={styles.tabPane}>
-                  <Card size="small" title="标定偏置" className={styles.sectionCard}>
-                    <Row gutter={12}>
-                      <Col xs={24} lg={8}>
-                        <Form.Item label="跳过处理" name={['calibration', 'passby']} valuePropName="checked">
-                          <Switch />
-                        </Form.Item>
-                      </Col>
-                    </Row>
-                    <Row gutter={12}>
-                      <Col xs={24} lg={12}>
-                        {renderVec3Fields('加速度偏置(accel_bias)', ['calibration', 'accel_bias'])}
-                      </Col>
-                      <Col xs={24} lg={12}>
-                        {renderVec3Fields('陀螺仪偏置(gyro_bias)', ['calibration', 'gyro_bias'])}
-                      </Col>
-                    </Row>
-                  </Card>
-                </div>
-              ),
-            },
-            {
-              key: 'matrix',
-              label: '标定矩阵',
-              children: (
-                <div className={styles.tabPane}>
-                  <Row gutter={12}>
-                    <Col xs={24} lg={12}>
-                      <Card size="small" title="加速度矩阵(accel_matrix)" className={styles.sectionCard}>
-                        {renderMatrixField(' ', 'accel_matrix')}
-                      </Card>
-                    </Col>
-                    <Col xs={24} lg={12}>
-                      <Card size="small" title="陀螺仪矩阵(gyro_matrix)" className={styles.sectionCard}>
-                        {renderMatrixField(' ', 'gyro_matrix')}
+                    <Col xs={24} lg={6}>
+                      <Card size="small" title="加速度计标定" className={styles.sectionCard}>
+                        <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+                          标定参数由向导采集并自动应用，无需手动调整。
+                        </Text>
+                        <Button
+                          type="primary"
+                          danger
+                          block
+                          onClick={() => setNeedsCalibration(true)}
+                        >
+                          重新标定
+                        </Button>
                       </Card>
                     </Col>
                   </Row>

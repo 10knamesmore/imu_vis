@@ -78,5 +78,22 @@ pub async fn ensure_schema(conn: &DatabaseConnection) -> anyhow::Result<()> {
         ))
         .await;
 
+    conn.execute(Statement::from_string(
+        db_backend,
+        "CREATE TABLE IF NOT EXISTS device_calibrations (
+            device_id     TEXT NOT NULL PRIMARY KEY,
+            accel_bias_x  REAL NOT NULL DEFAULT 0.0,
+            accel_bias_y  REAL NOT NULL DEFAULT 0.0,
+            accel_bias_z  REAL NOT NULL DEFAULT 0.0,
+            accel_scale_x REAL NOT NULL DEFAULT 1.0,
+            accel_scale_y REAL NOT NULL DEFAULT 1.0,
+            accel_scale_z REAL NOT NULL DEFAULT 1.0,
+            quality_error REAL NOT NULL DEFAULT 0.0,
+            created_at_ms INTEGER NOT NULL DEFAULT 0
+        );",
+    ))
+    .await
+    .context("create device_calibrations table")?;
+
     Ok(())
 }

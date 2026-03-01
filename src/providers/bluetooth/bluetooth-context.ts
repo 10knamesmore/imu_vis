@@ -9,6 +9,7 @@ import type {
   ResponseData,
 } from '../../types';
 
+
 export type DataMode = 'live' | 'replay';
 
 export type BluetoothContextValue = {
@@ -72,6 +73,12 @@ export type BluetoothContextValue = {
   updatePipelineConfig: (config: ProcessorPipelineConfig) => Promise<boolean>;
   /** 将当前生效配置保存到配置文件。 */
   savePipelineConfig: () => Promise<boolean>;
+  /** 是否需要显示标定向导（首次连接未标定设备时为 true）。 */
+  needsCalibration: boolean;
+  /** 设置标定向导显示状态。 */
+  setNeedsCalibration: (v: boolean) => void;
+  /** 注册原始数据回调（用于标定向导采集数据），传 null 解注册。 */
+  registerRawDataCallback: (cb: ((data: ResponseData) => void) | null) => void;
 };
 
 export const BluetoothContext = createContext<BluetoothContextValue | null>(null);

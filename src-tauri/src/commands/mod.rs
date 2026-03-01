@@ -1,5 +1,6 @@
 //! Tauri 命令路由。
 
+mod calibration;
 mod debug;
 mod imu;
 mod output;
@@ -26,6 +27,8 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         recording::stop_recording,
         recording::list_recordings,
         recording::update_recording_meta,
-        recording::get_recording_samples
+        recording::get_recording_samples,
+        calibration::save_device_calibration,
+        calibration::get_device_calibration
     ]
 }

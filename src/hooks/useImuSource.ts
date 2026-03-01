@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { Channel } from "@tauri-apps/api/core";
 import { imuApi } from "../services/imu";
 import { ResponseData } from "../types";
@@ -154,11 +154,16 @@ export const useImuSource = ({
     }
   }, [cancelReplayFrame, enabled, reset]);
 
-  return {
-    bufferRef,
-    latestRef,
-    streamStartMsRef,
-    sourceModeRef,
-    reset,
-  };
+  return useMemo(
+    () => ({
+      bufferRef,
+      latestRef,
+      streamStartMsRef,
+      sourceModeRef,
+      reset,
+    }),
+    // reset 由 useCallback([]) 保证稳定，所有 ref 也是稳定的，
+    // 所以此对象只在 hook 首次创建时生成一次。
+    [reset]
+  );
 };

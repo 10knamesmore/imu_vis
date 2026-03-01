@@ -63,6 +63,17 @@ impl Calibration {
     pub fn reset(&mut self) {
         self.state = CalibrationState::new(&self.config);
     }
+
+    /// 返回加速度计偏置（passby 模式下返回零）。
+    ///
+    /// 用于在 pipeline 中对 `accel_no_g` 做单独偏置修正。
+    pub fn accel_bias(&self) -> DVec3 {
+        if self.config.passby {
+            DVec3::ZERO
+        } else {
+            self.config.accel_bias
+        }
+    }
 }
 
 impl AxisCalibration {

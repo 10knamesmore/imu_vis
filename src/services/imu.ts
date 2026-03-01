@@ -7,6 +7,7 @@ import {
   RecordingStatus,
   DebugRealtimeFrame,
   DebugMonitorTick,
+  DeviceCalibrationData,
 } from "../types";
 
 // 通用 API 响应接口
@@ -67,4 +68,22 @@ export const imuApi = {
   // 获取指定录制的样本数据
   getRecordingSamples: (sessionId: number) =>
     invoke<imuApiResponse<ResponseData[]>>("get_recording_samples", { sessionId }),
+
+  // 保存设备标定结果到 SQLite
+  saveDeviceCalibration: (
+    deviceId: string,
+    accelBias: [number, number, number],
+    accelScale: [number, number, number],
+    qualityError: number,
+  ) =>
+    invoke<imuApiResponse<void>>("save_device_calibration", {
+      deviceId,
+      accelBias,
+      accelScale,
+      qualityError,
+    }),
+
+  // 查询设备历史标定数据
+  getDeviceCalibration: (deviceId: string) =>
+    invoke<imuApiResponse<DeviceCalibrationData | null>>("get_device_calibration", { deviceId }),
 };

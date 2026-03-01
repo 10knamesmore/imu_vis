@@ -90,7 +90,7 @@ export const ImuRealtimePanel = ({
   });
   const threeSource = hasReplayData ? replayThreeSource : chartSource;
 
-  const chartItems = [
+  const chartItems = useMemo(() => [
     {
       key: "accel",
       label: "加速度（无重力）",
@@ -290,7 +290,9 @@ export const ImuRealtimePanel = ({
         </div>
       ),
     },
-  ];
+  // chartSource 已由 useImuSource 内部 useMemo 稳定，showCharts 控制暂停/恢复
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  ], [chartSource, showCharts]);
 
   return (
     <div className={styles.imuRealtimePanel}>

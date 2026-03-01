@@ -1,7 +1,7 @@
 //! 录制模块入口与公共接口。
 
-mod db;
-mod models;
+pub mod db;
+pub mod models;
 mod service;
 
 pub use service::{

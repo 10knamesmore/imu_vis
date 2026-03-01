@@ -3,6 +3,7 @@ import { Layout, Modal, Tabs } from 'antd';
 
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { GlobalSettingFloatButton } from './components/GlobalSettingFloatButton';
+import { CalibrationWizard } from './components/CalibrationWizard';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { DebugPanel } from "./pages/DebugPanel";
 import { useBluetooth } from './hooks/useBluetooth';
@@ -21,7 +22,7 @@ const AppContent = () => {
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   /** 当前主内容 tab key。 */
   const [activeTabKey, setActiveTabKey] = useState("realtime");
-  const { connectedDevice, startScan, stopScan } = useBluetooth();
+  const { connectedDevice, startScan, stopScan, needsCalibration } = useBluetooth();
   const { isDeveloperMode } = useDeveloperMode();
 
 
@@ -89,6 +90,11 @@ const AppContent = () => {
       ),
     },
   ]
+
+  // 首次连接未标定设备时全页替换为标定向导
+  if (needsCalibration && connectedDevice) {
+    return <CalibrationWizard deviceId={connectedDevice.id} />;
+  }
 
   return (
     <Layout className={styles.appLayout}>
