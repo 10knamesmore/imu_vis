@@ -104,8 +104,8 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
         const state = centerTrailStateRef.current;
         const maxPoints = maxTrailPointsRef.current;
 
-        // 获取当前中心位置（固定使用计算数据）
-        tmpVec.set(latest.calculated_data.position.x, latest.calculated_data.position.y, latest.calculated_data.position.z);
+        // 获取当前中心位置
+        tmpVec.set(latest.position.x, latest.position.y, latest.position.z);
 
         if (state.count < maxPoints) {
           const i = state.count;

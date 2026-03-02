@@ -117,7 +117,7 @@ export const ImuModelView: React.FC<ImuModelViewProps> = ({
     const latest = sourceRef.current.latestRef.current;
     if (latest) {
       // 使用计算姿态，并转换成 Three.js 四元数
-      const attitude = latest.calculated_data.attitude;
+      const attitude = latest.attitude;
       tmpQuat.set(attitude.x, attitude.y, attitude.z, attitude.w);
 
       // 同步模型与坐标轴姿态

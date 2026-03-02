@@ -71,7 +71,7 @@ export const ImuRealtimePanel = ({
   );
   const restartReplayTooltip = useMemo(() => {
     const name = (currentReplayMeta?.name ?? "").trim() || "未命名";
-    const startedAt = currentReplayMeta?.started_at_ms ?? replaySamples?.[0]?.raw_data.timestamp_ms ?? null;
+    const startedAt = currentReplayMeta?.started_at_ms ?? replaySamples?.[0]?.timestamp_ms ?? null;
     const startedAtText = startedAt ? new Date(startedAt).toLocaleString() : "-";
     return (
       <div>
@@ -113,7 +113,7 @@ export const ImuRealtimePanel = ({
   const chartItems = useMemo(() => [
     {
       key: "accel",
-      label: "加速度（无重力）",
+      label: "加速度",
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
@@ -123,9 +123,9 @@ export const ImuRealtimePanel = ({
             label="加速度 (m/s^2)"
             visibilityKey="accel"
             series={[
-              { name: "X", color: C.xyz[0], getBuffer: (w) => w.builtin.accelX },
-              { name: "Y", color: C.xyz[1], getBuffer: (w) => w.builtin.accelY },
-              { name: "Z", color: C.xyz[2], getBuffer: (w) => w.builtin.accelZ },
+              { name: "X", color: C.xyz[0], getBuffer: (w) => w.accelX },
+              { name: "Y", color: C.xyz[1], getBuffer: (w) => w.accelY },
+              { name: "Z", color: C.xyz[2], getBuffer: (w) => w.accelZ },
             ]}
           />
         </div>
@@ -143,89 +143,9 @@ export const ImuRealtimePanel = ({
             label="偏航 / 俯仰 / 横滚 (deg)"
             visibilityKey="angle"
             series={[
-              { name: "X", color: C.angle[0], getBuffer: (w) => w.builtin.angleX },
-              { name: "Y", color: C.angle[1], getBuffer: (w) => w.builtin.angleY },
-              { name: "Z", color: C.angle[2], getBuffer: (w) => w.builtin.angleZ },
-            ]}
-          />
-        </div>
-      ),
-    },
-    {
-      key: "accel-with-g",
-      label: "加速度（含重力）",
-      children: (
-        <div className={styles.imuChartPanel}>
-          <ImuChartsCanvas
-            source={chartSource}
-            enabled={showCharts}
-            refreshMs={16}
-            label="Acceleration (m/s^2)"
-            visibilityKey="accel-with-g"
-            series={[
-              { name: "X", color: C.xyz[0], getBuffer: (w) => w.builtin.accelWithGX },
-              { name: "Y", color: C.xyz[1], getBuffer: (w) => w.builtin.accelWithGY },
-              { name: "Z", color: C.xyz[2], getBuffer: (w) => w.builtin.accelWithGZ },
-            ]}
-          />
-        </div>
-      ),
-    },
-    {
-      key: "offset",
-      label: "偏移",
-      children: (
-        <div className={styles.imuChartPanel}>
-          <ImuChartsCanvas
-            source={chartSource}
-            enabled={showCharts}
-            refreshMs={16}
-            label="m"
-            visibilityKey="offset"
-            series={[
-              { name: "X", color: C.offset[0], getBuffer: (w) => w.builtin.offsetX },
-              { name: "Y", color: C.offset[1], getBuffer: (w) => w.builtin.offsetY },
-              { name: "Z", color: C.offset[2], getBuffer: (w) => w.builtin.offsetZ },
-            ]}
-          />
-        </div>
-      ),
-    },
-    {
-      key: "nav",
-      label: "导航加速度",
-      children: (
-        <div className={styles.imuChartPanel}>
-          <ImuChartsCanvas
-            source={chartSource}
-            enabled={showCharts}
-            refreshMs={16}
-            label="导航加速度 (m/s^2)"
-            visibilityKey="nav"
-            series={[
-              { name: "X", color: C.nav[0], getBuffer: (w) => w.builtin.accelNavX },
-              { name: "Y", color: C.nav[1], getBuffer: (w) => w.builtin.accelNavY },
-              { name: "Z", color: C.nav[2], getBuffer: (w) => w.builtin.accelNavZ },
-            ]}
-          />
-        </div>
-      ),
-    },
-    {
-      key: "angle-delta",
-      label: "姿态差值",
-      children: (
-        <div className={styles.imuChartPanel}>
-          <ImuChartsCanvas
-            source={chartSource}
-            enabled={showCharts}
-            refreshMs={16}
-            label="角度差值 (deg)"
-            visibilityKey="angle-delta"
-            series={[
-              { name: "偏航 Δ", color: C.xyz[0], getBuffer: (w) => w.deltaAngleX },
-              { name: "俯仰 Δ", color: C.xyz[1], getBuffer: (w) => w.deltaAngleY },
-              { name: "横滚 Δ", color: C.xyz[2], getBuffer: (w) => w.deltaAngleZ },
+              { name: "X", color: C.angle[0], getBuffer: (w) => w.angleX },
+              { name: "Y", color: C.angle[1], getBuffer: (w) => w.angleY },
+              { name: "Z", color: C.angle[2], getBuffer: (w) => w.angleZ },
             ]}
           />
         </div>
@@ -233,7 +153,7 @@ export const ImuRealtimePanel = ({
     },
     {
       key: "velocity",
-      label: "速度（计算）",
+      label: "速度",
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
@@ -243,9 +163,9 @@ export const ImuRealtimePanel = ({
             label="速度 (m/s)"
             visibilityKey="velocity"
             series={[
-              { name: "X", color: C.angle[0], getBuffer: (w) => w.calculated.velocityX },
-              { name: "Y", color: C.angle[1], getBuffer: (w) => w.calculated.velocityY },
-              { name: "Z", color: C.angle[2], getBuffer: (w) => w.calculated.velocityZ },
+              { name: "X", color: C.angle[0], getBuffer: (w) => w.velocityX },
+              { name: "Y", color: C.angle[1], getBuffer: (w) => w.velocityY },
+              { name: "Z", color: C.angle[2], getBuffer: (w) => w.velocityZ },
             ]}
           />
         </div>
@@ -253,7 +173,7 @@ export const ImuRealtimePanel = ({
     },
     {
       key: "position",
-      label: "位置（计算）",
+      label: "位置",
       children: (
         <div className={styles.imuChartPanel}>
           <ImuChartsCanvas
@@ -263,9 +183,9 @@ export const ImuRealtimePanel = ({
             label="位置 (m)"
             visibilityKey="position"
             series={[
-              { name: "X", color: C.nav[0], getBuffer: (w) => w.calculated.positionX },
-              { name: "Y", color: C.nav[1], getBuffer: (w) => w.calculated.positionY },
-              { name: "Z", color: C.nav[2], getBuffer: (w) => w.calculated.positionZ },
+              { name: "X", color: C.nav[0], getBuffer: (w) => w.positionX },
+              { name: "Y", color: C.nav[1], getBuffer: (w) => w.positionY },
+              { name: "Z", color: C.nav[2], getBuffer: (w) => w.positionZ },
             ]}
           />
         </div>

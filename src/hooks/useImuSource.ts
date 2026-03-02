@@ -77,7 +77,7 @@ export const useImuSource = ({
       }
       latestRef.current = msg;
       if (streamStartMsRef.current === null) {
-        streamStartMsRef.current = msg.raw_data.timestamp_ms;
+        streamStartMsRef.current = msg.timestamp_ms;
       }
       bufferRef.current.push(msg, streamStartMsRef.current);
     };
@@ -111,7 +111,7 @@ export const useImuSource = ({
 
     const runId = replayRunIdRef.current + 1;
     replayRunIdRef.current = runId;
-    const playbackStartTs = replaySamples[0].raw_data.timestamp_ms;
+    const playbackStartTs = replaySamples[0].timestamp_ms;
     streamStartMsRef.current = playbackStartTs;
     let cursor = 0;
     const frameStart = performance.now();
@@ -123,7 +123,7 @@ export const useImuSource = ({
       const elapsedMs = now - frameStart;
       while (
         cursor < replaySamples.length &&
-        replaySamples[cursor].raw_data.timestamp_ms - playbackStartTs <= elapsedMs
+        replaySamples[cursor].timestamp_ms - playbackStartTs <= elapsedMs
       ) {
         const sample = replaySamples[cursor];
         latestRef.current = sample;

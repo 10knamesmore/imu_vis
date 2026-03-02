@@ -1,24 +1,21 @@
 //! 输出数据类型。
 
+use math_f64::{DQuat, DVec3};
 use serde::Serialize;
 
-use crate::processor::{output::CalculatedData, parser::ImuSampleRaw};
-
 #[derive(Debug, Clone, Copy, Serialize)]
-/// 响应数据结构，包含原始 IMU 数据和计算后的数据
+/// 前端响应数据，扁平化结构，仅包含展示所需字段
 pub struct ResponseData {
-    /// 原始 IMU 数据（加速度、角速度、四元数等）
-    pub raw_data: ImuSampleRaw,
-    /// 计算后的数据（速度、位置、姿态等）
-    pub calculated_data: CalculatedData,
-}
-
-impl ResponseData {
-    /// 从原始数据和计算数据构建响应数据
-    pub fn from_parts(raw_data: &ImuSampleRaw, calculated_data: &CalculatedData) -> Self {
-        Self {
-            raw_data: *raw_data,
-            calculated_data: *calculated_data,
-        }
-    }
+    /// 时间戳（毫秒）
+    pub timestamp_ms: u64,
+    /// 去重力加速度（m/s²）
+    pub accel: DVec3,
+    /// 含重力加速度（m/s²，用于标定向导）
+    pub accel_with_g: DVec3,
+    /// 姿态四元数（计算值）
+    pub attitude: DQuat,
+    /// 速度（m/s，计算值）
+    pub velocity: DVec3,
+    /// 位置（m，计算值）
+    pub position: DVec3,
 }

@@ -80,7 +80,7 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
   useEffect(() => {
     const channel = new Channel<ResponseData>();
     channel.onmessage = (data: ResponseData) => {
-      const v = data.raw_data.accel_with_g;
+      const v = data.accel_with_g;
       setLiveAccel({ x: v.x, y: v.y, z: v.z });
       if (phaseRef.current === 'collecting') {
         samplesRef.current.push({ x: v.x, y: v.y, z: v.z });

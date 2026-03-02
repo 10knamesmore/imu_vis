@@ -13,51 +13,14 @@ export interface Quaternion {
   z: number;
 }
 
-// IMU 原始数据结构
-export interface IMUData {
-  timestamp_ms: number; // 时间戳（毫秒）
-  accel_no_g: Vector3;  // 去除重力后的加速度
-  accel_with_g: Vector3; // 包含重力的加速度
-  gyro: Vector3;        // 角速度
-  quat: Quaternion;     // 姿态四元数
-  angle: Vector3;       // 欧拉角
-  offset: Vector3;      // 传感器偏差
-  accel_nav: Vector3;   // 导航坐标系下的加速度
-}
-
-// 计算后的数据（速度、位置等）
-export interface CalculatedData {
-  attitude: Quaternion; // 姿态四元数
-  velocity: Vector3; // 速度
-  position: Vector3; // 位置
-  timestamp_ms: number;
-}
-
-// IMU 历史数据缓冲（内置数据 + 计算数据）
-export interface ImuHistorySnapshot {
-  time: number[];
-  builtin: {
-    accel: { x: number[]; y: number[]; z: number[] };
-    accelWithG: { x: number[]; y: number[]; z: number[] };
-    gyro: { x: number[]; y: number[]; z: number[] };
-    angle: { x: number[]; y: number[]; z: number[] };
-    quat: { w: number[]; x: number[]; y: number[]; z: number[] };
-    offset: { x: number[]; y: number[]; z: number[] };
-    accelNav: { x: number[]; y: number[]; z: number[] };
-  };
-  calculated: {
-    angle: { x: number[]; y: number[]; z: number[] };
-    attitude: { w: number[]; x: number[]; y: number[]; z: number[] };
-    velocity: { x: number[]; y: number[]; z: number[] };
-    position: { x: number[]; y: number[]; z: number[] };
-  };
-  deltaAngle: { x: number[]; y: number[]; z: number[] };
-}
-
-// 后端返回的完整响应数据
+// 后端返回的响应数据（扁平化结构）
 export interface ResponseData {
-  raw_data: IMUData;          // 原始 IMU 数据
-  calculated_data: CalculatedData; // 计算后的数据
+  timestamp_ms: number;    // 时间戳（毫秒）
+  accel: Vector3;          // 去重力加速度（m/s²）
+  accel_with_g: Vector3;   // 含重力加速度（m/s²，用于标定）
+  attitude: Quaternion;    // 姿态四元数（计算值）
+  velocity: Vector3;       // 速度（m/s，计算值）
+  position: Vector3;       // 位置（m，计算值）
 }
 
 // 录制状态

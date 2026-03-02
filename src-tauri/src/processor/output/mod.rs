@@ -11,5 +11,5 @@ pub mod types;
 
 /// 输出构建器。
 pub use logic::OutputBuilder;
-/// 输出类型导出。
-pub use types::{CalculatedData, OutputFrame};
+/// 输出帧类型导出。
+pub use types::OutputFrame;

@@ -7,16 +7,13 @@ use std::{
 
 use anyhow::Context;
 
-use crate::{
-    processor::{
-        calibration::{AxisCalibration, Calibration, CorrectionRequest},
-        filter::LowPassFilter,
-        navigator::{Navigator, NavigatorConfig},
-        output::{OutputBuilder, OutputFrame},
-        parser::{ImuParser, ImuSampleRaw},
-        pipeline::types::ProcessorPipelineConfig,
-    },
-    types::outputs::ResponseData,
+use crate::processor::{
+    calibration::{AxisCalibration, Calibration, CorrectionRequest},
+    filter::LowPassFilter,
+    navigator::{Navigator, NavigatorConfig},
+    output::OutputFrame,
+    parser::{ImuParser, ImuSampleRaw},
+    pipeline::types::ProcessorPipelineConfig,
 };
 
 /// IMU 处理管线。
@@ -73,8 +70,8 @@ impl ProcessorPipeline {
         }
     }
 
-    /// 处理单个原始数据包并输出响应。
-    pub fn process_packet(&mut self, packet: &[u8]) -> Option<ResponseData> {
+    /// 处理单个原始数据包并输出帧。
+    pub fn process_packet(&mut self, packet: &[u8]) -> Option<OutputFrame> {
         // 解析原始蓝牙包
         let mut raw = match ImuParser::parse(packet) {
             Ok(sample) => sample,
@@ -97,9 +94,7 @@ impl ProcessorPipeline {
         let filtered = self.filter.apply(&calibrated);
 
         let nav = self.navigator.update(raw.quat, &filtered);
-        let frame = OutputFrame { raw, nav };
-        let response = OutputBuilder::build(&frame);
-        Some(response)
+        Some(OutputFrame { raw, nav })
     }
 
     /// 重置内部状态

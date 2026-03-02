@@ -1,16 +1,21 @@
 //! 输出构建逻辑。
 
-use crate::processor::output::types::{CalculatedData, OutputFrame};
+use crate::processor::output::types::OutputFrame;
 use crate::types::outputs::ResponseData;
 
 /// 输出构建器。
 pub struct OutputBuilder;
 
 impl OutputBuilder {
-    /// 构建响应数据。
+    /// 从输出帧构建前端响应数据。
     pub fn build(frame: &OutputFrame) -> ResponseData {
-        // 输出统一通过 ResponseData 发送给上下游
-        let calculated = CalculatedData::from_nav(&frame.nav);
-        ResponseData::from_parts(&frame.raw, &calculated)
+        ResponseData {
+            timestamp_ms: frame.raw.timestamp_ms,
+            accel: frame.raw.accel_no_g,
+            accel_with_g: frame.raw.accel_with_g,
+            attitude: frame.nav.attitude,
+            velocity: frame.nav.velocity,
+            position: frame.nav.position,
+        }
     }
 }

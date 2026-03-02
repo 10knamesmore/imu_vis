@@ -7,6 +7,7 @@ use flume::{Receiver, Sender};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
 use crate::{
+    processor::output::OutputFrame,
     recorder::{db, models},
     types::{
         outputs::ResponseData,
@@ -54,7 +55,7 @@ struct ActiveSession {
 }
 
 /// 启动录制任务。
-pub fn spawn_recorder(data_rx: Receiver<ResponseData>, control_rx: Receiver<RecorderCommand>) {
+pub fn spawn_recorder(data_rx: Receiver<OutputFrame>, control_rx: Receiver<RecorderCommand>) {
     tauri::async_runtime::spawn(async move {
         let mut active: Option<ActiveSession> = None;
         loop {
@@ -239,13 +240,9 @@ async fn stop_session(session: ActiveSession) -> anyhow::Result<RecordingStatus>
     })
 }
 
-async fn insert_sample(session: &mut ActiveSession, data: &ResponseData) -> anyhow::Result<()> {
-    let raw = &data.raw_data;
-    let calc = &data.calculated_data;
-
-    let attitude = calc.attitude;
-    let velocity = calc.velocity;
-    let position = calc.position;
+async fn insert_sample(session: &mut ActiveSession, frame: &OutputFrame) -> anyhow::Result<()> {
+    let raw = &frame.raw;
+    let nav = &frame.nav;
 
     let sample = models::imu_samples::ActiveModel {
         session_id: Set(session.session_id),
@@ -272,17 +269,17 @@ async fn insert_sample(session: &mut ActiveSession, data: &ResponseData) -> anyh
         accel_nav_x: Set(raw.accel_nav.x),
         accel_nav_y: Set(raw.accel_nav.y),
         accel_nav_z: Set(raw.accel_nav.z),
-        calc_attitude_w: Set(attitude.w),
-        calc_attitude_x: Set(attitude.x),
-        calc_attitude_y: Set(attitude.y),
-        calc_attitude_z: Set(attitude.z),
-        calc_velocity_x: Set(velocity.x),
-        calc_velocity_y: Set(velocity.y),
-        calc_velocity_z: Set(velocity.z),
-        calc_position_x: Set(position.x),
-        calc_position_y: Set(position.y),
-        calc_position_z: Set(position.z),
-        calc_timestamp_ms: Set(calc.timestamp_ms as i64),
+        calc_attitude_w: Set(nav.attitude.w),
+        calc_attitude_x: Set(nav.attitude.x),
+        calc_attitude_y: Set(nav.attitude.y),
+        calc_attitude_z: Set(nav.attitude.z),
+        calc_velocity_x: Set(nav.velocity.x),
+        calc_velocity_y: Set(nav.velocity.y),
+        calc_velocity_z: Set(nav.velocity.z),
+        calc_position_x: Set(nav.position.x),
+        calc_position_y: Set(nav.position.y),
+        calc_position_z: Set(nav.position.z),
+        calc_timestamp_ms: Set(nav.timestamp_ms as i64),
         ..Default::default()
     };
 
@@ -387,29 +384,16 @@ fn parse_tags(tags_json: Option<String>) -> Vec<String> {
 }
 
 fn sample_to_response_data(sample: models::imu_samples::Model) -> ResponseData {
-    use crate::processor::{parser::ImuSampleRaw, CalculatedData};
     use math_f64::{DQuat, DVec3};
 
-    let raw = ImuSampleRaw {
+    ResponseData {
         timestamp_ms: sample.timestamp_ms as u64,
-        accel_no_g: DVec3::new(
-            sample.accel_no_g_x,
-            sample.accel_no_g_y,
-            sample.accel_no_g_z,
-        ),
+        accel: DVec3::new(sample.accel_no_g_x, sample.accel_no_g_y, sample.accel_no_g_z),
         accel_with_g: DVec3::new(
             sample.accel_with_g_x,
             sample.accel_with_g_y,
             sample.accel_with_g_z,
         ),
-        gyro: DVec3::new(sample.gyro_x, sample.gyro_y, sample.gyro_z),
-        quat: DQuat::from_xyzw(sample.quat_x, sample.quat_y, sample.quat_z, sample.quat_w),
-        angle: DVec3::new(sample.angle_x, sample.angle_y, sample.angle_z),
-        offset: DVec3::new(sample.offset_x, sample.offset_y, sample.offset_z),
-        accel_nav: DVec3::new(sample.accel_nav_x, sample.accel_nav_y, sample.accel_nav_z),
-    };
-
-    let calc = CalculatedData {
         attitude: DQuat::from_xyzw(
             sample.calc_attitude_x,
             sample.calc_attitude_y,
@@ -426,10 +410,7 @@ fn sample_to_response_data(sample: models::imu_samples::Model) -> ResponseData {
             sample.calc_position_y,
             sample.calc_position_z,
         ),
-        timestamp_ms: sample.calc_timestamp_ms as u64,
-    };
-
-    ResponseData::from_parts(&raw, &calc)
+    }
 }
 
 fn now_ms() -> i64 {

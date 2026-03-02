@@ -14,6 +14,7 @@ use tauri::Emitter as _;
 use crate::{
     processor::{
         calibration::CorrectionRequest,
+        output::{OutputBuilder, OutputFrame},
         pipeline::{PipelineConfigRequest, ProcessorPipeline, ProcessorPipelineConfig},
     },
     types::outputs::ResponseData,
@@ -32,8 +33,6 @@ pub mod parser;
 /// 管线模块。
 pub mod pipeline;
 
-/// 对外暴露的计算结果数据类型。
-pub use output::CalculatedData;
 
 /// 数据处理器实例，启动独立线程消费 IMU 流。
 pub struct Processor {
@@ -68,7 +67,7 @@ impl Processor {
     pub fn new(
         upstream_rx: flume::Receiver<RawImuData>,
         downstream_tx: flume::Sender<ResponseData>,
-        record_tx: flume::Sender<ResponseData>,
+        record_tx: flume::Sender<OutputFrame>,
         calibration_rx: flume::Receiver<CorrectionRequest>,
         pipeline_config_rx: flume::Receiver<PipelineConfigRequest>,
         app_handle: tauri::AppHandle,
@@ -142,11 +141,12 @@ impl Processor {
 
                     match event {
                         PipelineEvent::Packet(data) => {
-                            if let Some(response_data) = pipeline.process_packet(&data) {
+                            if let Some(frame) = pipeline.process_packet(&data) {
+                                let response_data = OutputBuilder::build(&frame);
                                 if let Err(e) = downstream_tx.send(response_data) {
                                     tracing::error!("下游发送数据时失败: {:?}", e);
                                 }
-                                if let Err(e) = record_tx.send(response_data) {
+                                if let Err(e) = record_tx.send(frame) {
                                     tracing::error!("记录数据失败: {:?}", e);
                                 }
                             }
