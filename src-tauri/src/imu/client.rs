@@ -15,8 +15,7 @@ use tauri::async_runtime::JoinHandle;
 use tokio::sync::OnceCell;
 
 use crate::{
-    debug_monitor::DEBUG_MONITOR_TARGET, imu::config::IMUConfig, processor::RawImuData,
-    types::bluetooth::PeripheralInfo,
+    imu::config::IMUConfig, processor::RawImuData, types::bluetooth::PeripheralInfo,
 };
 
 struct NeededCharacteristics {
@@ -199,9 +198,7 @@ impl IMUClient {
             let mut last_report = Instant::now();
             while let Some(data) = notification_stream.next().await {
                 match tx.send_async(RawImuData::Packet(data.value)).await {
-                    Ok(_) => {
-                        tracing::trace!(target: DEBUG_MONITOR_TARGET, metric = "input");
-                    }
+                    Ok(_) => {}
                     // 当且仅当所有Receiver被drop时返回error
                     Err(e) => {
                         tracing::error!("下游通道已关闭, 停止接收IMU数据: {}", e);

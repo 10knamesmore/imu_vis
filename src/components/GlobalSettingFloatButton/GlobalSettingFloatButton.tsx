@@ -335,7 +335,7 @@ export const GlobalSettingFloatButton = ({ onClick, visible }: Props) => {
   }, [buttonDragging, buttonHiddenEdge, buttonPeekVisible, buttonReady]);
 
   /**
-   * 无设备且非开发者模式时，不渲染设置按钮。
+   * 不可见时不渲染设置按钮。
    */
   if (!visible) {
     return null;

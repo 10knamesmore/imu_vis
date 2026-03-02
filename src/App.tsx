@@ -1,13 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Layout, Modal, Tabs } from 'antd';
+import { Layout, Modal } from 'antd';
 
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { GlobalSettingFloatButton } from './components/GlobalSettingFloatButton';
 import { CalibrationWizard } from './components/CalibrationWizard';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
-import { DebugPanel } from "./pages/DebugPanel";
 import { useBluetooth } from './hooks/useBluetooth';
-import { useDeveloperMode } from './hooks/useDeveloperMode';
 import { AppProviders } from './providers';
 
 import styles from "./App.module.scss";
@@ -20,14 +18,10 @@ const { Content } = Layout;
 const AppContent = () => {
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  /** 当前主内容 tab key。 */
-  const [activeTabKey, setActiveTabKey] = useState("realtime");
   const { connectedDevice, startScan, stopScan, needsCalibration } = useBluetooth();
-  const { isDeveloperMode } = useDeveloperMode();
-
 
   const hasConnectedDevice = connectedDevice !== null;
-  const showSettingsButton = hasConnectedDevice || isDeveloperMode;
+  const showSettingsButton = hasConnectedDevice;
   const [wasConnected, setWasConnected] = useState(hasConnectedDevice);
 
 
@@ -59,38 +53,6 @@ const AppContent = () => {
     setWasConnected(hasConnectedDevice);
   }, [hasConnectedDevice, isDeviceModalOpen, wasConnected]);
 
-  /**
-   * 非开发者模式下强制回到实时页签，避免隐藏 tab 后 key 残留。
-   */
-  useEffect(() => {
-    if (!isDeveloperMode && activeTabKey !== "realtime") {
-      setActiveTabKey("realtime");
-    }
-  }, [isDeveloperMode, activeTabKey]);
-
-  const mainTabs = [
-    {
-      key: "realtime",
-      label: "实时面板",
-      children: (
-        <div className={styles.tabPane}>
-          <ImuRealtimePanel
-            onOpenDeviceModal={handleDeviceModalOpen}
-          />
-        </div>
-      ),
-    },
-    {
-      key: "debug",
-      label: "Debug",
-      children: (
-        <div className={styles.tabPane}>
-          <DebugPanel />
-        </div>
-      ),
-    },
-  ]
-
   // 首次连接未标定设备时全页替换为标定向导
   if (needsCalibration && connectedDevice) {
     return (
@@ -103,18 +65,9 @@ const AppContent = () => {
   return (
     <Layout className={styles.appLayout}>
       <Content className={styles.appContent}>
-        {isDeveloperMode ? (
-          <Tabs
-            className={styles.appTabs}
-            activeKey={activeTabKey}
-            onChange={setActiveTabKey}
-            items={mainTabs}
-          />
-        ) : (
-          <ImuRealtimePanel
-            onOpenDeviceModal={handleDeviceModalOpen}
-          />
-        )}
+        <ImuRealtimePanel
+          onOpenDeviceModal={handleDeviceModalOpen}
+        />
         <GlobalSettingFloatButton
           onClick={handleSettingsModalOpen}
           visible={showSettingsButton}

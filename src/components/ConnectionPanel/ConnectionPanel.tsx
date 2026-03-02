@@ -4,7 +4,6 @@ import { ReloadOutlined, PoweroffOutlined, CheckCircleOutlined, SignalFilled } f
 import Text from "antd/es/typography/Text";
 
 import { useBluetooth } from '../../hooks/useBluetooth';
-import { useDeveloperMode } from '../../hooks/useDeveloperMode';
 import { ProcessorPipelineConfig } from '../../types';
 
 import styles from "./ConnectionPanel.module.scss";
@@ -194,42 +193,12 @@ export const SettingsPanel = () => {
     savePipelineConfig,
     setNeedsCalibration,
   } = useBluetooth();
-  const { isDeveloperMode, enableDeveloperMode, disableDeveloperMode } = useDeveloperMode();
   const [loadingConfig, setLoadingConfig] = useState(false);
   const [savingConfig, setSavingConfig] = useState(false);
   const autoApplyTimerRef = useRef<number | undefined>(undefined);
   const latestFullConfigRef = useRef<ProcessorPipelineConfig | null>(null);
   const integrator = Form.useWatch(['trajectory', 'integrator'], form);
   const zuptImplType = Form.useWatch(['zupt', 'impl_type'], form);
-
-  /**
-   * 切换开发者模式开关。
-   * @param checked - 目标开关状态，true 表示开启，false 表示关闭。
-   */
-  const handleDeveloperModeChange = (checked: boolean) => {
-    if (checked) {
-      enableDeveloperMode();
-      message.success('开发者模式已开启');
-      return;
-    }
-    disableDeveloperMode();
-    message.info('开发者模式已关闭');
-  };
-
-  /** 渲染开发者模式开关区域。 */
-  const renderDeveloperModeControl = () => (
-    isDeveloperMode &&
-    <div className={styles.developerModeBar}>
-      <Tag color={isDeveloperMode ? 'geekblue' : 'default'}>开发者模式</Tag>
-      <Switch
-        size="small"
-        checked={isDeveloperMode}
-        onChange={handleDeveloperModeChange}
-        checkedChildren="开"
-        unCheckedChildren="关"
-      />
-    </div>
-  );
 
   useEffect(() => {
     const loadConfig = async () => {
@@ -296,7 +265,6 @@ export const SettingsPanel = () => {
   if (!connectedDevice) {
     return (
       <div className={`${styles.connectionPanel} ${styles.settingsPanel}`}>
-        {renderDeveloperModeControl()}
         <Empty description="请先在“设备”面板连接设备后再配置参数" />
       </div>
     );
@@ -307,7 +275,6 @@ export const SettingsPanel = () => {
       <div className={styles.configHeader}>
         <Text strong>流水线 配置</Text>
         <Space wrap>
-          {renderDeveloperModeControl()}
           <Button
             type="primary"
             block

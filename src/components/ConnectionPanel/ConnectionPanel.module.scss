@@ -36,12 +36,6 @@
     margin-bottom: 12px;
   }
 
-  .developerModeBar {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-  }
-
   .sectionCard {
     border-radius: 10px;
   }
@@ -141,10 +135,6 @@
 
   .configHeader {
     margin-bottom: 8px;
-  }
-
-  .developerModeBar {
-    margin-right: 8px;
   }
 
   :global(.ant-card-head) {

@@ -5,8 +5,6 @@ import {
   ResponseData,
   RecordingMeta,
   RecordingStatus,
-  DebugRealtimeFrame,
-  DebugMonitorTick,
   DeviceCalibrationData,
 } from "../types";
 
@@ -48,12 +46,6 @@ export const imuApi = {
   // onEvent: Tauri Channel，用于接收实时数据流
   subscribeOutput: (onEvent: Channel<ResponseData>) =>
     invoke("subscribe_output", { onEvent }),
-  // 订阅 Debug 实时流（阶段对比）
-  subscribeDebugRealtime: (onEvent: Channel<DebugRealtimeFrame>) =>
-    invoke("subscribe_debug_realtime", { onEvent }),
-  // 订阅 Debug 监控流（1 秒指标）
-  subscribeDebugMonitor: (onEvent: Channel<DebugMonitorTick>) =>
-    invoke("subscribe_debug_monitor", { onEvent }),
 
   // 开始录制数据
   startRecording: (options?: { name?: string; tags?: string[] }) =>

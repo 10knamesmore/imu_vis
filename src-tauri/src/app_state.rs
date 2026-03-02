@@ -4,7 +4,6 @@ use flume::Receiver;
 use tokio::sync::{oneshot, Mutex, MutexGuard};
 
 use crate::{
-    debug_monitor,
     imu::IMUClient,
     processor::{
         calibration::CorrectionRequest,
@@ -12,10 +11,7 @@ use crate::{
         Processor,
     },
     recorder::{spawn_recorder, RecorderCommand},
-    types::{
-        debug::{DebugMonitorTick, DebugRealtimeFrame},
-        outputs::ResponseData,
-    },
+    types::outputs::ResponseData,
 };
 
 /// 姿态零位校准请求通道句柄。
@@ -107,12 +103,6 @@ pub struct AppState {
     /// 下游订阅通道。
     pub downstream_rx: Receiver<ResponseData>,
 
-    /// Debug 实时流订阅通道。
-    pub debug_realtime_rx: Receiver<DebugRealtimeFrame>,
-
-    /// Debug 监控流订阅通道。
-    pub debug_monitor_rx: Receiver<DebugMonitorTick>,
-
     /// 录制控制通道。
     pub recorder_tx: flume::Sender<RecorderCommand>,
 
@@ -133,11 +123,8 @@ impl AppState {
         let (upstream_tx, upstream_rx) = flume::bounded(256);
         let (downstream_tx, downstream_rx) = flume::bounded(256);
         let (record_tx, record_rx) = flume::bounded(2048);
-        let (debug_realtime_tx, debug_realtime_rx) = flume::bounded(2048);
-        let (debug_monitor_tx, debug_monitor_rx) = flume::unbounded();
         let (recorder_tx, recorder_rx) = flume::unbounded();
         spawn_recorder(record_rx, recorder_rx);
-        debug_monitor::install_monitor_sender(debug_monitor_tx);
         let (calibration_handle, calibration_rx) = CalibrationHandle::new();
         let (pipeline_config_handle, pipeline_config_rx) = PipelineConfigHandle::new();
         AppState {
@@ -146,14 +133,11 @@ impl AppState {
                 upstream_rx,
                 downstream_tx,
                 record_tx,
-                debug_realtime_tx,
                 calibration_rx,
                 pipeline_config_rx,
                 app_handle,
             ),
             downstream_rx,
-            debug_realtime_rx,
-            debug_monitor_rx,
             recorder_tx,
             calibration_handle,
             pipeline_config_handle,

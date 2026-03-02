@@ -1,16 +1,12 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Button, Modal, Tag, Tooltip, message } from "antd";
+import React, { useState } from "react";
+import { Button, Modal, Tag, Tooltip } from "antd";
 import { ApiOutlined, MoonOutlined, ReloadOutlined, SearchOutlined, SunOutlined } from "@ant-design/icons";
 
 import { RecordingsPanel } from "../RecordingsPanel";
 import type { RecordingStatus } from "../../types";
-import { useDeveloperMode } from "../../hooks/useDeveloperMode";
 import { useColorScheme } from "../../hooks/useColorScheme";
 
 import styles from "./ImuToolBar.module.scss";
-
-const DEV_MODE_TAP_COUNT = 5;
-const DEV_MODE_TAP_TIMEOUT_MS = 1200;
 
 type ImuToolBarProps = {
   /** 点击“设备”按钮时的回调。 */
@@ -47,52 +43,8 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
   onExitReplay,
   onToggleRecording,
 }) => {
-  const { isDeveloperMode, enableDeveloperMode } = useDeveloperMode();
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [recordingsOpen, setRecordingsOpen] = useState(false);
-  /** 录制状态连击计数器。 */
-  const recordingStatusTapCountRef = useRef(0);
-  /** 连击计数重置定时器。 */
-  const tapResetTimerRef = useRef<number | null>(null);
-
-  /**
-   * 清理连击重置定时器。
-   */
-  const clearTapResetTimer = () => {
-    if (tapResetTimerRef.current !== null) {
-      window.clearTimeout(tapResetTimerRef.current);
-      tapResetTimerRef.current = null;
-    }
-  };
-
-  /**
-   * 处理“录制状态”点击，连续点击 5 次进入开发者模式。
-   */
-  const handleRecordingStatusTap = () => {
-    if (isDeveloperMode) return;
-    recordingStatusTapCountRef.current += 1;
-    clearTapResetTimer();
-    tapResetTimerRef.current = window.setTimeout(() => {
-      recordingStatusTapCountRef.current = 0;
-      tapResetTimerRef.current = null;
-    }, DEV_MODE_TAP_TIMEOUT_MS);
-
-    if (recordingStatusTapCountRef.current >= DEV_MODE_TAP_COUNT) {
-      clearTapResetTimer();
-      recordingStatusTapCountRef.current = 0;
-      enableDeveloperMode();
-      message.success("开发者模式已开启");
-    }
-  };
-
-  /**
-   * 组件卸载时清理定时器，避免泄漏。
-   */
-  useEffect(() => {
-    return () => {
-      clearTapResetTimer();
-    };
-  }, []);
 
   return (
     <>
@@ -109,7 +61,6 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
           <Tag color={replaying ? "orange" : "default"}>
             {replaying ? "回放模式" : "实时模式"}
           </Tag>
-          {isDeveloperMode && <Tag color="geekblue">开发者模式</Tag>}
         </div>
         <div className={styles.imuControls}>
           <div className={styles.imuControl}>
@@ -126,7 +77,6 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
             <Tag
               color={recording ? "red" : "default"}
               className={styles.recordingStatusTag}
-              onClick={handleRecordingStatusTap}
             >
               {recording ? `录制中: ${recordingStatus?.session_id ?? "-"}` : "录制: 关闭"}
             </Tag>
