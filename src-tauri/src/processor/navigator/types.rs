@@ -93,15 +93,15 @@ impl Default for ZuptConfig {
             impl_type: ZuptImpl::default(),
             gyro_thresh: 0.1,
             accel_thresh: 0.2,
-            gyro_enter_thresh: 0.12,
-            accel_enter_thresh: 0.18,
+            gyro_enter_thresh: 0.15,
+            accel_enter_thresh: 0.22,
             gyro_exit_thresh: 0.2,
             accel_exit_thresh: 0.3,
-            enter_frames: 6,
+            enter_frames: 3,
             exit_frames: 3,
-            vel_decay_tau_ms: 120.0,
-            pos_lock_tau_ms: 180.0,
-            vel_zero_eps: 0.02,
+            vel_decay_tau_ms: 70.0,
+            pos_lock_tau_ms: 110.0,
+            vel_zero_eps: 0.03,
         }
     }
 }
