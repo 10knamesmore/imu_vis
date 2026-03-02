@@ -145,19 +145,34 @@ impl Navigator {
                 self.nav_state.position += (v_prev + v_next) * (0.5 * dt);
             }
             IntegratorImpl::Rk4 => {
-                // 离散两点近似下的 RK4（a_k 与 a_{k+1}）：
-                // k1=a_k, k2=(a_k+a_{k+1})/2, k3=(a_k+a_{k+1})/2, k4=a_{k+1}
-                // v_{k+1}=v_k + (k1+2k2+2k3+k4)/6 * dt
+                // 对状态 x=[p,v] 做 RK4：
+                //   dp/dt = v
+                //   dv/dt = a(t)
+                // 其中 a(t) 由 a_prev -> a_lin 做线性插值，避免退化为仅对 v 的梯形更新。
                 let v_prev = self.nav_state.velocity;
                 let a_prev = self.last_accel_lin.unwrap_or(a_lin);
-                let k1 = a_prev;
-                let mid = (a_prev + a_lin) * 0.5;
-                let k2 = mid;
-                let k3 = mid;
-                let k4 = a_lin;
-                let v_next = v_prev + (k1 + k2 * 2.0 + k3 * 2.0 + k4) * (dt / 6.0);
-                self.nav_state.velocity = v_next;
-                self.nav_state.position += (v_prev + v_next) * (0.5 * dt);
+                let accel_at = |alpha: f64| a_prev + (a_lin - a_prev) * alpha;
+
+                let p0 = self.nav_state.position;
+                let v0 = v_prev;
+
+                let k1_p = v0;
+                let k1_v = accel_at(0.0);
+
+                let v2 = v0 + k1_v * (0.5 * dt);
+                let k2_p = v2;
+                let k2_v = accel_at(0.5);
+
+                let v3 = v0 + k2_v * (0.5 * dt);
+                let k3_p = v3;
+                let k3_v = accel_at(0.5);
+
+                let v4 = v0 + k3_v * dt;
+                let k4_p = v4;
+                let k4_v = accel_at(1.0);
+
+                self.nav_state.position = p0 + (k1_p + k2_p * 2.0 + k3_p * 2.0 + k4_p) * (dt / 6.0);
+                self.nav_state.velocity = v0 + (k1_v + k2_v * 2.0 + k3_v * 2.0 + k4_v) * (dt / 6.0);
             }
         }
         self.last_accel_lin = Some(a_lin);
@@ -327,7 +342,10 @@ mod tests {
 
     use crate::processor::{
         filter::ImuSampleFiltered,
-        navigator::{types::ZuptImpl, Navigator, NavigatorConfig, TrajectoryConfig, ZuptConfig},
+        navigator::{
+            types::{IntegratorImpl, ZuptImpl},
+            Navigator, NavigatorConfig, TrajectoryConfig, ZuptConfig,
+        },
     };
 
     #[test]
@@ -479,5 +497,63 @@ mod tests {
 
         assert!(nav.velocity.length() < 1e-12);
         assert!(nav.position.length() < 1e-12);
+    }
+
+    #[test]
+    fn rk4_position_differs_from_trapezoid_under_varying_accel() {
+        let gravity = 9.80665;
+        let mut nav_trapezoid = Navigator::new(NavigatorConfig {
+            gravity,
+            trajectory: TrajectoryConfig {
+                passby: false,
+                dt_min_ms: 1000,
+                dt_max_ms: 1000,
+                integrator: IntegratorImpl::Trapezoid,
+            },
+            zupt: ZuptConfig {
+                passby: true,
+                ..ZuptConfig::default()
+            },
+        });
+        let mut nav_rk4 = Navigator::new(NavigatorConfig {
+            gravity,
+            trajectory: TrajectoryConfig {
+                passby: false,
+                dt_min_ms: 1000,
+                dt_max_ms: 1000,
+                integrator: IntegratorImpl::Rk4,
+            },
+            zupt: ZuptConfig {
+                passby: true,
+                ..ZuptConfig::default()
+            },
+        });
+
+        let attitude = DQuat::IDENTITY;
+        // 第 1 帧: a=0；第 2 帧: a=1m/s²（世界系 z 轴），构造变加速度步进。
+        let s0 = ImuSampleFiltered {
+            timestamp_ms: 0,
+            accel_lp: DVec3::new(0.0, 0.0, gravity),
+            gyro_lp: DVec3::ZERO,
+        };
+        let s1 = ImuSampleFiltered {
+            timestamp_ms: 1000,
+            accel_lp: DVec3::new(0.0, 0.0, gravity + 1.0),
+            gyro_lp: DVec3::ZERO,
+        };
+
+        let _ = nav_trapezoid.update(attitude, &s0);
+        let _ = nav_rk4.update(attitude, &s0);
+
+        let out_trapezoid = nav_trapezoid.update(attitude, &s1);
+        let out_rk4 = nav_rk4.update(attitude, &s1);
+
+        // 两者速度相同（线性插值加速度下都为 0.5 m/s），位置应不同：
+        // 梯形: 0.25m，RK4: 1/6m。
+        assert!((out_trapezoid.velocity.z - 0.5).abs() < 1e-12);
+        assert!((out_rk4.velocity.z - 0.5).abs() < 1e-12);
+        assert!((out_trapezoid.position.z - 0.25).abs() < 1e-12);
+        assert!((out_rk4.position.z - (1.0 / 6.0)).abs() < 1e-12);
+        assert!((out_trapezoid.position.z - out_rk4.position.z).abs() > 1e-6);
     }
 }
