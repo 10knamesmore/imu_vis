@@ -5,6 +5,6 @@ pub mod models;
 mod service;
 
 pub use service::{
-    get_recording_samples, list_recordings, spawn_recorder, start_recording, stop_recording,
-    update_recording_meta, RecorderCommand, RecordingStartInput,
+    export_session_csv, get_recording_samples, list_recordings, spawn_recorder, start_recording,
+    stop_recording, update_recording_meta, RecorderCommand, RecordingStartInput,
 };

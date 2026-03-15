@@ -17,6 +17,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 anyhow              = "1.0"
+chrono              = "0.4"
 axum                = { version = "0.8",  features = ["ws"] }
 bitflags            = "2.9"
 btleplug            = "0.11"

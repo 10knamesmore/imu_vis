@@ -377,6 +377,59 @@ pub async fn get_recording_samples(session_id: i64) -> anyhow::Result<Vec<Respon
     Ok(data)
 }
 
+/// 将指定会话的样本导出为 CSV 文件，返回导出的文件路径。
+pub async fn export_session_csv(session_id: i64) -> anyhow::Result<std::path::PathBuf> {
+    use std::fmt::Write as FmtWrite;
+
+    let db_path = db::recording_db_path()?;
+    let db = db::connect(&db_path).await?;
+    db::ensure_schema(&db).await?;
+
+    let samples = models::imu_samples::Entity::find()
+        .filter(models::imu_samples::Column::SessionId.eq(session_id))
+        .order_by_asc(models::imu_samples::Column::TimestampMs)
+        .all(&db)
+        .await
+        .context("query recording samples")?;
+
+    let export_dir = db_path
+        .parent()
+        .context("db path has no parent")?
+        .join("exports");
+    std::fs::create_dir_all(&export_dir).context("create exports directory")?;
+
+    let now = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let file_path = export_dir.join(format!("imu_{now}.csv"));
+
+    let mut csv = String::new();
+    writeln!(
+        csv,
+        "timestamp_ms,calc_position_x,calc_position_y,calc_position_z,\
+         calc_velocity_x,calc_velocity_y,calc_velocity_z,\
+         calc_attitude_w,calc_attitude_x,calc_attitude_y,calc_attitude_z"
+    )?;
+    for s in samples {
+        writeln!(
+            csv,
+            "{},{},{},{},{},{},{},{},{},{},{}",
+            s.timestamp_ms,
+            s.calc_position_x,
+            s.calc_position_y,
+            s.calc_position_z,
+            s.calc_velocity_x,
+            s.calc_velocity_y,
+            s.calc_velocity_z,
+            s.calc_attitude_w,
+            s.calc_attitude_x,
+            s.calc_attitude_y,
+            s.calc_attitude_z,
+        )?;
+    }
+
+    std::fs::write(&file_path, csv).context("write csv file")?;
+    Ok(file_path)
+}
+
 fn parse_tags(tags_json: Option<String>) -> Vec<String> {
     tags_json
         .and_then(|raw| serde_json::from_str::<Vec<String>>(&raw).ok())

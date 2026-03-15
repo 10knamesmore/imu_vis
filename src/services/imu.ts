@@ -78,4 +78,8 @@ export const imuApi = {
   // 查询设备历史标定数据
   getDeviceCalibration: (deviceId: string) =>
     invoke<imuApiResponse<DeviceCalibrationData | null>>("get_device_calibration", { deviceId }),
+
+  // 将指定会话导出为 CSV，返回导出文件的绝对路径
+  exportSessionCsv: (sessionId: number) =>
+    invoke<imuApiResponse<string>>("export_session_csv", { sessionId }),
 };

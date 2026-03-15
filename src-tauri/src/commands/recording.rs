@@ -4,6 +4,7 @@ use crate::{
     app_state::AppState,
     commands::response::Response as IpcResponse,
     recorder::{
+        export_session_csv as export_session_csv_service,
         get_recording_samples as get_recording_samples_service,
         list_recordings as list_recordings_service, start_recording as start_recording_service,
         stop_recording as stop_recording_service,
@@ -83,6 +84,19 @@ pub async fn update_recording_meta(
 ) -> Response<RecordingMeta> {
     let result: anyhow::Result<RecordingMeta> =
         update_recording_meta_service(session_id, name, tags).await;
+
+    Ok(result.into())
+}
+
+#[tauri::command]
+#[tracing::instrument(level = "debug")]
+/// 将指定会话导出为 CSV，返回导出文件的绝对路径。
+pub async fn export_session_csv(session_id: i64) -> Response<String> {
+    let result: anyhow::Result<String> = async {
+        let path = export_session_csv_service(session_id).await?;
+        Ok(path.to_string_lossy().to_string())
+    }
+    .await;
 
     Ok(result.into())
 }

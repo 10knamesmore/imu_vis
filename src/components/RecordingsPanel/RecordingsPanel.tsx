@@ -1,8 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Button, Input, Select, Space, Table, Tooltip } from 'antd';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Button, Input, message, Select, Space, Table, Tooltip } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 
 import { useBluetooth } from '../../hooks/useBluetooth';
+import { imuApi } from '../../services/imu';
 import { RecordingMeta } from '../../types';
 
 import styles from "./RecordingsPanel.module.scss";
@@ -31,6 +33,35 @@ export const RecordingsPanel = () => {
   } = useBluetooth();
 
   const [edits, setEdits] = useState<Record<number, EditState>>({});
+  const [exporting, setExporting] = useState<number | null>(null);
+
+  const handleExport = useCallback(async (sessionId: number) => {
+    setExporting(sessionId);
+    try {
+      const resp = await imuApi.exportSessionCsv(sessionId);
+      if (resp.success && resp.data) {
+        message.success(
+          <span>
+            已导出到 <code>{resp.data}</code>
+            <Button
+              type="link"
+              size="small"
+              onClick={() => revealItemInDir(resp.data!)}
+            >
+              打开文件夹
+            </Button>
+          </span>,
+          8,
+        );
+      } else {
+        message.error(`导出失败：${resp.message ?? '未知错误'}`);
+      }
+    } catch (e) {
+      message.error(`导出失败：${e}`);
+    } finally {
+      setExporting(null);
+    }
+  }, []);
 
   useEffect(() => {
     refreshRecordings();
@@ -119,11 +150,17 @@ export const RecordingsPanel = () => {
             >
               保存
             </Button>
+            <Button
+              loading={exporting === record.id}
+              onClick={() => handleExport(record.id)}
+            >
+              导出 CSV
+            </Button>
           </Space>
         ),
       },
     ],
-    [edits, loadRecording, updateRecordingMeta],
+    [edits, exporting, loadRecording, updateRecordingMeta, handleExport],
   );
 
 

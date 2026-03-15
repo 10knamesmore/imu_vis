@@ -1,0 +1,708 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IMU 轨迹准确性验证指南</title>
+  <style>
+    :root {
+      --bg: #f5f8fc;
+      --surface: #ffffff;
+      --line: #d7e3f2;
+      --text: #1b2533;
+      --muted: #5f7088;
+      --brand: #0f6ab7;
+      --code-bg: #0f1c2e;
+      --code-fg: #d9e9ff;
+      --shadow: 0 10px 28px rgba(16, 42, 78, 0.08);
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      color: var(--text);
+      font-family: "IBM Plex Sans", "Noto Sans SC", "Segoe UI", sans-serif;
+      line-height: 1.65;
+      background: radial-gradient(circle at 100% -5%, #dcedff 0%, var(--bg) 42%, #f9fbff 100%);
+    }
+
+    .page {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 16px 40px;
+      display: grid;
+      grid-template-columns: 1fr 270px;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero { padding: 20px; margin-bottom: 12px; }
+    .hero h1 { margin: 0 0 8px; font-size: 30px; line-height: 1.2; }
+    .meta { color: var(--muted); font-size: 14px; }
+
+    .content { padding: 18px 20px; }
+    .content h1, .content h2, .content h3, .content h4 { line-height: 1.3; margin: 1.1em 0 0.5em; }
+    .content p { margin: 0.55em 0; }
+    .content ul, .content ol { margin: 0.55em 0; padding-left: 1.2em; }
+    .content blockquote {
+      margin: 0.8em 0;
+      padding: 0.55em 0.9em;
+      border-left: 4px solid #8bb8e6;
+      background: #f3f8ff;
+      color: #344a63;
+      border-radius: 8px;
+    }
+
+    .content code {
+      font-family: "JetBrains Mono", "Fira Code", monospace;
+      background: #edf3fb;
+      border-radius: 6px;
+      padding: 0.1em 0.35em;
+      font-size: 0.9em;
+    }
+
+    .content .codehilite {
+      position: relative;
+      margin: 0.9em 0;
+      background: var(--code-bg);
+      color: var(--code-fg);
+      border: 1px solid #1f3655;
+      border-radius: 10px;
+      padding: 40px 12px 12px;
+      overflow: auto;
+    }
+
+    .content .codehilite pre {
+      margin: 0;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      overflow: visible;
+      color: inherit;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .content .codehilite code {
+      background: transparent;
+      padding: 0;
+      border-radius: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+
+    .code-copy-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      border: 1px solid #2b4a71;
+      background: #183252;
+      color: #d9e9ff;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+
+    .code-copy-btn:hover {
+      background: #255182;
+      color: #ffffff;
+    }
+
+    .code-copy-btn:active {
+      transform: translateY(1px);
+    }
+
+    .code-copy-btn.copied {
+      background: #1f6b4f;
+      border-color: #2a8663;
+      color: #e9fff4;
+    }
+
+    .code-copy-btn.failed {
+      background: #7a2c35;
+      border-color: #96404b;
+      color: #ffe9ec;
+    }
+
+    /* Injected from pygments HtmlFormatter */
+    pre { line-height: 125%; }
+td.linenos .normal { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+span.linenos { color: #6e7681; background-color: #0d1117; padding-left: 5px; padding-right: 5px; }
+td.linenos .special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+span.linenos.special { color: #e6edf3; background-color: #6e7681; padding-left: 5px; padding-right: 5px; }
+.codehilite .hll { background-color: #6e7681 }
+.codehilite { background: #0d1117; color: #E6EDF3 }
+.codehilite .c { color: #8B949E; font-style: italic } /* Comment */
+.codehilite .err { color: #F85149 } /* Error */
+.codehilite .esc { color: #E6EDF3 } /* Escape */
+.codehilite .g { color: #E6EDF3 } /* Generic */
+.codehilite .k { color: #FF7B72 } /* Keyword */
+.codehilite .l { color: #A5D6FF } /* Literal */
+.codehilite .n { color: #E6EDF3 } /* Name */
+.codehilite .o { color: #FF7B72; font-weight: bold } /* Operator */
+.codehilite .x { color: #E6EDF3 } /* Other */
+.codehilite .p { color: #E6EDF3 } /* Punctuation */
+.codehilite .ch { color: #8B949E; font-style: italic } /* Comment.Hashbang */
+.codehilite .cm { color: #8B949E; font-style: italic } /* Comment.Multiline */
+.codehilite .cp { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Preproc */
+.codehilite .cpf { color: #8B949E; font-style: italic } /* Comment.PreprocFile */
+.codehilite .c1 { color: #8B949E; font-style: italic } /* Comment.Single */
+.codehilite .cs { color: #8B949E; font-weight: bold; font-style: italic } /* Comment.Special */
+.codehilite .gd { color: #FFA198; background-color: #490202 } /* Generic.Deleted */
+.codehilite .ge { color: #E6EDF3; font-style: italic } /* Generic.Emph */
+.codehilite .ges { color: #E6EDF3; font-weight: bold; font-style: italic } /* Generic.EmphStrong */
+.codehilite .gr { color: #FFA198 } /* Generic.Error */
+.codehilite .gh { color: #79C0FF; font-weight: bold } /* Generic.Heading */
+.codehilite .gi { color: #56D364; background-color: #0F5323 } /* Generic.Inserted */
+.codehilite .go { color: #8B949E } /* Generic.Output */
+.codehilite .gp { color: #8B949E } /* Generic.Prompt */
+.codehilite .gs { color: #E6EDF3; font-weight: bold } /* Generic.Strong */
+.codehilite .gu { color: #79C0FF } /* Generic.Subheading */
+.codehilite .gt { color: #FF7B72 } /* Generic.Traceback */
+.codehilite .g-Underline { color: #E6EDF3; text-decoration: underline } /* Generic.Underline */
+.codehilite .kc { color: #79C0FF } /* Keyword.Constant */
+.codehilite .kd { color: #FF7B72 } /* Keyword.Declaration */
+.codehilite .kn { color: #FF7B72 } /* Keyword.Namespace */
+.codehilite .kp { color: #79C0FF } /* Keyword.Pseudo */
+.codehilite .kr { color: #FF7B72 } /* Keyword.Reserved */
+.codehilite .kt { color: #FF7B72 } /* Keyword.Type */
+.codehilite .ld { color: #79C0FF } /* Literal.Date */
+.codehilite .m { color: #A5D6FF } /* Literal.Number */
+.codehilite .s { color: #A5D6FF } /* Literal.String */
+.codehilite .na { color: #E6EDF3 } /* Name.Attribute */
+.codehilite .nb { color: #E6EDF3 } /* Name.Builtin */
+.codehilite .nc { color: #F0883E; font-weight: bold } /* Name.Class */
+.codehilite .no { color: #79C0FF; font-weight: bold } /* Name.Constant */
+.codehilite .nd { color: #D2A8FF; font-weight: bold } /* Name.Decorator */
+.codehilite .ni { color: #FFA657 } /* Name.Entity */
+.codehilite .ne { color: #F0883E; font-weight: bold } /* Name.Exception */
+.codehilite .nf { color: #D2A8FF; font-weight: bold } /* Name.Function */
+.codehilite .nl { color: #79C0FF; font-weight: bold } /* Name.Label */
+.codehilite .nn { color: #FF7B72 } /* Name.Namespace */
+.codehilite .nx { color: #E6EDF3 } /* Name.Other */
+.codehilite .py { color: #79C0FF } /* Name.Property */
+.codehilite .nt { color: #7EE787 } /* Name.Tag */
+.codehilite .nv { color: #79C0FF } /* Name.Variable */
+.codehilite .ow { color: #FF7B72; font-weight: bold } /* Operator.Word */
+.codehilite .pm { color: #E6EDF3 } /* Punctuation.Marker */
+.codehilite .w { color: #6E7681 } /* Text.Whitespace */
+.codehilite .mb { color: #A5D6FF } /* Literal.Number.Bin */
+.codehilite .mf { color: #A5D6FF } /* Literal.Number.Float */
+.codehilite .mh { color: #A5D6FF } /* Literal.Number.Hex */
+.codehilite .mi { color: #A5D6FF } /* Literal.Number.Integer */
+.codehilite .mo { color: #A5D6FF } /* Literal.Number.Oct */
+.codehilite .sa { color: #79C0FF } /* Literal.String.Affix */
+.codehilite .sb { color: #A5D6FF } /* Literal.String.Backtick */
+.codehilite .sc { color: #A5D6FF } /* Literal.String.Char */
+.codehilite .dl { color: #79C0FF } /* Literal.String.Delimiter */
+.codehilite .sd { color: #A5D6FF } /* Literal.String.Doc */
+.codehilite .s2 { color: #A5D6FF } /* Literal.String.Double */
+.codehilite .se { color: #79C0FF } /* Literal.String.Escape */
+.codehilite .sh { color: #79C0FF } /* Literal.String.Heredoc */
+.codehilite .si { color: #A5D6FF } /* Literal.String.Interpol */
+.codehilite .sx { color: #A5D6FF } /* Literal.String.Other */
+.codehilite .sr { color: #79C0FF } /* Literal.String.Regex */
+.codehilite .s1 { color: #A5D6FF } /* Literal.String.Single */
+.codehilite .ss { color: #A5D6FF } /* Literal.String.Symbol */
+.codehilite .bp { color: #E6EDF3 } /* Name.Builtin.Pseudo */
+.codehilite .fm { color: #D2A8FF; font-weight: bold } /* Name.Function.Magic */
+.codehilite .vc { color: #79C0FF } /* Name.Variable.Class */
+.codehilite .vg { color: #79C0FF } /* Name.Variable.Global */
+.codehilite .vi { color: #79C0FF } /* Name.Variable.Instance */
+.codehilite .vm { color: #79C0FF } /* Name.Variable.Magic */
+.codehilite .il { color: #A5D6FF } /* Literal.Number.Integer.Long */
+
+    .toc {
+      position: sticky;
+      top: 12px;
+      align-self: start;
+      padding: 12px;
+      max-height: calc(100vh - 24px);
+      overflow: auto;
+    }
+
+    .toc h2 { margin: 2px 0 8px; font-size: 15px; }
+    .toc ul { list-style: none; padding: 0; margin: 0; }
+    .toc li { margin: 4px 0; }
+    .toc a {
+      color: #2f4e73;
+      text-decoration: none;
+      font-size: 13px;
+      display: block;
+      padding: 3px 6px;
+      border-radius: 6px;
+    }
+    .toc a:hover { background: #edf5ff; }
+    .toc li.lv3 a { padding-left: 18px; font-size: 12px; }
+    .toc li.lv4 a { padding-left: 30px; font-size: 12px; }
+
+    .empty-toc {
+      color: var(--muted);
+      font-size: 12px;
+      padding: 6px;
+    }
+
+    @media (max-width: 980px) {
+      .page { grid-template-columns: 1fr; }
+      .toc { position: static; max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <main>
+      <section class="card hero">
+        <h1>IMU 轨迹准确性验证指南</h1>
+        <div class="meta">Updated at: 2026-03-10 11:53 UTC</div>
+      </section>
+      <article class="card content">
+        <h1 id="imu-轨迹准确性验证指南">IMU 轨迹准确性验证指南</h1>
+<p>本文档说明如何使用 IMU Vis 内置的 <strong>CSV 导出功能</strong>与配套的 <strong>Python 离线分析脚本</strong>，对 IMU 积分轨迹进行系统性准确性验证。</p>
+<hr />
+<h2 id="快速开始">快速开始</h2>
+<div class="codehilite"><pre><span></span><code>录制数据  →  导出 CSV  →  运行分析脚本  →  查看报告
+</code></pre></div>
+
+<hr />
+<h2 id="第一步导出录制数据">第一步：导出录制数据</h2>
+<h3 id="操作步骤">操作步骤</h3>
+<ol>
+<li>打开 IMU Vis，切换到<strong>录制面板</strong>（Recordings）。</li>
+<li>选择需要分析的会话，在<strong>操作列</strong>点击 <strong>「导出 CSV」</strong> 按钮。</li>
+<li>导出成功后，界面会弹出提示，显示文件路径，并附有 <strong>「打开文件夹」</strong> 快捷按钮。</li>
+</ol>
+<h3 id="导出文件位置">导出文件位置</h3>
+<p>CSV 文件自动保存到项目根目录下的 <code>exports/</code> 文件夹：</p>
+<div class="codehilite"><pre><span></span><code>imu_recordings.sqlite          ← 数据库（同级目录）
+exports/
+  imu_20260310_192503.csv      ← 按导出时间命名（UTC）
+  imu_20260310_201145.csv
+  ...
+</code></pre></div>
+
+<h3 id="csv-字段说明">CSV 字段说明</h3>
+<table>
+<thead>
+<tr>
+<th>字段</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>timestamp_ms</code></td>
+<td>int</td>
+<td>采样时间戳（Unix 毫秒）</td>
+</tr>
+<tr>
+<td><code>calc_position_x</code></td>
+<td>float</td>
+<td>积分位置 X（米）</td>
+</tr>
+<tr>
+<td><code>calc_position_y</code></td>
+<td>float</td>
+<td>积分位置 Y（米，竖直方向）</td>
+</tr>
+<tr>
+<td><code>calc_position_z</code></td>
+<td>float</td>
+<td>积分位置 Z（米）</td>
+</tr>
+<tr>
+<td><code>calc_velocity_x</code></td>
+<td>float</td>
+<td>积分速度 X（米/秒）</td>
+</tr>
+<tr>
+<td><code>calc_velocity_y</code></td>
+<td>float</td>
+<td>积分速度 Y（米/秒）</td>
+</tr>
+<tr>
+<td><code>calc_velocity_z</code></td>
+<td>float</td>
+<td>积分速度 Z（米/秒）</td>
+</tr>
+<tr>
+<td><code>calc_attitude_w</code></td>
+<td>float</td>
+<td>姿态四元数 w</td>
+</tr>
+<tr>
+<td><code>calc_attitude_x</code></td>
+<td>float</td>
+<td>姿态四元数 x</td>
+</tr>
+<tr>
+<td><code>calc_attitude_y</code></td>
+<td>float</td>
+<td>姿态四元数 y</td>
+</tr>
+<tr>
+<td><code>calc_attitude_z</code></td>
+<td>float</td>
+<td>姿态四元数 z</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><strong>坐标系</strong>：X/Z 构成水平面（俯视），Y 为竖直方向（向上为正）。</p>
+</blockquote>
+<hr />
+<h2 id="第二步运行分析脚本">第二步：运行分析脚本</h2>
+<h3 id="安装依赖">安装依赖</h3>
+<div class="codehilite"><pre><span></span><code>pip<span class="w"> </span>install<span class="w"> </span>numpy<span class="w"> </span>pandas<span class="w"> </span>matplotlib
+</code></pre></div>
+
+<h3 id="脚本位置">脚本位置</h3>
+<div class="codehilite"><pre><span></span><code>scripts/validate_trajectory.py
+</code></pre></div>
+
+<h3 id="用法一仅-imu-分析无视频真值">用法一：仅 IMU 分析（无视频真值）</h3>
+<p>适用于静置漂移、直线往返、矩形/圆形闭环等实验。</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/validate_trajectory.py<span class="w"> </span>--imu<span class="w"> </span>exports/imu_session_1.csv
+</code></pre></div>
+
+<p><strong>输出内容</strong>：</p>
+<ul>
+<li>控制台打印：样本数、时长、<strong>闭环误差</strong>（终点距起点距离）、<strong>漂移速率</strong>（cm/s）</li>
+<li>自动保存 <code>imu_trajectory.png</code>：XZ 俯视轨迹图 + 位移-时间曲线</li>
+</ul>
+<h3 id="用法二与视频真值对比">用法二：与视频真值对比</h3>
+<p>适用于羽毛球拍挥拍验证实验。</p>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/validate_trajectory.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--imu<span class="w"> </span>exports/imu_session_3.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--video<span class="w"> </span>video_tracker.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--plane<span class="w"> </span>xz
+</code></pre></div>
+
+<p><strong>参数说明</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>参数</th>
+<th>说明</th>
+<th>默认值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--imu</code></td>
+<td>IMU 导出 CSV 路径</td>
+<td>必填</td>
+</tr>
+<tr>
+<td><code>--video</code></td>
+<td>视频真值 CSV 路径</td>
+<td>无（仅 IMU 模式）</td>
+</tr>
+<tr>
+<td><code>--plane</code></td>
+<td>IMU 投影平面：<code>xz</code>（俯视）/ <code>xy</code>（正视）/ <code>yz</code>（侧视）</td>
+<td><code>xz</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>输出内容</strong>：</p>
+<ul>
+<li>控制台打印：RMSE、最大偏差、平均偏差（单位 cm）</li>
+<li>自动保存 <code>trajectory_comparison.png</code>：轨迹叠加图 + 逐帧误差曲线 + 误差摘要</li>
+</ul>
+<hr />
+<h2 id="验证实验操作手册">验证实验操作手册</h2>
+<h3 id="实验一静置漂移测试">实验一：静置漂移测试</h3>
+<p><strong>验证目标</strong>：测量 IMU 完全静止时的位置漂移速率。</p>
+<p><strong>操作步骤</strong>：</p>
+<ol>
+<li>IMU 固定在桌面，保持静置。</li>
+<li>在 IMU Vis 中开始录制，静置 <strong>60 秒</strong>后停止。</li>
+<li>导出 CSV，运行脚本：</li>
+</ol>
+<div class="codehilite"><pre><span></span><code>python<span class="w"> </span>scripts/validate_trajectory.py<span class="w"> </span>--imu<span class="w"> </span>exports/imu_session_1.csv
+</code></pre></div>
+
+<p><strong>关注指标</strong>：</p>
+<ul>
+<li>漂移速率 &lt; <strong>0.083 cm/s</strong>（即 60 s 漂移 &lt; 5 cm）</li>
+</ul>
+<hr />
+<h3 id="实验二直线往返测试">实验二：直线往返测试</h3>
+<p><strong>验证目标</strong>：验证直线位移测量精度和 ZUPT 效果。</p>
+<p><strong>操作步骤</strong>：</p>
+<ol>
+<li>在地面用卷尺标记 1 米的起点和终点。</li>
+<li>IMU 从起点出发，沿直线运动到终点后<strong>停顿 2 秒</strong>，再返回起点停顿。</li>
+<li>导出 CSV，运行脚本查看轨迹和闭环误差。</li>
+</ol>
+<p><strong>关注指标</strong>：</p>
+<ul>
+<li>峰值位移（脚本图表中曲线最高点）误差 &lt; <strong>10%</strong>（即 &gt; 0.9 m）</li>
+<li>闭环误差 &lt; <strong>5 cm</strong></li>
+</ul>
+<hr />
+<h3 id="实验三矩形轨迹闭环测试">实验三：矩形轨迹闭环测试</h3>
+<p><strong>验证目标</strong>：测试二维轨迹累积误差与形状保真度。</p>
+<p><strong>操作步骤</strong>：</p>
+<ol>
+<li>在地面贴胶带标记 <strong>1 m × 0.5 m</strong> 矩形。</li>
+<li>从某角落出发，沿矩形走一圈，每个角落<strong>短暂停顿</strong>（触发 ZUPT），回到起点停止。</li>
+<li>导出 CSV，运行脚本查看 XZ 俯视轨迹。</li>
+</ol>
+<p><strong>关注指标</strong>：</p>
+<ul>
+<li>闭环误差 &lt; <strong>10 cm</strong></li>
+<li>XZ 俯视轨迹形状可辨认为矩形</li>
+</ul>
+<hr />
+<h3 id="实验四圆形轨迹测试">实验四：圆形轨迹测试</h3>
+<p><strong>验证目标</strong>：测试曲线轨迹的形状保真度。</p>
+<p><strong>操作步骤</strong>：</p>
+<ol>
+<li>在地面标记直径 <strong>1 m</strong> 的圆（可用绳子和粉笔辅助）。</li>
+<li>从起点出发，沿圆形轨迹匀速走一圈，回到起点停止。</li>
+<li>导出 CSV，运行脚本查看俯视轨迹，目视判断是否呈圆形。</li>
+</ol>
+<p><strong>关注指标</strong>：</p>
+<ul>
+<li>闭环误差 &lt; <strong>10 cm</strong></li>
+<li>俯视轨迹近似圆形，无明显顺/逆时针系统性偏转</li>
+</ul>
+<hr />
+<h3 id="实验五羽毛球拍挥拍验证含视频真值">实验五：羽毛球拍挥拍验证（含视频真值）</h3>
+<p><strong>验证目标</strong>：将 IMU 轨迹与高速视频追踪结果定量对比。</p>
+<h4 id="51-录制准备">5.1 录制准备</h4>
+<ul>
+<li>手机固定在<strong>正前方</strong>，240 fps 慢动作模式。</li>
+<li>在拍柄末端贴一块<strong>彩色反光贴纸</strong>作为视觉标记。</li>
+<li>IMU 固定在反光贴纸旁边（偏移 &lt; 5 cm）。</li>
+</ul>
+<h4 id="52-时间同步">5.2 时间同步</h4>
+<p>录制开始时，将球拍在摄像机前<strong>用力顿击桌面一次</strong>，产生：</p>
+<ul>
+<li>视频中可见的冲击帧（标记视觉 t=0）</li>
+<li>IMU 数据中的加速度尖峰（标记 IMU t=0）</li>
+</ul>
+<p>分析时，手动裁剪两个 CSV，使起点均对齐到冲击事件后的第一帧。</p>
+<h4 id="53-用-tracker-软件获取视频真值">5.3 用 Tracker 软件获取视频真值</h4>
+<ol>
+<li><a href="https://physlets.org/tracker/">下载 Tracker</a>（免费，物理教育软件）。</li>
+<li>导入慢动作视频，用<strong>已知长度</strong>（球拍拍框长约 68 cm，或画面中的卷尺）设置参考尺度。</li>
+<li>在反光贴纸处逐帧手动点击追踪。</li>
+<li>导出表格（File → Export → Data File），包含 <code>frame</code>、<code>x</code>（m）、<code>y</code>（m）列。</li>
+</ol>
+<h4 id="54-转换-tracker-csv-格式">5.4 转换 Tracker CSV 格式</h4>
+<p>Tracker 导出格式为 <code>frame, x, y</code>，需转换为脚本所需的 <code>time_ms, x_m, y_m</code>：</p>
+<div class="codehilite"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">pandas</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">pd</span>
+
+<span class="n">FPS</span> <span class="o">=</span> <span class="mi">240</span>  <span class="c1"># 慢动作帧率</span>
+
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">read_csv</span><span class="p">(</span><span class="s1">&#39;tracker_raw.csv&#39;</span><span class="p">,</span> <span class="n">comment</span><span class="o">=</span><span class="s1">&#39;%&#39;</span><span class="p">,</span> <span class="n">skipinitialspace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">df</span><span class="o">.</span><span class="n">rename</span><span class="p">(</span><span class="n">columns</span><span class="o">=</span><span class="p">{</span><span class="s1">&#39;t&#39;</span><span class="p">:</span> <span class="s1">&#39;time_ms&#39;</span><span class="p">,</span> <span class="s1">&#39;x&#39;</span><span class="p">:</span> <span class="s1">&#39;x_m&#39;</span><span class="p">,</span> <span class="s1">&#39;y&#39;</span><span class="p">:</span> <span class="s1">&#39;y_m&#39;</span><span class="p">})</span>
+<span class="c1"># 若 Tracker 导出的是时间（秒），换算为毫秒：</span>
+<span class="n">df</span><span class="p">[</span><span class="s1">&#39;time_ms&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">df</span><span class="p">[</span><span class="s1">&#39;time_ms&#39;</span><span class="p">]</span> <span class="o">*</span> <span class="mi">1000</span><span class="p">)</span><span class="o">.</span><span class="n">round</span><span class="p">()</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+<span class="c1"># 若导出的是帧号，换算为毫秒：</span>
+<span class="c1"># df[&#39;time_ms&#39;] = (df[&#39;frame&#39;] / FPS * 1000).round().astype(int)</span>
+<span class="n">df</span><span class="p">[[</span><span class="s1">&#39;time_ms&#39;</span><span class="p">,</span> <span class="s1">&#39;x_m&#39;</span><span class="p">,</span> <span class="s1">&#39;y_m&#39;</span><span class="p">]]</span><span class="o">.</span><span class="n">to_csv</span><span class="p">(</span><span class="s1">&#39;video_tracker.csv&#39;</span><span class="p">,</span> <span class="n">index</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</code></pre></div>
+
+<h4>5.5 运行对比分析</h4>
+<div class="codehilite"><pre><span></span><code><span class="c1"># 正视图（手机正对球拍挥动平面）→ 用 xz 平面对应水平+垂直</span>
+python<span class="w"> </span>scripts/validate_trajectory.py<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--imu<span class="w"> </span>exports/imu_session_3.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--video<span class="w"> </span>video_tracker.csv<span class="w"> </span><span class="se">\</span>
+<span class="w">  </span>--plane<span class="w"> </span>xz
+</code></pre></div>
+
+<p><strong>关注指标</strong>：</p>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>验收标准</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>RMSE</td>
+<td>&lt; <strong>15 cm</strong></td>
+</tr>
+<tr>
+<td>最大偏差</td>
+<td>&lt; <strong>30 cm</strong></td>
+</tr>
+<tr>
+<td>闭环误差</td>
+<td>动作结束后 &lt; <strong>10 cm</strong></td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>视频真值 CSV 格式参考</h2>
+<p>脚本的 <code>--video</code> 参数要求 CSV 包含以下三列（列名严格匹配）：</p>
+<table>
+<thead>
+<tr>
+<th>列名</th>
+<th>类型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>time_ms</code></td>
+<td>int</td>
+<td>时间戳（毫秒），起点可为任意值</td>
+</tr>
+<tr>
+<td><code>x_m</code></td>
+<td>float</td>
+<td>水平位置（米）</td>
+</tr>
+<tr>
+<td><code>y_m</code></td>
+<td>float</td>
+<td>垂直位置（米）</td>
+</tr>
+</tbody>
+</table>
+<p>示例：</p>
+<div class="codehilite"><pre><span></span><code>time_ms,x_m,y_m
+0,0.000,0.000
+4,0.003,0.001
+8,0.011,0.004
+...
+</code></pre></div>
+
+<hr />
+<h2>常见问题</h2>
+<p><strong>Q：导出的 CSV 文件在哪里？</strong>
+A：在项目根目录的 <code>exports/</code> 文件夹，文件名为 <code>imu_session_&lt;ID&gt;.csv</code>。点击"导出 CSV"成功后的提示消息中也会显示完整路径，点击「打开文件夹」可直接定位。</p>
+<p><strong>Q：脚本报错"缺少列"怎么办？</strong>
+A：检查 CSV 的列名是否与脚本期望的列名一致（IMU CSV 由应用自动生成，格式固定；视频 CSV 需手动保证列名为 <code>time_ms, x_m, y_m</code>）。</p>
+<p><strong>Q：轨迹图显示后脚本卡住了？</strong>
+A：关闭 matplotlib 弹出的图表窗口即可继续。图片文件（<code>.png</code>）已在关闭前保存。</p>
+<p><strong>Q：闭环误差很大，是哪里出了问题？</strong>
+A：常见原因：ZUPT 阈值过高（静止时速度未归零）、加速度计标定偏差、行进过快导致重力补偿误差。可检查速度通道数据，观察静止段速度是否收敛到零附近。</p>
+      </article>
+    </main>
+    <aside class="card toc" aria-label="Table of contents">
+      <h2>Contents</h2>
+      <ul>
+<li class="lv2"><a href="#快速开始">快速开始</a></li>
+<li class="lv2"><a href="#第一步导出录制数据">第一步：导出录制数据</a></li>
+<li class="lv3"><a href="#操作步骤">操作步骤</a></li>
+<li class="lv3"><a href="#导出文件位置">导出文件位置</a></li>
+<li class="lv3"><a href="#csv-字段说明">CSV 字段说明</a></li>
+<li class="lv2"><a href="#第二步运行分析脚本">第二步：运行分析脚本</a></li>
+<li class="lv3"><a href="#安装依赖">安装依赖</a></li>
+<li class="lv3"><a href="#脚本位置">脚本位置</a></li>
+<li class="lv3"><a href="#用法一仅-imu-分析无视频真值">用法一：仅 IMU 分析（无视频真值）</a></li>
+<li class="lv3"><a href="#用法二与视频真值对比">用法二：与视频真值对比</a></li>
+<li class="lv2"><a href="#验证实验操作手册">验证实验操作手册</a></li>
+<li class="lv3"><a href="#实验一静置漂移测试">实验一：静置漂移测试</a></li>
+<li class="lv3"><a href="#实验二直线往返测试">实验二：直线往返测试</a></li>
+<li class="lv3"><a href="#实验三矩形轨迹闭环测试">实验三：矩形轨迹闭环测试</a></li>
+<li class="lv3"><a href="#实验四圆形轨迹测试">实验四：圆形轨迹测试</a></li>
+<li class="lv3"><a href="#实验五羽毛球拍挥拍验证含视频真值">实验五：羽毛球拍挥拍验证（含视频真值）</a></li>
+<li class="lv2"><a href="#视频真值-csv-格式参考">视频真值 CSV 格式参考</a></li>
+<li class="lv2"><a href="#常见问题">常见问题</a></li>
+</ul>
+    </aside>
+  </div>
+
+  <script>
+    (function () {
+      function fallbackCopy(text) {
+        var ta = document.createElement('textarea');
+        ta.value = text;
+        ta.setAttribute('readonly', '');
+        ta.style.position = 'fixed';
+        ta.style.top = '-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        var ok = false;
+        try {
+          ok = document.execCommand('copy');
+        } catch (e) {
+          ok = false;
+        }
+        document.body.removeChild(ta);
+        return ok;
+      }
+
+      function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+          return navigator.clipboard.writeText(text).then(function () {
+            return true;
+          }).catch(function () {
+            return fallbackCopy(text);
+          });
+        }
+        return Promise.resolve(fallbackCopy(text));
+      }
+
+      function setBtnState(btn, stateText, stateClass) {
+        var original = btn.getAttribute('data-original-text') || '复制';
+        btn.textContent = stateText;
+        btn.classList.remove('copied', 'failed');
+        if (stateClass) {
+          btn.classList.add(stateClass);
+        }
+        window.setTimeout(function () {
+          btn.textContent = original;
+          btn.classList.remove('copied', 'failed');
+        }, 1200);
+      }
+
+      function mountCopyButton(block) {
+        if (!block || block.getAttribute('data-copy-ready') === '1') {
+          return;
+        }
+        var pre = block.querySelector('pre');
+        if (!pre) {
+          return;
+        }
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'code-copy-btn';
+        btn.textContent = '复制';
+        btn.setAttribute('data-original-text', '复制');
+        btn.setAttribute('aria-label', '复制代码');
+
+        btn.addEventListener('click', function () {
+          var text = pre.innerText || pre.textContent || '';
+          text = text.replace(/\n$/, '');
+          copyText(text).then(function (ok) {
+            if (ok) {
+              setBtnState(btn, '已复制', 'copied');
+            } else {
+              setBtnState(btn, '复制失败', 'failed');
+            }
+          });
+        });
+
+        block.appendChild(btn);
+        block.setAttribute('data-copy-ready', '1');
+      }
+
+      document.addEventListener('DOMContentLoaded', function () {
+        var blocks = document.querySelectorAll('.content .codehilite');
+        for (var i = 0; i < blocks.length; i++) {
+          mountCopyButton(blocks[i]);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
