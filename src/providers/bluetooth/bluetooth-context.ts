@@ -66,6 +66,8 @@ export type BluetoothContextValue = {
   needsCalibration: boolean;
   /** 设置标定向导显示状态。 */
   setNeedsCalibration: (v: boolean) => void;
+  /** 删除指定录制会话及其所有样本。 */
+  deleteRecording: (sessionId: number) => Promise<void>;
 };
 
 export const BluetoothContext = createContext<BluetoothContextValue | null>(null);

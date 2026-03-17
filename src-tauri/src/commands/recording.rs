@@ -4,6 +4,7 @@ use crate::{
     app_state::AppState,
     commands::response::Response as IpcResponse,
     recorder::{
+        delete_recording as delete_recording_service,
         export_session_csv as export_session_csv_service,
         get_recording_samples as get_recording_samples_service,
         list_recordings as list_recordings_service, start_recording as start_recording_service,
@@ -98,6 +99,14 @@ pub async fn export_session_csv(session_id: i64) -> Response<String> {
     }
     .await;
 
+    Ok(result.into())
+}
+
+#[tauri::command]
+#[tracing::instrument(level = "debug")]
+/// 删除指定录制会话及其所有样本数据。
+pub async fn delete_recording(session_id: i64) -> Response<()> {
+    let result = delete_recording_service(session_id).await;
     Ok(result.into())
 }
 

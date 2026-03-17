@@ -26,6 +26,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         recording::update_recording_meta,
         recording::get_recording_samples,
         recording::export_session_csv,
+        recording::delete_recording,
         calibration::save_device_calibration,
         calibration::get_device_calibration
     ]

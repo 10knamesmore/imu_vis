@@ -82,4 +82,8 @@ export const imuApi = {
   // 将指定会话导出为 CSV，返回导出文件的绝对路径
   exportSessionCsv: (sessionId: number) =>
     invoke<imuApiResponse<string>>("export_session_csv", { sessionId }),
+
+  // 删除指定录制会话及其所有样本数据
+  deleteRecording: (sessionId: number) =>
+    invoke<imuApiResponse<void>>("delete_recording", { sessionId }),
 };

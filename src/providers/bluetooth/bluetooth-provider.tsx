@@ -387,6 +387,20 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     enterLiveMode(true);
   }, [enterLiveMode]);
 
+  // 删除录制会话
+  const deleteRecording = useCallback(async (sessionId: number) => {
+    try {
+      const res = await imuApi.deleteRecording(sessionId);
+      if (!res.success) throw new Error(res.message || '未知错误');
+      setRecordings((prev) => prev.filter((item) => item.id !== sessionId));
+      if (replaySessionId === sessionId) enterLiveMode(true);
+      message.success('录制已删除');
+    } catch (e) {
+      console.error(e);
+      message.error('删除录制失败');
+    }
+  }, [replaySessionId, enterLiveMode]);
+
   return {
     scanning,
     devices,
@@ -415,6 +429,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     savePipelineConfig,
     needsCalibration,
     setNeedsCalibration,
+    deleteRecording,
   };
 };
 

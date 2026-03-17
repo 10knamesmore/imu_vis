@@ -292,6 +292,27 @@ async fn insert_sample(session: &mut ActiveSession, frame: &OutputFrame) -> anyh
     Ok(())
 }
 
+/// 删除指定录制会话及其所有样本数据。
+pub async fn delete_recording(session_id: i64) -> anyhow::Result<()> {
+    let db_path = db::recording_db_path()?;
+    let db = db::connect(&db_path).await?;
+    db::ensure_schema(&db).await?;
+
+    // 先删子表（外键约束），再删主记录
+    models::imu_samples::Entity::delete_many()
+        .filter(models::imu_samples::Column::SessionId.eq(session_id))
+        .exec(&db)
+        .await
+        .context("delete imu samples")?;
+
+    models::recording_sessions::Entity::delete_by_id(session_id)
+        .exec(&db)
+        .await
+        .context("delete recording session")?;
+
+    Ok(())
+}
+
 /// 列出录制会话。
 pub async fn list_recordings() -> anyhow::Result<Vec<RecordingMeta>> {
     let db_path = db::recording_db_path()?;
