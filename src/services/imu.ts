@@ -86,4 +86,8 @@ export const imuApi = {
   // 删除指定录制会话及其所有样本数据
   deleteRecording: (sessionId: number) =>
     invoke<imuApiResponse<void>>("delete_recording", { sessionId }),
+
+  // 读取已连接设备的电量（0–100）
+  getBatteryLevel: () =>
+    invoke<imuApiResponse<number>>("get_battery_level"),
 };

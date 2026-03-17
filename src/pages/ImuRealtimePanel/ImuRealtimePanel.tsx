@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Card } from "antd";
+import { useCallback, useMemo, useState } from "react";
+import { App as AntdApp, Card } from "antd";
 
 import { useBluetooth } from "../../hooks/useBluetooth";
 import { useImuSource } from "../../hooks/useImuSource";
@@ -49,6 +49,7 @@ export const ImuRealtimePanel = ({
     restartReplay,
     exitReplay,
     toggleRecording,
+    batteryLevel,
   } = useBluetooth();
   /** 跟踪图表区域是否折叠。 */
   const [chartsCollapsed, setChartsCollapsed] = useState(false);
@@ -82,8 +83,13 @@ export const ImuRealtimePanel = ({
   }, [currentReplayMeta?.name, currentReplayMeta?.started_at_ms, replaySamples]);
   const sourceAvailable = useMemo(() => deviceConnected || hasReplayData, [deviceConnected, hasReplayData]);
 
+  const { message } = AntdApp.useApp();
   const { colorScheme } = useColorScheme();
   const C = CHART_COLORS[colorScheme];
+
+  const handleLargeDt = useCallback((dtMs: number) => {
+    message.warning(`BLE 丢包：数据中断 ${dtMs}ms，轨迹积分可能产生误差`, 4);
+  }, [message]);
 
   /** 切换图表区域折叠状态。 */
   const handleToggleChartsCollapsed = () => {
@@ -97,6 +103,7 @@ export const ImuRealtimePanel = ({
     replaying: hasReplayData,
     replaySamples,
     replaySessionId,
+    onLargeDt: handleLargeDt,
   });
 
   // Three 数据源：使用 replayVersion 触发重播。
@@ -214,6 +221,7 @@ export const ImuRealtimePanel = ({
             onRestartReplay={restartReplay}
             onExitReplay={exitReplay}
             onToggleRecording={toggleRecording}
+            batteryLevel={batteryLevel}
           />
         </Card>
       </div>

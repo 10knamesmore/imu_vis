@@ -68,6 +68,8 @@ export type BluetoothContextValue = {
   setNeedsCalibration: (v: boolean) => void;
   /** 删除指定录制会话及其所有样本。 */
   deleteRecording: (sessionId: number) => Promise<void>;
+  /** 设备电量（0–100），未连接或未知时为 null。 */
+  batteryLevel: number | null;
 };
 
 export const BluetoothContext = createContext<BluetoothContextValue | null>(null);

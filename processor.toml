@@ -1,65 +1,74 @@
-# ==========================================
-# IMU 数据处理流水线配置文件
-# ==========================================
-
-# --- 全局参数 ---
 [global]
-gravity = 9.848         # 当地重力加速度（m/s²）- 全局使用
+gravity = 9.848
 
-# --- 标定模块 ---
-# 作用：对原始 acc/gyro 数据进行零偏补偿和矩阵校正
-# 注意：accel_bias 和 accel_matrix 由标定向导写入 SQLite，连接设备时自动加载，无需在此手动配置。
 [calibration]
 passby = false
-accel_bias = { x = 0.0, y = 0.0, z = 0.0 }
-gyro_bias = { x = 0.0, y = 0.0, z = 0.0 }
 accel_matrix = [
-  [1.0, 0.0, 0.0],
-  [0.0, 1.0, 0.0],
-  [0.0, 0.0, 1.0],
+    [
+    1.001901595837556,
+    0.0,
+    0.0,
+],
+    [
+    0.0,
+    0.999519460725826,
+    0.0,
+],
+    [
+    0.0,
+    0.0,
+    1.0006785714285746,
+],
 ]
 gyro_matrix = [
-  [1.0, 0.0, 0.0],
-  [0.0, 1.0, 0.0],
-  [0.0, 0.0, 1.0],
+    [
+    1.0,
+    0.0,
+    0.0,
+],
+    [
+    0.0,
+    1.0,
+    0.0,
+],
+    [
+    0.0,
+    0.0,
+    1.0,
+],
 ]
 
-# --- 低通滤波模块 ---
-# 作用：平滑 acc/gyro 数据，降低高频噪声
+[calibration.accel_bias]
+x = 0.0023925781249696243
+y = -0.040075683593808975
+z = 0.038281249999969624
+
+[calibration.gyro_bias]
+x = 0.0
+y = 0.0
+z = 0.0
+
 [filter]
-passby = true           # true = 跳过滤波，直接使用标定后的数据
-                        # false = 应用低通滤波器
-alpha = 0.9             # 滤波系数（0~1），越大越平滑但延迟越高
+passby = true
+alpha = 0.9
 
-# 姿态直接使用 IMU 原始四元数（quat），不做额外估计。
-
-# --- 三维轨迹计算模块 ---
-# 作用：通过姿态和加速度积分计算世界坐标系中的三维运动轨迹
 [trajectory]
-passby = false          # true = 跳过轨迹计算，不进行位置推算
-                        # false = 启用轨迹计算（注意：长时间会漂移，需配合 ZUPT）
-integrator = "trapezoid" # legacy_euler | trapezoid
-                        # legacy_euler = 旧版一阶欧拉积分（用于对照）
-                        # trapezoid    = 梯形积分（推荐）
-dt_min_ms = 1            # 积分步长下限（ms），防止过小 dt 引发噪声放大
-dt_max_ms = 50           # 积分步长上限（ms），防止时间戳跳变导致积分发散
+passby = false
+integrator = "trapezoid"
+dt_min_ms = 1
+dt_max_ms = 50
 
-# --- 零速修正模块 (ZUPT) ---
-# 作用：检测静止状态并修正速度漂移
 [zupt]
-passby = false          # true = 跳过零速检测
-                        # false = 启用零速修正（适用于挥拍间歇等间歇运动）
-impl_type = "smooth_hysteresis" # legacy_hard_lock | smooth_hysteresis
-                                # legacy_hard_lock  = 旧版硬清零+硬锁定（用于对照）
-                                # smooth_hysteresis = 滞回检测+平滑收敛（推荐）
-gyro_thresh = 0.15      # 陀螺仪静止阈值（rad/s）- 稍放宽以适应握拍轻微晃动
-accel_thresh = 0.3      # 加速度静止阈值（m/s²）- 稍放宽以容忍小幅晃动
-gyro_enter_thresh = 0.15 # 进入静止阈值（角速度，rad/s）
-accel_enter_thresh = 0.22 # 进入静止阈值（线加速度，m/s²）
-gyro_exit_thresh = 0.2   # 退出静止阈值（角速度，rad/s）
-accel_exit_thresh = 0.3  # 退出静止阈值（线加速度，m/s²）
-enter_frames = 3         # 连续满足进入阈值多少帧后判定为静止
-exit_frames = 3          # 连续满足退出阈值多少帧后判定为运动
-vel_decay_tau_ms = 70.0  # 静止期速度衰减时间常数（ms），越小衰减越快
-pos_lock_tau_ms = 110.0  # 静止期位置锁定时间常数（ms），越小回锁越快
-vel_zero_eps = 0.03      # 速度归零阈值（m/s），低于该值直接置零
+passby = false
+impl_type = "smooth_hysteresis"
+gyro_thresh = 0.15
+accel_thresh = 0.6
+gyro_enter_thresh = 0.15
+accel_enter_thresh = 0.22
+gyro_exit_thresh = 0.2
+accel_exit_thresh = 0.3
+enter_frames = 3
+exit_frames = 3
+vel_decay_tau_ms = 35.0
+pos_lock_tau_ms = 110.0
+vel_zero_eps = 0.03

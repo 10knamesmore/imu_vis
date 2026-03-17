@@ -21,7 +21,7 @@ use crate::{
 struct NeededCharacteristics {
     write_char: Characteristic,
     notify_char: Characteristic,
-    _battery_char: Characteristic,
+    battery_char: Characteristic,
 }
 
 // ===============================
@@ -120,7 +120,7 @@ impl IMUClient {
         self.chars = Some(NeededCharacteristics {
             write_char,
             notify_char,
-            _battery_char: battery_char,
+            battery_char,
         });
 
         match self.init_peripheral().await {
@@ -347,6 +347,16 @@ impl IMUClient {
             .await
             .context("subscribe notification")?;
         Ok(())
+    }
+
+    /// 读取设备电量（0–100）。未连接时返回错误。
+    pub async fn get_battery_level(&self) -> anyhow::Result<u8> {
+        let (peripheral, chars) = self.assert_initialzation()?;
+        let data = peripheral
+            .read(&chars.battery_char)
+            .await
+            .context("读取电量特征")?;
+        data.first().copied().ok_or_else(|| anyhow!("电量数据为空"))
     }
 
     /// 尝试采用蓝牙高速通信特性

@@ -19,6 +19,7 @@ pub fn handlers() -> impl Fn(tauri::ipc::Invoke) -> bool + Send + Sync + 'static
         imu::get_pipeline_config,
         imu::update_pipeline_config,
         imu::save_pipeline_config,
+        imu::get_battery_level,
         output::subscribe_output,
         recording::start_recording,
         recording::stop_recording,

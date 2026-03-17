@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Button, Modal, Tag, Tooltip } from "antd";
-import { ApiOutlined, MoonOutlined, ReloadOutlined, SearchOutlined, SunOutlined } from "@ant-design/icons";
+import { ApiOutlined, MoonOutlined, ReloadOutlined, SearchOutlined, SunOutlined, ThunderboltOutlined } from "@ant-design/icons";
 
 import { RecordingsPanel } from "../RecordingsPanel";
 import type { RecordingStatus } from "../../types";
@@ -27,8 +27,10 @@ type ImuToolBarProps = {
   onRestartReplay: () => void;
   /** 点击“切到实时”时的回调。 */
   onExitReplay: () => void;
-  /** 点击“开始/停止录制”时的回调。 */
+  /** 点击”开始/停止录制”时的回调。 */
   onToggleRecording: () => void;
+  /** 设备电量（0–100），null 表示未知。 */
+  batteryLevel?: number | null;
 };
 
 export const ImuToolBar: React.FC<ImuToolBarProps> = ({
@@ -42,6 +44,7 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
   onRestartReplay,
   onExitReplay,
   onToggleRecording,
+  batteryLevel,
 }) => {
   const { colorScheme, toggleColorScheme } = useColorScheme();
   const [recordingsOpen, setRecordingsOpen] = useState(false);
@@ -61,6 +64,11 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
           <Tag color={replaying ? "orange" : "default"}>
             {replaying ? "回放模式" : "实时模式"}
           </Tag>
+          {connectedDevice && batteryLevel != null && (
+            <Tag icon={<ThunderboltOutlined />} color={batteryLevel < 20 ? "red" : "green"}>
+              {batteryLevel}%
+            </Tag>
+          )}
         </div>
         <div className={styles.imuControls}>
           <div className={styles.imuControl}>

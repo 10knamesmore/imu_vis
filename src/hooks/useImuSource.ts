@@ -30,6 +30,10 @@ type UseImuSourceOptions = {
   replaySessionId?: number | null;
   /** 回放版本号（变化时触发重新回放）。 */
   replayVersion?: number;
+  /** 帧间隔超过该值（ms）时触发回调，仅实时模式有效。默认 50ms。 */
+  largeDtThresholdMs?: number;
+  /** 检测到大 dt 时的回调，参数为实际间隔（ms）。 */
+  onLargeDt?: (dtMs: number) => void;
 };
 
 export const useImuSource = ({
@@ -39,6 +43,8 @@ export const useImuSource = ({
   replaySamples = null,
   replaySessionId = null,
   replayVersion = 0,
+  largeDtThresholdMs = 50,
+  onLargeDt,
 }: UseImuSourceOptions): ImuSource => {
   const bufferRef = useRef(new ImuHistoryBuffer(capacity));
   const latestRef = useRef<ResponseData | null>(null);
@@ -47,6 +53,8 @@ export const useImuSource = ({
   const activeRef = useRef(false);
   const replayRafRef = useRef<number | null>(null);
   const replayRunIdRef = useRef(0);
+  const prevLiveTsRef = useRef<number | null>(null);
+  const lastWarnTimeRef = useRef<number>(0);
 
   const cancelReplayFrame = useCallback(() => {
     if (replayRafRef.current !== null) {
@@ -75,6 +83,18 @@ export const useImuSource = ({
       if (!activeRef.current || sourceModeRef.current !== "live") {
         return;
       }
+      const prev = prevLiveTsRef.current;
+      if (prev !== null) {
+        const dt = msg.timestamp_ms - prev;
+        if (dt > largeDtThresholdMs && onLargeDt) {
+          const now = Date.now();
+          if (now - lastWarnTimeRef.current > 3000) {
+            lastWarnTimeRef.current = now;
+            onLargeDt(dt);
+          }
+        }
+      }
+      prevLiveTsRef.current = msg.timestamp_ms;
       latestRef.current = msg;
       if (streamStartMsRef.current === null) {
         streamStartMsRef.current = msg.timestamp_ms;

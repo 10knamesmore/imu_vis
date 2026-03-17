@@ -100,3 +100,10 @@ pub async fn save_pipeline_config(state: State<'_, AppState>) -> Response<()> {
         Err(err) => Ok(IpcResponse::error(err)),
     }
 }
+
+#[tauri::command]
+#[tracing::instrument(level = "debug", skip(state))]
+/// 读取已连接设备的电量（0–100）。
+pub async fn get_battery_level(state: State<'_, AppState>) -> Response<u8> {
+    Ok(state.client().await.get_battery_level().await.into())
+}

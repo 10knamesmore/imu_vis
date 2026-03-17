@@ -21,6 +21,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
   const [connectedDevice, setConnectedDevice] = useState<PeripheralInfo | null>(null);
   // 是否需要显示标定向导
   const [needsCalibration, setNeedsCalibration] = useState(false);
+  const [batteryLevel, setBatteryLevel] = useState<number | null>(null);
   const [recordingStatus, setRecordingStatus] = useState<RecordingStatus | null>(null);
   const [recording, setRecording] = useState(false);
   const dataModeRef = useRef<DataMode>('live');
@@ -53,6 +54,23 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     }
     setDataMode('replay');
   }, [switchDataMode]);
+
+  // 轮询设备电量
+  useEffect(() => {
+    if (!connectedDevice) {
+      setBatteryLevel(null);
+      return;
+    }
+    const fetchBattery = async () => {
+      try {
+        const res = await imuApi.getBatteryLevel();
+        if (res.success && res.data != null) setBatteryLevel(res.data);
+      } catch { /* ignore */ }
+    };
+    fetchBattery();
+    const timer = setInterval(fetchBattery, 30_000);
+    return () => clearInterval(timer);
+  }, [connectedDevice]);
 
   // 监听配置更新事件
   useEffect(() => {
@@ -430,6 +448,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
     needsCalibration,
     setNeedsCalibration,
     deleteRecording,
+    batteryLevel,
   };
 };
 
