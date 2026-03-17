@@ -406,6 +406,13 @@ pub async fn export_session_csv(session_id: i64) -> anyhow::Result<std::path::Pa
     let db = db::connect(&db_path).await?;
     db::ensure_schema(&db).await?;
 
+    let session = models::recording_sessions::Entity::find()
+        .filter(models::recording_sessions::Column::Id.eq(session_id))
+        .one(&db)
+        .await
+        .context("query reqcording session")?
+        .context("no session found")?;
+
     let samples = models::imu_samples::Entity::find()
         .filter(models::imu_samples::Column::SessionId.eq(session_id))
         .order_by_asc(models::imu_samples::Column::TimestampMs)
@@ -420,7 +427,11 @@ pub async fn export_session_csv(session_id: i64) -> anyhow::Result<std::path::Pa
     std::fs::create_dir_all(&export_dir).context("create exports directory")?;
 
     let now = chrono::Utc::now().format("%Y%m%d_%H%M%S");
-    let file_path = export_dir.join(format!("imu_{now}.csv"));
+    let file_path = export_dir.join(if let Some(name) = session.name {
+        format!("imu_{}.csv", name)
+    } else {
+        format!("imu_{now}.csv")
+    });
 
     let mut csv = String::new();
     writeln!(
@@ -447,7 +458,9 @@ pub async fn export_session_csv(session_id: i64) -> anyhow::Result<std::path::Pa
         )?;
     }
 
-    std::fs::write(&file_path, csv).context("write csv file")?;
+    tokio::fs::write(&file_path, csv)
+        .await
+        .context("write csv file")?;
     Ok(file_path)
 }
 
@@ -462,7 +475,11 @@ fn sample_to_response_data(sample: models::imu_samples::Model) -> ResponseData {
 
     ResponseData {
         timestamp_ms: sample.timestamp_ms as u64,
-        accel: DVec3::new(sample.accel_no_g_x, sample.accel_no_g_y, sample.accel_no_g_z),
+        accel: DVec3::new(
+            sample.accel_no_g_x,
+            sample.accel_no_g_y,
+            sample.accel_no_g_z,
+        ),
         accel_with_g: DVec3::new(
             sample.accel_with_g_x,
             sample.accel_with_g_y,
