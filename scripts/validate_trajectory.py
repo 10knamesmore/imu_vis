@@ -24,10 +24,17 @@ IMU CSV 格式（由应用"导出 CSV"按钮生成）：
 
 import argparse
 import sys
+from pathlib import Path
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+from matplotlib import rcParams
+
+# 配置中文字体，避免 CJK 字形缺失警告
+rcParams['font.sans-serif'] = ['Noto Sans CJK JP', 'Noto Serif CJK JP', 'sans-serif']
+rcParams['font.monospace'] = ['Noto Sans CJK JP', 'DejaVu Sans Mono', 'monospace']
+rcParams['axes.unicode_minus'] = False  # 正常显示负号
 
 
 # ─────────────────────────────────────────────
@@ -37,6 +44,16 @@ import matplotlib.gridspec as gridspec
 def load_imu(path: str) -> pd.DataFrame:
     df = pd.read_csv(path, skipinitialspace=True)
     df.columns = [c.strip() for c in df.columns]
+
+    # 兼容参考轨迹格式（time_ms, x_m, y_m）：映射为 IMU 列名
+    if {"time_ms", "x_m", "y_m"}.issubset(df.columns):
+        df = df.rename(columns={
+            "time_ms": "timestamp_ms",
+            "x_m": "calc_position_x",
+            "y_m": "calc_position_y",
+        })
+        df["calc_position_z"] = 0.0
+
     required = {"timestamp_ms", "calc_position_x", "calc_position_y", "calc_position_z"}
     missing = required - set(df.columns)
     if missing:
@@ -122,24 +139,29 @@ def drift_rate(imu: pd.DataFrame) -> float:
 # 绘图
 # ─────────────────────────────────────────────
 
-def plot_imu_only(imu: pd.DataFrame, title: str = "IMU 轨迹（XZ 水平面）"):
+def plot_imu_only(imu: pd.DataFrame, out_path: Path, title: str = "IMU 轨迹"):
     fig, axes = plt.subplots(1, 2, figsize=(14, 6))
     fig.suptitle(title)
 
-    # XZ 平面投影（水平面）
+    # 自动选平面：Y 轴有运动则用 XY（参考轨迹），否则用 XZ（IMU 输出）
+    use_xy = imu["calc_position_y"].abs().max() > imu["calc_position_z"].abs().max()
+    h_col = "calc_position_y" if use_xy else "calc_position_z"
+    h_label = "Y (m)" if use_xy else "Z (m)"
+    plane_title = "XY 平面（俯视）" if use_xy else "XZ 平面（俯视）"
+
     ax = axes[0]
-    ax.plot(imu["calc_position_x"], imu["calc_position_z"], color="steelblue", linewidth=1.5)
+    ax.plot(imu["calc_position_x"], imu[h_col], color="steelblue", linewidth=1.5)
     ax.scatter(
-        [imu["calc_position_x"].iloc[0]], [imu["calc_position_z"].iloc[0]],
+        [imu["calc_position_x"].iloc[0]], [imu[h_col].iloc[0]],
         color="green", s=80, zorder=5, label="起点"
     )
     ax.scatter(
-        [imu["calc_position_x"].iloc[-1]], [imu["calc_position_z"].iloc[-1]],
+        [imu["calc_position_x"].iloc[-1]], [imu[h_col].iloc[-1]],
         color="red", s=80, zorder=5, label="终点"
     )
     ax.set_xlabel("X (m)")
-    ax.set_ylabel("Z (m)")
-    ax.set_title("XZ 平面（俯视）")
+    ax.set_ylabel(h_label)
+    ax.set_title(plane_title)
     ax.axis("equal")
     ax.legend()
     ax.grid(True, alpha=0.4)
@@ -158,8 +180,8 @@ def plot_imu_only(imu: pd.DataFrame, title: str = "IMU 轨迹（XZ 水平面）"
     axes[1].grid(True, alpha=0.4)
 
     plt.tight_layout()
-    plt.savefig("imu_trajectory.png", dpi=150)
-    print("图表已保存到 imu_trajectory.png")
+    plt.savefig(out_path, dpi=150)
+    print(f"图表已保存到 {out_path}")
     plt.show()
 
 
@@ -168,6 +190,7 @@ def plot_comparison(
     video: pd.DataFrame,
     imu_proj: np.ndarray,
     metrics: dict,
+    out_path: Path,
 ):
     fig = plt.figure(figsize=(16, 7))
     gs = gridspec.GridSpec(1, 3, figure=fig, width_ratios=[2, 2, 1.2])
@@ -226,8 +249,8 @@ def plot_comparison(
     )
 
     plt.tight_layout()
-    plt.savefig("trajectory_comparison.png", dpi=150)
-    print("图表已保存到 trajectory_comparison.png")
+    plt.savefig(out_path, dpi=150)
+    print(f"图表已保存到 {out_path}")
     plt.show()
 
 
@@ -271,8 +294,10 @@ def main():
     print(f"漂移速率: {rate*100:.4f} cm/s")
     print(f"{'═'*40}\n")
 
+    imu_path = Path(args.imu)
     if args.video is None:
-        plot_imu_only(imu, title=f"IMU 轨迹分析（{args.imu}）")
+        out = imu_path.with_suffix(".png")
+        plot_imu_only(imu, out, title=f"IMU 轨迹分析（{imu_path.name}）")
         return
 
     video = load_video(args.video)
@@ -310,7 +335,8 @@ def main():
     print(f"平均偏差: {metrics['mean_dev_m']*100:.2f} cm")
     print(f"{'═'*40}\n")
 
-    plot_comparison(imu, video, imu_proj, metrics)
+    out = imu_path.with_suffix(".png")
+    plot_comparison(imu, video, imu_proj, metrics, out)
 
 
 if __name__ == "__main__":
