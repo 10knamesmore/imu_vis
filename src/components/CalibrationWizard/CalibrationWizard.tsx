@@ -367,19 +367,19 @@ const CollectionStep = ({
       <Row gutter={16}>
         <Col span={8}>
           <Statistic
-            title="accel_with_g X（m/s²）"
+            title="加速度 X（m/s²）"
             value={liveAccel?.x.toFixed(4) ?? '—'}
           />
         </Col>
         <Col span={8}>
           <Statistic
-            title="accel_with_g Y（m/s²）"
+            title="加速度 Y（m/s²）"
             value={liveAccel?.y.toFixed(4) ?? '—'}
           />
         </Col>
         <Col span={8}>
           <Statistic
-            title="accel_with_g Z（m/s²）"
+            title="加速度 Z（m/s²）"
             value={liveAccel?.z.toFixed(4) ?? '—'}
           />
         </Col>
