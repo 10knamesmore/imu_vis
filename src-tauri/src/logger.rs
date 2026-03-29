@@ -8,7 +8,7 @@ use tracing_subscriber::{
 
 /// 初始化 tracing 并返回 guard。
 pub fn init_tracing() -> WorkerGuard {
-    let stdout_layer = if cfg!(debug_assertions) {
+    let stdout_layer = if true {
         let targets = Targets::new()
             .with_target("bluez_async::events", LevelFilter::INFO)
             .with_target("sqlx", LevelFilter::WARN)

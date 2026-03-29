@@ -5,19 +5,19 @@ gravity = 9.848
 passby = false
 accel_matrix = [
     [
-    1.001901595837556,
+    1.0017445924006412,
     0.0,
     0.0,
 ],
     [
     0.0,
-    0.999519460725826,
+    1.0022240155302835,
     0.0,
 ],
     [
     0.0,
     0.0,
-    1.0006785714285746,
+    1.0010396257947205,
 ],
 ]
 gyro_matrix = [
@@ -39,9 +39,9 @@ gyro_matrix = [
 ]
 
 [calibration.accel_bias]
-x = 0.0023925781249696243
-y = -0.040075683593808975
-z = 0.038281249999969624
+x = 0.005225674735134689
+y = -0.048607837194670545
+z = 0.06877963390946906
 
 [calibration.gyro_bias]
 x = 0.0
@@ -63,12 +63,12 @@ passby = false
 impl_type = "smooth_hysteresis"
 gyro_thresh = 0.15
 accel_thresh = 0.6
-gyro_enter_thresh = 0.15
-accel_enter_thresh = 0.22
+gyro_enter_thresh = 0.1
+accel_enter_thresh = 0.15
 gyro_exit_thresh = 0.2
 accel_exit_thresh = 0.3
-enter_frames = 3
-exit_frames = 3
+enter_frames = 12
+exit_frames = 5
 vel_decay_tau_ms = 35.0
 pos_lock_tau_ms = 110.0
-vel_zero_eps = 0.03
+vel_zero_eps = 0.1
