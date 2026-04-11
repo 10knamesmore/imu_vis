@@ -2,6 +2,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> **如果你是新开启的 agent session（尤其是跨机器接棒的）**：先读 [`HANDOFF.md`](./HANDOFF.md)，那里有前一个 session 的交接笔记，包括已完成的工作、未解决的问题、调查建议和红线清单。本文件（`CLAUDE.md`）描述稳定的架构和不变式，`HANDOFF.md` 描述动态的会话状态。
+
 ## 项目概述
 
 IMU Vis 是一个基于 Tauri + React + TypeScript 的跨平台 IMU（惯性测量单元）数据可视化工具。后端使用 Rust 处理蓝牙通信、数据处理管道和 SQLite 数据库录制，前端使用 React + Ant Design 构建现代化界面，并通过 Canvas 和 Three.js 实现高性能的实时数据可视化。
