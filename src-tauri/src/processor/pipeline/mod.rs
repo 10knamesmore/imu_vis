@@ -4,6 +4,8 @@
 //! 串成单线程处理链，保持外部接口不变。
 //! 原理：同一帧按固定顺序流过各模块，输出 ResponseData。
 
+/// 管线诊断数据采集。
+pub mod diagnostics;
 /// 管线逻辑。
 pub mod logic;
 /// 管线配置类型。

@@ -348,11 +348,21 @@ export const SettingsPanel = () => {
             <Card size="small" title="轨迹计算" className={styles.sectionCard}>
               <Row gutter={12}>
                 <Col xs={24} md={8}>
+                  <Form.Item label="导航器" tooltip="legacy=传统积分+ZUPT硬修正，eskf=误差状态卡尔曼滤波（推荐）。" name={['navigator_impl']} rules={numberRules} className={styles.compactItem}>
+                    <Select
+                      options={[
+                        { label: 'Legacy (传统)', value: 'legacy' },
+                        { label: 'ESKF (卡尔曼)', value: 'eskf' },
+                      ]}
+                    />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} md={8}>
                   <Form.Item label="跳过处理" tooltip="开启后将关闭轨迹积分与位置计算。" name={['trajectory', 'passby']} valuePropName="checked" className={styles.compactItem}>
                     <Switch />
                   </Form.Item>
                 </Col>
-                <Col xs={24} md={16}>
+                <Col xs={24} md={8}>
                   <Form.Item label="积分实现" tooltip="选择轨迹积分算法：旧版欧拉、梯形积分或 RK4。" name={['trajectory', 'integrator']} rules={numberRules} className={styles.compactItem}>
                     <Select
                       options={[

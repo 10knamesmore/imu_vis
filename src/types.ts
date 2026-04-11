@@ -121,3 +121,43 @@ export interface DeviceCalibrationData {
   /** 标定时间戳（ms）*/
   created_at_ms: number;
 }
+
+// 管线诊断数据（后端 PipelineDiagnostics 对应）
+export interface PipelineDiagnostics {
+  timestamp_ms: number;
+  // 标定阶段
+  cal_accel_bias: Vector3;
+  cal_gyro_bias: Vector3;
+  cal_accel_pre: Vector3;
+  cal_accel_post: Vector3;
+  cal_gyro_pre: Vector3;
+  cal_gyro_post: Vector3;
+  // 滤波阶段
+  filt_accel_pre: Vector3;
+  filt_accel_post: Vector3;
+  filt_gyro_pre: Vector3;
+  filt_gyro_post: Vector3;
+  // ZUPT 阶段
+  zupt_is_static: boolean;
+  zupt_gyro_norm: number;
+  zupt_accel_norm: number;
+  zupt_enter_count: number;
+  zupt_exit_count: number;
+  // 导航阶段
+  nav_dt: number;
+  nav_linear_accel: Vector3;
+  // ESKF 专属
+  eskf_cov_diag: number[] | null;
+  eskf_bias_gyro: Vector3 | null;
+  eskf_bias_accel: Vector3 | null;
+  eskf_innovation: Vector3 | null;
+  // 后向修正
+  backward_triggered: boolean;
+  backward_correction_mag: number;
+  // 性能指标
+  perf_process_us: number;
+  perf_upstream_queue_len: number;
+  perf_downstream_queue_len: number;
+  perf_record_queue_len: number;
+  perf_ble_interval_ms: number;
+}

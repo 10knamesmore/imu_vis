@@ -1,5 +1,7 @@
 //! 应用全局状态与资源管理。
 
+use std::sync::{atomic::AtomicBool, Arc};
+
 use flume::Receiver;
 use tokio::sync::{oneshot, Mutex, MutexGuard};
 
@@ -7,7 +9,10 @@ use crate::{
     imu::IMUClient,
     processor::{
         calibration::CorrectionRequest,
-        pipeline::{PipelineConfigRequest, ProcessorPipelineConfig},
+        pipeline::{
+            diagnostics::{DiagnosticsFlag, PipelineDiagnostics},
+            PipelineConfigRequest, ProcessorPipelineConfig,
+        },
         Processor,
     },
     recorder::{spawn_recorder, RecorderCommand},
@@ -111,6 +116,12 @@ pub struct AppState {
 
     /// Pipeline 配置控制句柄。
     pub pipeline_config_handle: PipelineConfigHandle,
+
+    /// 诊断数据接收通道。
+    pub diagnostics_rx: Receiver<PipelineDiagnostics>,
+
+    /// 诊断开关（跨线程共享）。
+    pub diagnostics_flag: DiagnosticsFlag,
 }
 
 impl AppState {
@@ -127,6 +138,8 @@ impl AppState {
         spawn_recorder(record_rx, recorder_rx);
         let (calibration_handle, calibration_rx) = CalibrationHandle::new();
         let (pipeline_config_handle, pipeline_config_rx) = PipelineConfigHandle::new();
+        let (diagnostics_tx, diagnostics_rx) = flume::bounded::<PipelineDiagnostics>(64);
+        let diagnostics_flag: DiagnosticsFlag = Arc::new(AtomicBool::new(false));
         AppState {
             imu_client: Mutex::new(IMUClient::new(upstream_tx)),
             processor: Processor::new(
@@ -135,12 +148,16 @@ impl AppState {
                 record_tx,
                 calibration_rx,
                 pipeline_config_rx,
+                diagnostics_flag.clone(),
+                diagnostics_tx,
                 app_handle,
             ),
             downstream_rx,
             recorder_tx,
             calibration_handle,
             pipeline_config_handle,
+            diagnostics_rx,
+            diagnostics_flag,
         }
     }
 

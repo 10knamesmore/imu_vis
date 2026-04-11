@@ -1,45 +1,41 @@
-//! Hand-written 15x15 matrix and 15-element vector for ESKF covariance operations.
+//! 用于 ESKF 协方差运算的手写 15x15 矩阵和 15 元向量。
 //!
-//! This module provides stack-allocated, fixed-size linear algebra primitives
-//! specifically sized for the 15-state error-state Kalman filter (ESKF).
+//! 该模块提供栈分配的固定尺寸线性代数基础类型，尺寸专门匹配 15 维误差状态卡尔曼滤波（ESKF）。
 //!
-//! # Storage layout
+//! # 存储布局
 //!
-//! [`Mat15`] uses **row-major** storage in a flat `[f64; 225]` array.
-//! Element `(i, j)` is stored at index `i * 15 + j`.
+//! [`Mat15`] 使用扁平 `[f64; 225]` 数组按**行优先**存储。
+//! 元素 `(i, j)` 存储在索引 `i * 15 + j` 处。
 //!
 //! ```text
-//! | data[  0] data[  1] ... data[ 14] |   row 0
-//! | data[ 15] data[ 16] ... data[ 29] |   row 1
+//! | data[  0] data[  1] ... data[ 14] |   第 0 行
+//! | data[ 15] data[ 16] ... data[ 29] |   第 1 行
 //! |   ...                              |
-//! | data[210] data[211] ... data[224] |   row 14
+//! | data[210] data[211] ... data[224] |   第 14 行
 //! ```
 //!
-//! # Performance notes
+//! # 性能说明
 //!
-//! All operations are implemented with explicit loops over fixed-size arrays.
-//! The compiler can fully unroll small loops and apply SIMD auto-vectorization.
-//! No heap allocation is performed; both `Mat15` and `Vec15` live entirely on
-//! the stack (~1.8 KB for `Mat15`, 120 bytes for `Vec15`).
+//! 所有操作都通过固定尺寸数组上的显式循环实现。编译器可以完全展开小循环并应用 SIMD
+//! 自动向量化。不会执行堆分配；`Mat15` 和 `Vec15` 完全位于栈上（`Mat15` 约 1.8 KB，
+//! `Vec15` 为 120 字节）。
 //!
-//! For the ZUPT measurement update, specialized accessors (`velocity_cols`,
-//! `zupt_update`) avoid constructing full intermediate matrices when only
-//! the velocity-block columns (indices 3..6) are needed.
+//! 对于 ZUPT 量测更新，专用访问器（`velocity_cols`、`zupt_update`）在只需要速度块列
+//! （索引 3..6）时避免构造完整的中间矩阵。
 
-/// Dimension of the ESKF error state vector.
+/// ESKF 误差状态向量的维度。
 const N: usize = 15;
 
-/// Total number of elements in a 15x15 matrix.
+/// 15x15 矩阵中的元素总数。
 const NN: usize = N * N;
 
-/// 15x15 double-precision matrix (row-major storage).
+/// 15x15 双精度矩阵（行优先存储）。
 ///
-/// Used for the ESKF covariance matrix P (15x15) and the state transition
-/// matrix F (15x15). Row-major layout: element (row, col) is at index
-/// `row * 15 + col`.
+/// 用于 ESKF 协方差矩阵 P（15x15）和状态转移矩阵 F（15x15）。
+/// 行优先布局：元素 `(row, col)` 位于索引 `row * 15 + col`。
 #[derive(Clone)]
 pub struct Mat15 {
-    /// Row-major storage of 225 elements.
+    /// 225 个元素的行优先存储。
     pub data: [f64; NN],
 }
 
@@ -50,12 +46,12 @@ impl std::fmt::Debug for Mat15 {
 }
 
 impl Mat15 {
-    /// Create a zero matrix.
+    /// 创建零矩阵。
     pub fn zeros() -> Self {
         Self { data: [0.0; NN] }
     }
 
-    /// Create a 15x15 identity matrix.
+    /// 创建 15x15 单位矩阵。
     pub fn identity() -> Self {
         let mut m = Self::zeros();
         for i in 0..N {
@@ -64,9 +60,9 @@ impl Mat15 {
         m
     }
 
-    /// Create a diagonal matrix from a 15-element array.
+    /// 根据 15 元数组创建对角矩阵。
     ///
-    /// Off-diagonal elements are zero.
+    /// 非对角元素为零。
     pub fn from_diagonal(diag: &[f64; N]) -> Self {
         let mut m = Self::zeros();
         for i in 0..N {
@@ -75,19 +71,31 @@ impl Mat15 {
         m
     }
 
-    /// Get element at `(row, col)`.
+    /// 将对角元素提取为固定尺寸数组。
+    ///
+    /// 返回 `[P(0,0), P(1,1), ..., P(14,14)]`，表示每个误差状态分量的方差
+    /// （不确定性的平方）。
+    pub fn diagonal(&self) -> [f64; N] {
+        let mut d = [0.0; N];
+        for i in 0..N {
+            d[i] = self.data[i * N + i];
+        }
+        d
+    }
+
+    /// 获取 `(row, col)` 处的元素。
     #[inline]
     pub fn get(&self, row: usize, col: usize) -> f64 {
         self.data[row * N + col]
     }
 
-    /// Set element at `(row, col)`.
+    /// 设置 `(row, col)` 处的元素。
     #[inline]
     pub fn set(&mut self, row: usize, col: usize, val: f64) {
         self.data[row * N + col] = val;
     }
 
-    /// Matrix transpose.
+    /// 矩阵转置。
     pub fn transpose(&self) -> Self {
         let mut out = Self::zeros();
         for i in 0..N {
@@ -98,7 +106,7 @@ impl Mat15 {
         out
     }
 
-    /// Matrix-matrix multiplication: `self * rhs`.
+    /// 矩阵-矩阵乘法：`self * rhs`。
     pub fn mul(&self, rhs: &Mat15) -> Mat15 {
         let mut out = Mat15::zeros();
         for i in 0..N {
@@ -115,7 +123,7 @@ impl Mat15 {
         out
     }
 
-    /// Matrix-vector multiplication: `self * v`.
+    /// 矩阵-向量乘法：`self * v`。
     pub fn mul_vec15(&self, v: &Vec15) -> Vec15 {
         let mut out = Vec15::zeros();
         for i in 0..N {
@@ -128,7 +136,7 @@ impl Mat15 {
         out
     }
 
-    /// Element-wise addition: `self + rhs`.
+    /// 逐元素加法：`self + rhs`。
     pub fn add(&self, rhs: &Mat15) -> Mat15 {
         let mut out = Mat15::zeros();
         for i in 0..NN {
@@ -137,7 +145,7 @@ impl Mat15 {
         out
     }
 
-    /// Element-wise subtraction: `self - rhs`.
+    /// 逐元素减法：`self - rhs`。
     pub fn sub(&self, rhs: &Mat15) -> Mat15 {
         let mut out = Mat15::zeros();
         for i in 0..NN {
@@ -146,7 +154,7 @@ impl Mat15 {
         out
     }
 
-    /// Scalar multiplication: `self * s`.
+    /// 标量乘法：`self * s`。
     pub fn scale(&self, s: f64) -> Mat15 {
         let mut out = Mat15::zeros();
         for i in 0..NN {
@@ -155,11 +163,11 @@ impl Mat15 {
         out
     }
 
-    /// Extract columns 3..6 (velocity block) as an array of 15 row-vectors.
+    /// 将列 3..6（速度块）提取为包含 15 个行向量的数组。
     ///
-    /// Returns `P[:, 3..6]` as `[[f64; 3]; 15]`, where `result[i][j]` is
-    /// `P(i, 3+j)`. This is the `P * Hᵀ` factor needed for ZUPT Kalman gain
-    /// computation (since H = [0|I₃|0|0|0], we have P*Hᵀ = P[:, 3..6]).
+    /// 将 `P[:, 3..6]` 作为 `[[f64; 3]; 15]` 返回，其中 `result[i][j]` 为
+    /// `P(i, 3+j)`。这是计算 ZUPT Kalman 增益所需的 `P * Hᵀ` 因子
+    /// （由于 H = [0|I₃|0|0|0]，有 P*Hᵀ = P[:, 3..6]）。
     pub fn velocity_cols(&self) -> [[f64; 3]; N] {
         let mut out = [[0.0; 3]; N];
         for i in 0..N {
@@ -170,20 +178,18 @@ impl Mat15 {
         out
     }
 
-    /// Apply the ZUPT measurement update to the covariance in-place.
+    /// 就地对协方差应用 ZUPT 量测更新。
     ///
-    /// Computes `P = (I - K * H) * P` where H = \[0|I₃|0|0|0\] selects
-    /// velocity rows 3..6. The Kalman gain K is provided as `[[f64; 3]; 15]`
-    /// (a 15x3 matrix stored as 15 row-vectors of length 3).
+    /// 计算 `P = (I - K * H) * P`，其中 H = \[0|I₃|0|0|0\] 用于选择速度行 3..6。
+    /// Kalman 增益 K 以 `[[f64; 3]; 15]` 提供（15x3 矩阵，存储为 15 个长度为 3 的行向量）。
     ///
-    /// This avoids building a full 15x15 `K*H` matrix by exploiting the
-    /// sparse structure of H: `(K*H)[i][j] = K[i][j-3]` for j in 3..6,
-    /// and zero otherwise.
+    /// 这会利用 H 的稀疏结构避免构造完整的 15x15 `K*H` 矩阵：
+    /// 当 j 位于 3..6 时 `(K*H)[i][j] = K[i][j-3]`，否则为零。
     pub fn zupt_update(&mut self, k: &[[f64; 3]; N]) {
-        // Compute (I - K*H) * P
-        // (I - K*H)[i][j] = delta(i,j) - K[i][j-3] if j in [3,6), else delta(i,j)
+        // 计算 (I - K*H) * P。
+        // 若 j 位于 [3,6)，则 (I - K*H)[i][j] = δ(i,j) - K[i][j-3]，否则为 δ(i,j)。
         //
-        // We compute row i of the result as:
+        // 将结果的第 i 行计算为：
         //   result_row[i] = P_row[i] - K[i][0]*P_row[3] - K[i][1]*P_row[4] - K[i][2]*P_row[5]
         let old = self.data;
         for i in 0..N {
@@ -200,35 +206,35 @@ impl Mat15 {
     }
 }
 
-/// 15-element double-precision vector.
+/// 15 元双精度向量。
 ///
-/// Represents the ESKF error state δx = [δθ, δv, δp, δb_g, δb_a]ᵀ,
-/// where each sub-vector is 3-dimensional (total 15 states).
+/// 表示 ESKF 误差状态 δx = [δθ, δv, δp, δb_g, δb_a]ᵀ，
+/// 其中每个子向量为三维（共 15 个状态）。
 #[derive(Debug, Clone)]
 pub struct Vec15 {
-    /// The 15 elements.
+    /// 15 个元素。
     pub data: [f64; N],
 }
 
 impl Vec15 {
-    /// Create a zero vector.
+    /// 创建零向量。
     pub fn zeros() -> Self {
         Self { data: [0.0; N] }
     }
 
-    /// Get element at index `i`.
+    /// 获取索引 `i` 处的元素。
     #[inline]
     pub fn get(&self, i: usize) -> f64 {
         self.data[i]
     }
 
-    /// Set element at index `i`.
+    /// 设置索引 `i` 处的元素。
     #[inline]
     pub fn set(&mut self, i: usize, val: f64) {
         self.data[i] = val;
     }
 
-    /// Element-wise addition.
+    /// 逐元素加法。
     pub fn add(&self, rhs: &Vec15) -> Vec15 {
         let mut out = Vec15::zeros();
         for i in 0..N {
@@ -237,7 +243,7 @@ impl Vec15 {
         out
     }
 
-    /// Element-wise subtraction.
+    /// 逐元素减法。
     pub fn sub(&self, rhs: &Vec15) -> Vec15 {
         let mut out = Vec15::zeros();
         for i in 0..N {
@@ -246,7 +252,7 @@ impl Vec15 {
         out
     }
 
-    /// Scalar multiplication.
+    /// 标量乘法。
     pub fn scale(&self, s: f64) -> Vec15 {
         let mut out = Vec15::zeros();
         for i in 0..N {
@@ -278,7 +284,7 @@ mod tests {
 
     #[test]
     fn mul_associativity() {
-        // Build three distinct non-trivial matrices and verify (A*B)*C == A*(B*C)
+        // 构造三个不同的非平凡矩阵，并验证 (A*B)*C == A*(B*C)。
         let mut a = Mat15::zeros();
         let mut b = Mat15::zeros();
         let mut c = Mat15::zeros();

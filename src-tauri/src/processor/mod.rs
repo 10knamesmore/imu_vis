@@ -15,7 +15,10 @@ use crate::{
     processor::{
         calibration::CorrectionRequest,
         output::{OutputBuilder, OutputFrame},
-        pipeline::{PipelineConfigRequest, ProcessorPipeline, ProcessorPipelineConfig},
+        pipeline::{
+            diagnostics::{DiagnosticsFlag, PipelineDiagnostics, QueueProbe},
+            PipelineConfigRequest, ProcessorPipeline, ProcessorPipelineConfig,
+        },
     },
     types::outputs::ResponseData,
 };
@@ -64,12 +67,17 @@ impl Processor {
     /// * `downstream_tx`: 发给 AppState 的 rx（command 中接收）
     /// * `record_tx`: 发给 recorder 线程的录制通道
     /// * `calibration_rx`: 手动校正请求通道
+    /// 数据处理器实例。
+    ///
+    /// 新增 `diagnostics_flag` / `diagnostics_tx` 用于诊断数据采集。
     pub fn new(
         upstream_rx: flume::Receiver<RawImuData>,
         downstream_tx: flume::Sender<ResponseData>,
         record_tx: flume::Sender<OutputFrame>,
         calibration_rx: flume::Receiver<CorrectionRequest>,
         pipeline_config_rx: flume::Receiver<PipelineConfigRequest>,
+        diagnostics_flag: DiagnosticsFlag,
+        diagnostics_tx: flume::Sender<PipelineDiagnostics>,
         app_handle: tauri::AppHandle,
     ) -> Self {
         let (shutdown_tx, shutdown_rx) = flume::unbounded::<()>();
@@ -77,11 +85,21 @@ impl Processor {
             Self::init_config_watcher(shutdown_rx.clone());
 
         let app_handle = app_handle.clone();
+        let queue_probe = QueueProbe::new(
+            upstream_rx.clone(),
+            downstream_tx.clone(),
+            record_tx.clone(),
+        );
         let processor_thread = thread::Builder::new()
             .name("DataProcessorThread".into())
             .spawn(move || {
                 let mut current_config = config.clone();
-                let mut pipeline = ProcessorPipeline::new(config);
+                let mut pipeline = ProcessorPipeline::new(
+                    config,
+                    diagnostics_flag,
+                    diagnostics_tx,
+                    queue_probe,
+                );
                 let mut config_enabled = true;
 
                 loop {

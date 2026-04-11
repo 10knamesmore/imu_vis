@@ -75,6 +75,13 @@ impl Calibration {
         }
     }
 
+    /// 返回当前陀螺仪偏置 (rad/s)。
+    ///
+    /// 用于诊断系统观测在线零偏估计的演化。
+    pub fn gyro_bias(&self) -> DVec3 {
+        self.state.bias_g
+    }
+
     /// 在线更新陀螺仪零偏估计。
     ///
     /// 当 ZUPT 检测到静止状态时调用，使用 EMA 平滑更新陀螺零偏。

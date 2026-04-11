@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import { Button, Modal, Tag, Tooltip } from "antd";
-import { ApiOutlined, MoonOutlined, ReloadOutlined, SearchOutlined, SunOutlined, ThunderboltOutlined } from "@ant-design/icons";
+import { ApiOutlined, BugOutlined, MoonOutlined, ReloadOutlined, SearchOutlined, SunOutlined, ThunderboltOutlined } from "@ant-design/icons";
 
 import { RecordingsPanel } from "../RecordingsPanel";
 import type { RecordingStatus } from "../../types";
 import { useColorScheme } from "../../hooks/useColorScheme";
+import { useDeveloperMode } from "../../hooks/useDeveloperMode";
 
 import styles from "./ImuToolBar.module.scss";
 
@@ -47,7 +48,23 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
   batteryLevel,
 }) => {
   const { colorScheme, toggleColorScheme } = useColorScheme();
+  const { developerMode, toggleDeveloperMode } = useDeveloperMode();
   const [recordingsOpen, setRecordingsOpen] = useState(false);
+
+  // 连续快速点击模式标签 5 次激活开发者模式
+  const tapCountRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleModeLabelClick = useCallback(() => {
+    if (developerMode) return; // 已激活时不处理
+    tapCountRef.current += 1;
+    if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    if (tapCountRef.current >= 5) {
+      tapCountRef.current = 0;
+      toggleDeveloperMode();
+    } else {
+      tapTimerRef.current = setTimeout(() => { tapCountRef.current = 0; }, 1500);
+    }
+  }, [developerMode, toggleDeveloperMode]);
 
   return (
     <>
@@ -61,9 +78,20 @@ export const ImuToolBar: React.FC<ImuToolBarProps> = ({
           >
             设备
           </Button>
-          <Tag color={replaying ? "orange" : "default"}>
+          <Tag
+            color={replaying ? "orange" : "default"}
+            onClick={handleModeLabelClick}
+            style={{ cursor: "default", userSelect: "none" }}
+          >
             {replaying ? "回放模式" : "实时模式"}
           </Tag>
+          {developerMode && (
+            <Tooltip title="点击关闭开发者模式">
+              <Tag icon={<BugOutlined />} color="purple" onClick={toggleDeveloperMode} style={{ cursor: "pointer" }}>
+                DEV
+              </Tag>
+            </Tooltip>
+          )}
           {connectedDevice && batteryLevel != null && (
             <Tag icon={<ThunderboltOutlined />} color={batteryLevel < 20 ? "red" : "green"}>
               {batteryLevel}%

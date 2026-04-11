@@ -1,6 +1,7 @@
 import { invoke, Channel } from "@tauri-apps/api/core";
 import {
   PeripheralInfo,
+  PipelineDiagnostics,
   ProcessorPipelineConfig,
   ResponseData,
   RecordingMeta,
@@ -46,6 +47,10 @@ export const imuApi = {
   // onEvent: Tauri Channel，用于接收实时数据流
   subscribeOutput: (onEvent: Channel<ResponseData>) =>
     invoke("subscribe_output", { onEvent }),
+
+  // 订阅管线诊断数据流（开发者模式）
+  subscribeDiagnostics: (onEvent: Channel<PipelineDiagnostics>) =>
+    invoke("subscribe_diagnostics", { onEvent }),
 
   // 开始录制数据
   startRecording: (options?: { name?: string; tags?: string[] }) =>

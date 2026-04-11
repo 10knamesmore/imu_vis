@@ -1,73 +1,64 @@
-//! Error-State Kalman Filter (ESKF) navigator implementation.
+//! 误差状态卡尔曼滤波（ESKF）导航器实现。
 //!
-//! # Algorithm overview
+//! # 算法概览
 //!
-//! The ESKF (Error-State Kalman Filter), also known as the indirect Kalman
-//! filter, is a widely used fusion algorithm for inertial navigation. Unlike
-//! a direct (extended) Kalman filter that estimates the full navigation state,
-//! the ESKF maintains two parallel representations:
+//! ESKF（误差状态卡尔曼滤波）也称为间接卡尔曼滤波，是惯性导航中广泛使用的融合算法。
+//! 与直接估计完整导航状态的直接（扩展）卡尔曼滤波不同，ESKF 维护两套并行表示：
 //!
-//! 1. **Nominal state** — propagated via standard mechanization equations
-//!    (quaternion integration, velocity/position integration). This is the
-//!    "best guess" of the true state and is what gets reported to consumers.
+//! 1. **名义状态** — 通过标准机械化方程传播（四元数积分、速度/位置积分）。
+//!    这是对真实状态的“最佳估计”，也是对外输出给使用方的状态。
 //!
-//! 2. **Error state** — a small perturbation vector δx that captures the
-//!    deviation between the nominal state and the true state. The Kalman
-//!    filter operates on this error state, which remains small and therefore
-//!    well-suited to linearization.
+//! 2. **误差状态** — 一个小扰动向量 δx，用于表示名义状态与真实状态之间的偏差。
+//!    卡尔曼滤波器作用在该误差状态上；由于误差保持较小，因此适合线性化处理。
 //!
-//! # Why 15 states?
+//! # 为什么是 15 维状态？
 //!
-//! The error state vector δx has 15 elements organized in five 3-vectors:
+//! 误差状态向量 δx 包含 15 个元素，由五个三维向量组成：
 //!
-//! | Index | Symbol | Meaning                        | Units  |
-//! |-------|--------|--------------------------------|--------|
-//! | 0..3  | δθ     | Attitude error (rotation vec)  | rad    |
-//! | 3..6  | δv     | Velocity error                 | m/s    |
-//! | 6..9  | δp     | Position error                 | m      |
-//! | 9..12 | δb_g   | Gyroscope bias error           | rad/s  |
-//! | 12..15| δb_a   | Accelerometer bias error       | m/s²   |
+//! | 索引 | 符号 | 含义                         | 单位   |
+//! |------|------|------------------------------|--------|
+//! | 0..3 | δθ   | 姿态误差（旋转向量）         | rad    |
+//! | 3..6 | δv   | 速度误差                     | m/s    |
+//! | 6..9 | δp   | 位置误差                     | m      |
+//! | 9..12 | δb_g | 陀螺仪偏差误差              | rad/s  |
+//! | 12..15 | δb_a | 加速度计偏差误差           | m/s²   |
 //!
-//! The bias states allow the filter to estimate and compensate for slowly
-//! drifting sensor biases, which is the primary advantage over simple
-//! direct integration with ZUPT hard-lock.
+//! 偏差状态使滤波器能够估计并补偿缓慢漂移的传感器偏差，这是相对于简单直接积分加 ZUPT
+//! 硬约束方案的主要优势。
 //!
-//! # How it differs from direct integration (legacy navigator)
+//! # 与直接积分（旧导航器）的区别
 //!
-//! The legacy navigator performs:
-//! - Direct double-integration of accelerometer data
-//! - Hard velocity zeroing or exponential decay during detected standstill
-//! - No sensor bias estimation
+//! 旧导航器执行：
+//! - 对加速度计数据直接二次积分
+//! - 检测到静止时对速度硬归零或执行指数衰减
+//! - 不估计传感器偏差
 //!
-//! The ESKF instead:
-//! - Tracks a full 15x15 covariance matrix of estimation uncertainty
-//! - Uses optimal (Kalman) gain to fuse ZUPT observations
-//! - Estimates gyroscope and accelerometer biases online
-//! - Produces statistically consistent corrections proportional to uncertainty
+//! ESKF 则会：
+//! - 跟踪完整的 15x15 估计不确定性协方差矩阵
+//! - 使用最优（Kalman）增益融合 ZUPT 观测
+//! - 在线估计陀螺仪和加速度计偏差
+//! - 按不确定性大小生成统计上一致的修正量
 //!
-//! # Prediction / update cycle
+//! # 预测 / 更新循环
 //!
-//! Each IMU sample triggers:
+//! 每个 IMU 采样都会触发：
 //!
-//! 1. **Nominal state propagation**: integrate velocity and position using
-//!    bias-corrected accelerometer data (same physics as legacy, but with
-//!    bias subtraction).
+//! 1. **名义状态传播**：使用偏差修正后的加速度计数据积分速度和位置（物理模型与旧实现相同，
+//!    但会扣除偏差）。
 //!
-//! 2. **Error covariance prediction**: propagate P via `P = F*P*Fᵀ + Q`
-//!    where F is the linearized error-state dynamics and Q is process noise.
+//! 2. **误差协方差预测**：通过 `P = F*P*Fᵀ + Q` 传播 P，其中 F 是线性化后的误差状态动力学，
+//!    Q 是过程噪声。
 //!
-//! 3. **ZUPT detection**: hysteresis-based static detection (same logic as
-//!    legacy SmoothHysteresis).
+//! 3. **ZUPT 检测**：基于迟滞的静止检测（逻辑与旧版 SmoothHysteresis 相同）。
 //!
-//! 4. **Measurement update** (if static): compute Kalman gain from P and
-//!    the ZUPT observation model, correct the error state, inject corrections
-//!    into the nominal state, and update P.
+//! 4. **量测更新**（若静止）：根据 P 和 ZUPT 观测模型计算 Kalman 增益，修正误差状态，
+//!    将修正量注入名义状态，并更新 P。
 
-/// Hand-written 15x15 matrix and 15-element vector types.
+/// 手写的 15x15 矩阵和 15 元向量类型。
 pub mod matrix;
-/// ESKF prediction step (F matrix, Q matrix, covariance propagation).
+/// ESKF 预测步骤（F 矩阵、Q 矩阵、协方差传播）。
 pub mod predict;
-/// ESKF ZUPT measurement update step.
+/// ESKF ZUPT 量测更新步骤。
 pub mod update;
 
 use math_f64::{DQuat, DVec3};
@@ -78,59 +69,70 @@ use self::update::{apply_state_injection, zupt_update};
 use crate::processor::filter::ImuSampleFiltered;
 use crate::processor::navigator::types::{NavState, NavigatorConfig};
 
-/// ESKF-based inertial navigator.
+/// 基于 ESKF 的惯性导航器。
 ///
-/// Combines nominal state mechanization with error-state Kalman filtering
-/// for optimal ZUPT-aided pedestrian dead reckoning. Estimates and
-/// compensates gyroscope and accelerometer biases online.
+/// 将名义状态机械化与误差状态卡尔曼滤波结合，用于最优的 ZUPT 辅助行人航位推算。
+/// 在线估计并补偿陀螺仪和加速度计偏差。
 ///
-/// See module-level documentation for algorithm details.
+/// 算法细节见模块级文档。
 pub struct EskfNavigator {
-    /// Navigator configuration (trajectory, ZUPT, gravity, ESKF params).
+    /// 导航器配置（轨迹、ZUPT、重力、ESKF 参数）。
     config: NavigatorConfig,
-    /// Current nominal navigation state (position, velocity, attitude).
+    /// 当前名义导航状态（位置、速度、姿态）。
     nav_state: NavState,
-    /// Gravity reference vector in the world frame.
+    /// 世界坐标系中的重力参考向量。
     gravity_ref: DVec3,
-    /// Estimated gyroscope bias (rad/s).
+    /// 估计的陀螺仪偏差 (rad/s)。
     bias_gyro: DVec3,
-    /// Estimated accelerometer bias (m/s²).
+    /// 估计的加速度计偏差 (m/s²)。
     bias_accel: DVec3,
-    /// 15x15 error-state covariance matrix.
+    /// 15x15 误差状态协方差矩阵。
     covariance: Mat15,
-    /// Timestamp of the last processed sample (ms).
+    /// 上一次处理样本的时间戳 (ms)。
     last_timestamp_ms: Option<u64>,
-    /// Previous static detection result for hysteresis.
+    /// 用于迟滞判断的上一次静止检测结果。
     last_is_static: Option<bool>,
-    /// Counter for entering static state (hysteresis).
+    /// 进入静止状态的计数器（迟滞）。
     static_enter_count: u32,
-    /// Counter for exiting static state (hysteresis).
+    /// 退出静止状态的计数器（迟滞）。
     static_exit_count: u32,
-    /// Previous frame's linear acceleration in world frame (for trapezoid integration).
+    /// 上一帧世界坐标系线性加速度（用于梯形积分）。
     last_accel_lin: Option<DVec3>,
+
+    // —— 诊断用字段 ——
+    /// 最近一帧 ZUPT 检测的陀螺仪范数 (rad/s)。
+    diag_gyro_norm: f64,
+    /// 最近一帧 ZUPT 检测的线加速度范数 (m/s²)。
+    diag_accel_norm: f64,
+    /// 最近一帧的世界系线性加速度 (m/s²)。
+    diag_linear_accel: DVec3,
+    /// 当前积分步长 (s)。
+    diag_dt: f64,
+    /// 最近一次 ZUPT 更新的创新向量。
+    diag_last_innovation: Option<DVec3>,
 }
 
 impl EskfNavigator {
-    /// Create a new ESKF navigator with the given configuration.
+    /// 使用给定配置创建新的 ESKF 导航器。
     ///
-    /// Initializes the covariance matrix from the `init_sigma_*` fields in
-    /// [`EskfConfig`](crate::processor::navigator::types::EskfConfig).
+    /// 根据 [`EskfConfig`](crate::processor::navigator::types::EskfConfig) 中的
+    /// `init_sigma_*` 字段初始化协方差矩阵。
     pub fn new(config: NavigatorConfig) -> Self {
         let gravity = config.gravity;
         let eskf = &config.eskf;
 
-        // Build initial covariance from configured initial standard deviations
+        // 根据配置的初始标准差构建初始协方差。
         let sa = eskf.init_sigma_attitude;
         let sv = eskf.init_sigma_velocity;
         let sp = eskf.init_sigma_position;
         let sbg = eskf.init_sigma_gyro_bias;
         let sba = eskf.init_sigma_accel_bias;
         let init_diag = [
-            sa * sa, sa * sa, sa * sa, // attitude
-            sv * sv, sv * sv, sv * sv, // velocity
-            sp * sp, sp * sp, sp * sp, // position
-            sbg * sbg, sbg * sbg, sbg * sbg, // gyro bias
-            sba * sba, sba * sba, sba * sba, // accel bias
+            sa * sa, sa * sa, sa * sa, // 姿态
+            sv * sv, sv * sv, sv * sv, // 速度
+            sp * sp, sp * sp, sp * sp, // 位置
+            sbg * sbg, sbg * sbg, sbg * sbg, // 陀螺仪偏差
+            sba * sba, sba * sba, sba * sba, // 加速度计偏差
         ];
 
         Self {
@@ -150,17 +152,22 @@ impl EskfNavigator {
             static_enter_count: 0,
             static_exit_count: 0,
             last_accel_lin: None,
+            diag_gyro_norm: 0.0,
+            diag_accel_norm: 0.0,
+            diag_linear_accel: DVec3::ZERO,
+            diag_dt: 0.0,
+            diag_last_innovation: None,
         }
     }
 
-    /// Update the navigator with one IMU sample and return the current state.
+    /// 使用一个 IMU 样本更新导航器，并返回当前状态。
     ///
-    /// Executes the full ESKF cycle:
-    /// 1. Compute dt from timestamps
-    /// 2. Nominal state propagation (bias-corrected integration)
-    /// 3. Error covariance prediction (F, Q, P propagation)
-    /// 4. ZUPT detection (hysteresis)
-    /// 5. If static: ZUPT measurement update + state injection
+    /// 执行完整 ESKF 循环：
+    /// 1. 根据时间戳计算 dt
+    /// 2. 名义状态传播（偏差修正后的积分）
+    /// 3. 误差协方差预测（F、Q、P 传播）
+    /// 4. ZUPT 检测（迟滞）
+    /// 5. 若静止：执行 ZUPT 量测更新和状态注入
     pub fn update(&mut self, attitude: DQuat, sample: &ImuSampleFiltered) -> NavState {
         self.nav_state.attitude = attitude;
         self.nav_state.timestamp_ms = sample.timestamp_ms;
@@ -170,7 +177,7 @@ impl EskfNavigator {
             return self.nav_state;
         }
 
-        // --- Step 1: Compute dt ---
+        // --- 步骤 1：计算 dt ---
         let dt = self
             .last_timestamp_ms
             .map(|ts| {
@@ -184,16 +191,19 @@ impl EskfNavigator {
         self.last_timestamp_ms = Some(sample.timestamp_ms);
 
         if dt <= 0.0 {
+            self.diag_dt = 0.0;
             return self.nav_state;
         }
+        self.diag_dt = dt;
 
-        // --- Step 2: Nominal state propagation (trapezoid integration) ---
-        // Subtract estimated biases from the raw (filtered) measurements
+        // --- 步骤 2：名义状态传播（梯形积分） ---
+        // 从原始（滤波后）量测中扣除估计偏差。
         let accel_corrected = sample.accel_lp - self.bias_accel;
         let a_world = attitude.rotate_vec3(accel_corrected);
         let a_lin = a_world - self.gravity_ref;
+        self.diag_linear_accel = a_lin;
 
-        // Trapezoid integration: average current and previous acceleration
+        // 梯形积分：对当前和上一帧加速度取平均。
         let a_prev = self.last_accel_lin.unwrap_or(a_lin);
         let v_prev = self.nav_state.velocity;
         let v_next = v_prev + (a_prev + a_lin) * (0.5 * dt);
@@ -201,18 +211,28 @@ impl EskfNavigator {
         self.nav_state.position += (v_prev + v_next) * (0.5 * dt);
         self.last_accel_lin = Some(a_lin);
 
-        // --- Step 3: Error covariance prediction ---
+        // --- 步骤 3：误差协方差预测 ---
         let f = build_f_matrix(attitude, a_lin, dt);
         let q = build_q_matrix(&self.config.eskf, dt);
         self.covariance = propagate_covariance(&self.covariance, &f, &q);
 
-        // --- Step 4: ZUPT detection (hysteresis) ---
+        // --- 步骤 4：ZUPT 检测（迟滞） ---
+        //
+        // 静止检测用不依赖 bias_accel 估计的线加速度范数，避免 bias 估计
+        // 跑偏时 ZUPT 永不触发。
         let gyro_norm = sample.gyro_lp.length();
-        let accel_norm = a_lin.length();
+        let a_world_raw = attitude.rotate_vec3(sample.accel_lp);
+        let a_lin_raw = a_world_raw - self.gravity_ref;
+        let accel_norm = a_lin_raw.length();
+        self.diag_gyro_norm = gyro_norm;
+        self.diag_accel_norm = accel_norm;
+        self.diag_last_innovation = None; // 每帧重置，仅 ZUPT 帧有值
         let is_static = self.detect_static(gyro_norm, accel_norm);
 
-        // --- Step 5: ZUPT measurement update ---
+        // --- 步骤 5：ZUPT 量测更新 ---
         if is_static {
+            // 创新向量 = 观测值 - 预测值 = 0 - v_nominal
+            self.diag_last_innovation = Some(-self.nav_state.velocity);
             let dx = zupt_update(
                 &mut self.covariance,
                 self.nav_state.velocity,
@@ -227,6 +247,17 @@ impl EskfNavigator {
                 &mut self.bias_gyro,
                 &mut self.bias_accel,
             );
+
+            // 静止时硬归零速度。
+            //
+            // 理论上 Kalman 修正后的速度应该接近零，但实际中由于加速度计残差
+            // 持续被积分，速度会在零附近偏移（甚至线性增长）。直接归零避免位置
+            // 因小幅速度残差而持续漂移。
+            //
+            // 注意：协方差和偏差估计仍通过上面的 zupt_update/apply_state_injection
+            // 正常更新，硬归零只影响最终的名义速度。
+            self.nav_state.velocity = DVec3::ZERO;
+            self.last_accel_lin = None;
 
             if sample.timestamp_ms % 1000 < 4 {
                 tracing::info!(
@@ -247,15 +278,67 @@ impl EskfNavigator {
         self.nav_state
     }
 
-    /// Return whether the navigator currently detects static (standstill).
+    // —— 诊断访问器 ——
+
+    /// 最近一帧 ZUPT 检测的陀螺仪范数 (rad/s)。
+    pub fn zupt_gyro_norm(&self) -> f64 {
+        self.diag_gyro_norm
+    }
+
+    /// 最近一帧 ZUPT 检测的线加速度范数 (m/s²)。
+    pub fn zupt_accel_norm(&self) -> f64 {
+        self.diag_accel_norm
+    }
+
+    /// 迟滞进入计数器。
+    pub fn zupt_enter_count(&self) -> u32 {
+        self.static_enter_count
+    }
+
+    /// 迟滞退出计数器。
+    pub fn zupt_exit_count(&self) -> u32 {
+        self.static_exit_count
+    }
+
+    /// 当前积分步长 (s)。
+    pub fn current_dt(&self) -> f64 {
+        self.diag_dt
+    }
+
+    /// 最近一帧世界系线性加速度 (m/s²)。
+    pub fn last_linear_accel(&self) -> DVec3 {
+        self.diag_linear_accel
+    }
+
+    /// ESKF 协方差对角线（15 个值）。
+    pub fn eskf_cov_diag(&self) -> [f64; 15] {
+        self.covariance.diagonal()
+    }
+
+    /// ESKF 估计的陀螺偏差 (rad/s)。
+    pub fn eskf_bias_gyro(&self) -> DVec3 {
+        self.bias_gyro
+    }
+
+    /// ESKF 估计的加速度计偏差 (m/s²)。
+    pub fn eskf_bias_accel(&self) -> DVec3 {
+        self.bias_accel
+    }
+
+    /// 取出并清除上次 ZUPT 更新的创新向量。
+    pub fn take_last_innovation(&mut self) -> Option<DVec3> {
+        self.diag_last_innovation.take()
+    }
+
+    /// 返回导航器当前是否检测到静止状态。
     pub fn is_static(&self) -> bool {
         self.last_is_static.unwrap_or(false)
     }
 
-    /// Set the gravity reference vector after attitude zero-point calibration.
+    /// 在姿态零点校准后设置重力参考向量。
     ///
-    /// `quat_offset` is the left-multiply quaternion used for axis alignment.
-    /// The gravity vector is rotated to match the calibrated reference frame.
+    /// `quat_offset` 是用于轴对齐的左乘四元数。
+    /// 重力向量会被旋转到与校准后的参考坐标系一致。
     pub fn set_gravity_reference(&mut self, quat_offset: DQuat) {
         let gravity_world = DVec3::new(0.0, 0.0, self.config.gravity);
         self.gravity_ref = quat_offset.rotate_vec3(gravity_world);
@@ -267,7 +350,7 @@ impl EskfNavigator {
         );
     }
 
-    /// Manually set the position (e.g., for coordinate correction).
+    /// 手动设置位置（例如用于坐标校正）。
     pub fn set_position(&mut self, position: DVec3) {
         tracing::info!(
             "ESKF 位置手动校正 | old=[{:.3}, {:.3}, {:.3}] | new=[{:.3}, {:.3}, {:.3}]",
@@ -282,7 +365,7 @@ impl EskfNavigator {
         self.nav_state.velocity = DVec3::ZERO;
     }
 
-    /// Reset all internal state to initial values.
+    /// 将所有内部状态重置为初始值。
     pub fn reset(&mut self) {
         let eskf = &self.config.eskf;
         let sa = eskf.init_sigma_attitude;
@@ -313,15 +396,19 @@ impl EskfNavigator {
         self.static_enter_count = 0;
         self.static_exit_count = 0;
         self.last_accel_lin = None;
+        self.diag_gyro_norm = 0.0;
+        self.diag_accel_norm = 0.0;
+        self.diag_linear_accel = DVec3::ZERO;
+        self.diag_dt = 0.0;
+        self.diag_last_innovation = None;
 
         tracing::info!("ESKF 导航器已重置");
     }
 
-    /// Hysteresis-based ZUPT static detection.
+    /// 基于迟滞的 ZUPT 静止检测。
     ///
-    /// Uses enter/exit thresholds with frame counters to avoid rapid toggling
-    /// between static and moving states. This is the same logic as the legacy
-    /// `SmoothHysteresis` detection but without the smooth decay correction.
+    /// 使用进入/退出阈值和帧计数器，避免静止与运动状态之间快速抖动。
+    /// 该逻辑与旧版 `SmoothHysteresis` 检测相同，但不包含平滑衰减修正。
     fn detect_static(&mut self, gyro_norm: f64, accel_norm: f64) -> bool {
         let zupt = &self.config.zupt;
         let entering = gyro_norm < zupt.gyro_enter_thresh
@@ -369,7 +456,7 @@ impl EskfNavigator {
     }
 }
 
-/// Clamp a millisecond time delta to `[dt_min_ms, dt_max_ms]` and convert to seconds.
+/// 将毫秒时间差限制在 `[dt_min_ms, dt_max_ms]` 范围内，并转换为秒。
 fn clamp_dt_s(delta_ms: u64, dt_min_ms: u64, dt_max_ms: u64) -> f64 {
     let lower = dt_min_ms.max(1);
     let upper = dt_max_ms.max(lower);
@@ -413,7 +500,7 @@ mod tests {
         let attitude = DQuat::IDENTITY;
         let gravity = 9.80665;
 
-        // Feed several static samples
+        // 输入若干静止样本。
         for i in 0..20 {
             let sample = ImuSampleFiltered {
                 timestamp_ms: i * 20,
@@ -423,7 +510,7 @@ mod tests {
             nav.update(attitude, &sample);
         }
 
-        // After many ZUPT updates, velocity should be very close to zero
+        // 多次 ZUPT 更新后，速度应非常接近零。
         assert!(
             nav.nav_state.velocity.length() < 0.05,
             "velocity should converge toward zero, got length={}",

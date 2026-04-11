@@ -1,11 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Layout, Modal } from 'antd';
+import { useEffect, useMemo, useState } from 'react';
+import { Layout, Modal, Tabs } from 'antd';
 
 import { ConnectionPanel, SettingsPanel } from './components/ConnectionPanel';
 import { GlobalSettingFloatButton } from './components/GlobalSettingFloatButton';
 import { CalibrationWizard } from './components/CalibrationWizard';
+import { DiagnosticsPanel } from './components/DiagnosticsPanel';
 import { ImuRealtimePanel } from './pages/ImuRealtimePanel';
 import { useBluetooth } from './hooks/useBluetooth';
+import { useDeveloperMode } from './hooks/useDeveloperMode';
 import { AppProviders } from './providers';
 
 import styles from "./App.module.scss";
@@ -19,6 +21,7 @@ const AppContent = () => {
   const [isDeviceModalOpen, setIsDeviceModalOpen] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
   const { connectedDevice, startScan, stopScan, needsCalibration } = useBluetooth();
+  const { developerMode } = useDeveloperMode();
 
   const hasConnectedDevice = connectedDevice !== null;
   const showSettingsButton = hasConnectedDevice;
@@ -53,21 +56,49 @@ const AppContent = () => {
     setWasConnected(hasConnectedDevice);
   }, [hasConnectedDevice, isDeviceModalOpen, wasConnected]);
 
-  // 首次连接未标定设备时全页替换为标定向导
-  if (needsCalibration && connectedDevice) {
-    return (
-      <CalibrationWizard
-        deviceAddress={connectedDevice.address}
-      />
-    );
-  }
+  const showCalibration = needsCalibration && connectedDevice !== null;
+
+  const appTabItems = useMemo(() => {
+    const items = [
+      {
+        key: "realtime",
+        label: "实时",
+        children: (
+          <div className={styles.tabPane}>
+            <ImuRealtimePanel onOpenDeviceModal={handleDeviceModalOpen} />
+          </div>
+        ),
+      },
+    ];
+    if (developerMode) {
+      items.push({
+        key: "diagnostics",
+        label: "诊断",
+        children: (
+          <div className={styles.tabPane}>
+            <DiagnosticsPanel enabled />
+          </div>
+        ),
+      });
+    }
+    return items;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [developerMode]);
 
   return (
     <Layout className={styles.appLayout}>
       <Content className={styles.appContent}>
-        <ImuRealtimePanel
-          onOpenDeviceModal={handleDeviceModalOpen}
-        />
+        {showCalibration ? (
+          <CalibrationWizard deviceAddress={connectedDevice!.address} />
+        ) : developerMode ? (
+          <Tabs
+            items={appTabItems}
+            className={styles.appTabs}
+            destroyOnHidden
+          />
+        ) : (
+          <ImuRealtimePanel onOpenDeviceModal={handleDeviceModalOpen} />
+        )}
         <GlobalSettingFloatButton
           onClick={handleSettingsModalOpen}
           visible={showSettingsButton}

@@ -1,20 +1,25 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Checkbox } from "antd";
 
-import type { ImuHistoryWindow } from "../../utils/ImuHistoryBuffer";
 import { useColorScheme } from "../../hooks/useColorScheme";
 
 import styles from "./ImuChartsCanvas.module.scss";
 
+/** 图表窗口最小接口：仅需 count/getTime/getValue，由 SeriesSpec 提供缓冲区映射。 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartWindow = { count: number; latestTime: number; getIndex: (v: number) => number; getTime: (v: number) => number; getValue: (buf: any, v: number) => number; [key: string]: unknown };
+
 type SeriesSpec = {
   name: string;
   color: string;
-  getBuffer: (window: ImuHistoryWindow) => Float32Array | Float64Array;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  getBuffer: (window: any) => Float32Array | Float64Array | Uint8Array;
 };
 
 type ImuChartsCanvasProps = {
   /** 图表数据源，提供历史窗口读取能力。 */
-  source: { bufferRef: React.RefObject<{ getWindow: (durationMs: number, offsetMs: number) => ImuHistoryWindow }> };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  source: { bufferRef: React.RefObject<{ getWindow: (durationMs: number, offsetMs: number) => any }> };
   /** 是否启用图表渲染。 */
   enabled: boolean;
   /** 重绘间隔（毫秒），用于控制刷新频率。 */
@@ -330,8 +335,8 @@ const bezierEaseOut = (t: number) => {
  */
 const drawChart = (
   ctx: CanvasRenderingContext2D,
-  window: ImuHistoryWindow,
-  series: Array<{ color: string; name: string; buffer: Float32Array | Float64Array }>,
+  window: ChartWindow,
+  series: Array<{ color: string; name: string; buffer: Float32Array | Float64Array | Uint8Array }>,
   yAxisLabel: string,
   width: number,
   height: number,

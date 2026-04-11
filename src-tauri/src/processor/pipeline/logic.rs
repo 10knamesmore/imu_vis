@@ -2,7 +2,8 @@
 
 use std::{
     path::{Path, PathBuf},
-    time::SystemTime,
+    sync::atomic::Ordering,
+    time::{Instant, SystemTime},
 };
 
 use anyhow::Context;
@@ -13,7 +14,10 @@ use crate::processor::{
     navigator::{Navigator, NavigatorConfig},
     output::OutputFrame,
     parser::{ImuParser, ImuSampleRaw},
-    pipeline::types::ProcessorPipelineConfig,
+    pipeline::{
+        diagnostics::{DiagnosticsFlag, PipelineDiagnostics, QueueProbe},
+        types::ProcessorPipelineConfig,
+    },
 };
 
 /// IMU 处理管线。
@@ -23,6 +27,14 @@ pub struct ProcessorPipeline {
     filter: LowPassFilter,
     navigator: Navigator,
     latest_raw: Option<ImuSampleRaw>,
+    /// 上一帧主机接收时刻（用于计算真实 BLE 收包间隔）。
+    prev_receive_instant: Option<Instant>,
+    /// 诊断开关。
+    diagnostics_flag: DiagnosticsFlag,
+    /// 诊断数据发送通道。
+    diagnostics_tx: flume::Sender<PipelineDiagnostics>,
+    /// 通道队列深度探针。
+    queue_probe: QueueProbe,
 }
 
 /// 处理管线配置快照。
@@ -37,7 +49,12 @@ pub struct PipelineConfigSnapshot {
 
 impl ProcessorPipeline {
     /// 创建处理管线。
-    pub fn new(config: ProcessorPipelineConfig) -> Self {
+    pub fn new(
+        config: ProcessorPipelineConfig,
+        diagnostics_flag: DiagnosticsFlag,
+        diagnostics_tx: flume::Sender<PipelineDiagnostics>,
+        queue_probe: QueueProbe,
+    ) -> Self {
         let ProcessorPipelineConfig {
             global,
             calibration,
@@ -59,6 +76,10 @@ impl ProcessorPipeline {
                 eskf,
             }),
             latest_raw: None,
+            prev_receive_instant: None,
+            diagnostics_flag,
+            diagnostics_tx,
+            queue_probe,
         }
     }
 
@@ -66,7 +87,15 @@ impl ProcessorPipeline {
     /// 并自动执行一次姿态零位校准。
     pub fn reset_with_config(&mut self, config: ProcessorPipelineConfig) {
         let last_raw = self.latest_raw;
-        *self = Self::new(config);
+        let diag_flag = self.diagnostics_flag.clone();
+        let diag_tx = self.diagnostics_tx.clone();
+        // QueueProbe 内部是 flume 的 clone 句柄，创建新的
+        let queue_probe = QueueProbe::new(
+            self.queue_probe.upstream_rx(),
+            self.queue_probe.downstream_tx(),
+            self.queue_probe.record_tx(),
+        );
+        *self = Self::new(config, diag_flag, diag_tx, queue_probe);
         if let Some(raw) = last_raw {
             self.axis_calibration.update_from_raw(&raw);
             self.navigator
@@ -76,6 +105,13 @@ impl ProcessorPipeline {
 
     /// 处理单个原始数据包并输出帧。
     pub fn process_packet(&mut self, packet: &[u8]) -> Option<OutputFrame> {
+        let diag_enabled = self.diagnostics_flag.load(Ordering::Relaxed);
+        let t_start = if diag_enabled {
+            Some(Instant::now())
+        } else {
+            None
+        };
+
         // 解析原始蓝牙包
         let mut raw = match ImuParser::parse(packet) {
             Ok(sample) => sample,
@@ -105,6 +141,53 @@ impl ProcessorPipeline {
                 .update_gyro_bias_online(calibrated.gyro);
         }
 
+        // —— 诊断采集：仅当开关开启时执行 ——
+        if let Some(t_start) = t_start {
+            let diag = PipelineDiagnostics {
+                timestamp_ms: raw.timestamp_ms,
+                // 标定阶段
+                cal_accel_bias: self.calibration.accel_bias(),
+                cal_gyro_bias: self.calibration.gyro_bias(),
+                cal_accel_pre: raw.accel_with_g,
+                cal_accel_post: calibrated.accel,
+                cal_gyro_pre: raw.gyro,
+                cal_gyro_post: calibrated.gyro,
+                // 滤波阶段
+                filt_accel_pre: calibrated.accel,
+                filt_accel_post: filtered.accel_lp,
+                filt_gyro_pre: calibrated.gyro,
+                filt_gyro_post: filtered.gyro_lp,
+                // ZUPT 阶段
+                zupt_is_static: self.navigator.is_static(),
+                zupt_gyro_norm: self.navigator.zupt_gyro_norm(),
+                zupt_accel_norm: self.navigator.zupt_accel_norm(),
+                zupt_enter_count: self.navigator.zupt_enter_count(),
+                zupt_exit_count: self.navigator.zupt_exit_count(),
+                // 导航阶段
+                nav_dt: self.navigator.current_dt(),
+                nav_linear_accel: self.navigator.last_linear_accel(),
+                // ESKF 专属
+                eskf_cov_diag: self.navigator.eskf_cov_diag(),
+                eskf_bias_gyro: self.navigator.eskf_bias_gyro(),
+                eskf_bias_accel: self.navigator.eskf_bias_accel(),
+                eskf_innovation: self.navigator.take_last_innovation(),
+                // 后向修正
+                backward_triggered: self.navigator.backward_triggered(),
+                backward_correction_mag: self.navigator.backward_correction_mag(),
+                // 性能指标
+                perf_process_us: t_start.elapsed().as_micros() as u64,
+                perf_upstream_queue_len: self.queue_probe.upstream_len() as u32,
+                perf_downstream_queue_len: self.queue_probe.downstream_len() as u32,
+                perf_record_queue_len: self.queue_probe.record_len() as u32,
+                perf_ble_interval_ms: self
+                    .prev_receive_instant
+                    .map(|prev| t_start.duration_since(prev).as_secs_f64() * 1000.0)
+                    .unwrap_or(0.0),
+            };
+            let _ = self.diagnostics_tx.try_send(diag);
+        }
+
+        self.prev_receive_instant = Some(Instant::now());
         Some(OutputFrame { raw, nav })
     }
 
@@ -115,6 +198,7 @@ impl ProcessorPipeline {
         self.filter.reset();
         self.navigator.reset();
         self.latest_raw = None;
+        self.prev_receive_instant = None;
     }
 
     /// 响应姿态零位校准请求。
@@ -148,9 +232,21 @@ impl ProcessorPipeline {
 }
 
 impl ProcessorPipelineConfig {
-    /// 返回 pipeline 配置文件的固定路径（当前工作目录）。
+    /// 返回 pipeline 配置文件路径。
+    ///
+    /// 优先查找当前目录下的 `processor.toml`，若不存在则查找父目录。
+    /// 这样无论工作目录是 `src-tauri/` 还是项目根目录都能正确找到。
     pub fn default_config_path() -> PathBuf {
-        PathBuf::from("processor.toml")
+        let local = PathBuf::from("processor.toml");
+        if local.exists() {
+            return local;
+        }
+        let parent = PathBuf::from("../processor.toml");
+        if parent.exists() {
+            return parent;
+        }
+        // 回退到当前目录（让后续读取产生有意义的错误信息）
+        local
     }
 
     /// 从默认路径加载配置与修改时间。

@@ -89,6 +89,104 @@ impl Navigator {
             NavigatorInner::Eskf(n) => n.reset(),
         }
     }
+
+    // —— 诊断访问器 ——
+
+    /// 最近一帧 ZUPT 检测的陀螺仪范数 (rad/s)。
+    pub fn zupt_gyro_norm(&self) -> f64 {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.zupt_gyro_norm(),
+            NavigatorInner::Eskf(n) => n.zupt_gyro_norm(),
+        }
+    }
+
+    /// 最近一帧 ZUPT 检测的线加速度范数 (m/s²)。
+    pub fn zupt_accel_norm(&self) -> f64 {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.zupt_accel_norm(),
+            NavigatorInner::Eskf(n) => n.zupt_accel_norm(),
+        }
+    }
+
+    /// 迟滞进入计数器。
+    pub fn zupt_enter_count(&self) -> u32 {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.zupt_enter_count(),
+            NavigatorInner::Eskf(n) => n.zupt_enter_count(),
+        }
+    }
+
+    /// 迟滞退出计数器。
+    pub fn zupt_exit_count(&self) -> u32 {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.zupt_exit_count(),
+            NavigatorInner::Eskf(n) => n.zupt_exit_count(),
+        }
+    }
+
+    /// 当前积分步长 (s)。
+    pub fn current_dt(&self) -> f64 {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.current_dt(),
+            NavigatorInner::Eskf(n) => n.current_dt(),
+        }
+    }
+
+    /// 最近一帧世界系线性加速度 (m/s²)。
+    pub fn last_linear_accel(&self) -> DVec3 {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.last_linear_accel(),
+            NavigatorInner::Eskf(n) => n.last_linear_accel(),
+        }
+    }
+
+    /// ESKF 协方差对角线。Legacy 模式返回 `None`。
+    pub fn eskf_cov_diag(&self) -> Option<[f64; 15]> {
+        match &self.inner {
+            NavigatorInner::Legacy(_) => None,
+            NavigatorInner::Eskf(n) => Some(n.eskf_cov_diag()),
+        }
+    }
+
+    /// ESKF 估计的陀螺偏差。Legacy 模式返回 `None`。
+    pub fn eskf_bias_gyro(&self) -> Option<DVec3> {
+        match &self.inner {
+            NavigatorInner::Legacy(_) => None,
+            NavigatorInner::Eskf(n) => Some(n.eskf_bias_gyro()),
+        }
+    }
+
+    /// ESKF 估计的加速度计偏差。Legacy 模式返回 `None`。
+    pub fn eskf_bias_accel(&self) -> Option<DVec3> {
+        match &self.inner {
+            NavigatorInner::Legacy(_) => None,
+            NavigatorInner::Eskf(n) => Some(n.eskf_bias_accel()),
+        }
+    }
+
+    /// 取出并清除上次 ZUPT 创新向量。Legacy 模式返回 `None`。
+    pub fn take_last_innovation(&mut self) -> Option<DVec3> {
+        match &mut self.inner {
+            NavigatorInner::Legacy(_) => None,
+            NavigatorInner::Eskf(n) => n.take_last_innovation(),
+        }
+    }
+
+    /// 后向修正是否在本帧触发。仅 Legacy 模式有效。
+    pub fn backward_triggered(&self) -> bool {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.backward_triggered(),
+            NavigatorInner::Eskf(_) => false,
+        }
+    }
+
+    /// 后向修正量 (m)。仅 Legacy 模式有效。
+    pub fn backward_correction_mag(&self) -> f64 {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.backward_correction_mag(),
+            NavigatorInner::Eskf(_) => 0.0,
+        }
+    }
 }
 
 #[cfg(test)]

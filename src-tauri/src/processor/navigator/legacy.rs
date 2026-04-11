@@ -33,6 +33,18 @@ pub struct LegacyNavigator {
     swing_start_time: Option<u64>,
     /// 运动段起始位置（用于 backward correction）。
     swing_start_position: Option<DVec3>,
+
+    // —— 诊断用字段（仅用于读取，不影响导航逻辑）——
+    /// 最近一帧 ZUPT 检测的陀螺仪范数 (rad/s)。
+    diag_gyro_norm: f64,
+    /// 最近一帧 ZUPT 检测的线加速度范数 (m/s²)。
+    diag_accel_norm: f64,
+    /// 最近一帧的世界系线性加速度 (m/s²)。
+    diag_linear_accel: DVec3,
+    /// 本帧是否触发了后向修正。
+    diag_backward_triggered: bool,
+    /// 后向修正量 (m)。
+    diag_backward_correction_mag: f64,
 }
 
 impl LegacyNavigator {
@@ -57,6 +69,11 @@ impl LegacyNavigator {
             static_position: None,
             swing_start_time: None,
             swing_start_position: None,
+            diag_gyro_norm: 0.0,
+            diag_accel_norm: 0.0,
+            diag_linear_accel: DVec3::ZERO,
+            diag_backward_triggered: false,
+            diag_backward_correction_mag: 0.0,
         }
     }
 
@@ -82,9 +99,55 @@ impl LegacyNavigator {
 
     /// 更新一帧导航状态。
     pub fn update(&mut self, attitude: DQuat, sample: &ImuSampleFiltered) -> NavState {
+        // 每帧重置事件标记
+        self.diag_backward_triggered = false;
+        self.diag_backward_correction_mag = 0.0;
+
         self.predict(attitude, sample);
         self.apply_zupt(sample);
         self.nav_state
+    }
+
+    // —— 诊断访问器 ——
+
+    /// 最近一帧 ZUPT 检测的陀螺仪范数 (rad/s)。
+    pub fn zupt_gyro_norm(&self) -> f64 {
+        self.diag_gyro_norm
+    }
+
+    /// 最近一帧 ZUPT 检测的线加速度范数 (m/s²)。
+    pub fn zupt_accel_norm(&self) -> f64 {
+        self.diag_accel_norm
+    }
+
+    /// 迟滞进入计数器。
+    pub fn zupt_enter_count(&self) -> u32 {
+        self.static_enter_count
+    }
+
+    /// 迟滞退出计数器。
+    pub fn zupt_exit_count(&self) -> u32 {
+        self.static_exit_count
+    }
+
+    /// 当前积分步长 (s)。
+    pub fn current_dt(&self) -> f64 {
+        self.current_dt_s
+    }
+
+    /// 最近一帧世界系线性加速度 (m/s²)。
+    pub fn last_linear_accel(&self) -> DVec3 {
+        self.diag_linear_accel
+    }
+
+    /// 本帧是否触发了后向修正。
+    pub fn backward_triggered(&self) -> bool {
+        self.diag_backward_triggered
+    }
+
+    /// 后向修正量 (m)。
+    pub fn backward_correction_mag(&self) -> f64 {
+        self.diag_backward_correction_mag
     }
 
     /// 手动设置位置（用于校正）。
@@ -125,6 +188,11 @@ impl LegacyNavigator {
         self.static_position = None;
         self.swing_start_time = None;
         self.swing_start_position = None;
+        self.diag_gyro_norm = 0.0;
+        self.diag_accel_norm = 0.0;
+        self.diag_linear_accel = DVec3::ZERO;
+        self.diag_backward_triggered = false;
+        self.diag_backward_correction_mag = 0.0;
     }
 
     fn predict(&mut self, attitude: DQuat, sample: &ImuSampleFiltered) {
@@ -144,6 +212,7 @@ impl LegacyNavigator {
 
         let a_world = attitude.rotate_vec3(sample.accel_lp);
         let mut a_lin = a_world - self.gravity_ref;
+        self.diag_linear_accel = a_lin;
 
         // 加速度幅值钳位：防止传感器饱和尖峰被积分
         let clamp = self.config.trajectory.accel_clamp_ms2;
@@ -216,6 +285,10 @@ impl LegacyNavigator {
         let accel_norm = accel_lin.length();
         let dt = self.current_dt_s;
 
+        // 保存诊断值
+        self.diag_gyro_norm = gyro_norm;
+        self.diag_accel_norm = accel_norm;
+
         match self.config.zupt.impl_type {
             ZuptImpl::LegacyHardLock => {
                 let is_static =
@@ -278,6 +351,8 @@ impl LegacyNavigator {
                         let v_residual = self.nav_state.velocity;
                         let pos_correction = v_residual * (swing_duration_s / 2.0);
                         self.nav_state.position -= pos_correction;
+                        self.diag_backward_triggered = true;
+                        self.diag_backward_correction_mag = pos_correction.length();
                         tracing::info!(
                             "ZUPT backward correction | swing={:.3}s | v_residual=[{:.3}, {:.3}, {:.3}] | pos_corr=[{:.4}, {:.4}, {:.4}]",
                             swing_duration_s,
