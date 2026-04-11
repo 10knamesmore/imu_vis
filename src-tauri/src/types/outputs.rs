@@ -12,6 +12,8 @@ pub struct ResponseData {
     pub accel: DVec3,
     /// 含重力加速度（m/s²，用于标定向导）
     pub accel_with_g: DVec3,
+    /// 角速度（°/s，用于陀螺零偏标定）
+    pub gyro: DVec3,
     /// 姿态四元数（计算值）
     pub attitude: DQuat,
     /// 速度（m/s，计算值）

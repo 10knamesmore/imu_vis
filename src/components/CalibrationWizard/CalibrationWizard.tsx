@@ -33,7 +33,7 @@ interface StepDef {
   sign: 1 | -1;
 }
 
-const STEPS: StepDef[] = [
+const ACCEL_STEPS: StepDef[] = [
   { id: 'x_pos', label: 'X+ 轴朝上', hint: '将设备右侧面朝上水平放置', axis: 'x', sign: 1 },
   { id: 'x_neg', label: 'X- 轴朝上', hint: '将设备左侧面朝上水平放置', axis: 'x', sign: -1 },
   { id: 'y_pos', label: 'Y+ 轴朝上', hint: '将设备前侧面朝上水平放置', axis: 'y', sign: 1 },
@@ -41,6 +41,10 @@ const STEPS: StepDef[] = [
   { id: 'z_pos', label: 'Z+ 轴朝上', hint: '将设备正面（显示面）朝上水平放置', axis: 'z', sign: 1 },
   { id: 'z_neg', label: 'Z- 轴朝上', hint: '将设备底面朝上水平放置', axis: 'z', sign: -1 },
 ];
+
+// 总步骤数：6 个加速度计步骤 + 1 个陀螺仪步骤 + 1 个结果页
+const GYRO_STEP_INDEX = ACCEL_STEPS.length; // 6
+const RESULT_STEP_INDEX = GYRO_STEP_INDEX + 1; // 7
 
 type StepMean = Vector3;
 
@@ -61,8 +65,12 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
   const [stepIndex, setStepIndex] = useState(0);
   // 各位置采集均值
   const [means, setMeans] = useState<Partial<Record<StepId, StepMean>>>({});
+  // 陀螺仪零偏采集均值（°/s）
+  const [gyroBiasMean, setGyroBiasMean] = useState<Vector3 | null>(null);
   // 当前实时 accel_with_g 显示值
   const [liveAccel, setLiveAccel] = useState<Vector3 | null>(null);
+  // 当前实时 gyro 显示值（°/s）
+  const [liveGyro, setLiveGyro] = useState<Vector3 | null>(null);
   // 采集阶段
   const [phase, setPhase] = useState<CollectionPhase>('idle');
   // 倒计时/进度（0-100）
@@ -70,20 +78,30 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
   // 保存中
   const [saving, setSaving] = useState(false);
 
-  // 内部采样缓冲
+  // 内部采样缓冲（加速度计或陀螺仪采集共用）
   const samplesRef = useRef<Vector3[]>([]);
+  // 陀螺仪采样缓冲（仅在陀螺步骤使用）
+  const gyroSamplesRef = useRef<Vector3[]>([]);
   const phaseStartRef = useRef<number>(0);
   const phaseRef = useRef<CollectionPhase>('idle');
   phaseRef.current = phase;
+  const stepIndexRef = useRef(stepIndex);
+  stepIndexRef.current = stepIndex;
 
   // 标定向导期间直接订阅实时输出，避免额外全局订阅造成双重消息分发开销。
   useEffect(() => {
     const channel = new Channel<ResponseData>();
     channel.onmessage = (data: ResponseData) => {
       const v = data.accel_with_g;
+      const g = data.gyro;
       setLiveAccel({ x: v.x, y: v.y, z: v.z });
+      setLiveGyro({ x: g.x, y: g.y, z: g.z });
       if (phaseRef.current === 'collecting') {
-        samplesRef.current.push({ x: v.x, y: v.y, z: v.z });
+        if (stepIndexRef.current === GYRO_STEP_INDEX) {
+          gyroSamplesRef.current.push({ x: g.x, y: g.y, z: g.z });
+        } else {
+          samplesRef.current.push({ x: v.x, y: v.y, z: v.z });
+        }
       }
     };
     imuApi.subscribeOutput(channel);
@@ -93,11 +111,12 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
     };
   }, []);
 
-  const currentStep = STEPS[stepIndex];
+  const currentAccelStep = stepIndex < ACCEL_STEPS.length ? ACCEL_STEPS[stepIndex] : null;
 
-  // 开始采集（含倒计时）
+  // 开始采集（含倒计时）——加速度计和陀螺仪步骤共用
   const startCollection = useCallback(() => {
     samplesRef.current = [];
+    gyroSamplesRef.current = [];
     setProgress(0);
     setPhase('countdown');
     phaseStartRef.current = Date.now();
@@ -110,6 +129,7 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
         clearInterval(countdownTimer);
         // 进入采集阶段
         samplesRef.current = [];
+        gyroSamplesRef.current = [];
         phaseStartRef.current = Date.now();
         setPhase('collecting');
         setProgress(0);
@@ -120,15 +140,27 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
           setProgress(pct2);
           if (elapsed2 >= COLLECT_DURATION_MS) {
             clearInterval(collectTimer);
-            // 计算均值
-            const buf = samplesRef.current;
-            if (buf.length > 0) {
-              const mean: Vector3 = {
-                x: buf.reduce((s, v) => s + v.x, 0) / buf.length,
-                y: buf.reduce((s, v) => s + v.y, 0) / buf.length,
-                z: buf.reduce((s, v) => s + v.z, 0) / buf.length,
-              };
-              setMeans((prev) => ({ ...prev, [currentStep.id]: mean }));
+            if (stepIndex === GYRO_STEP_INDEX) {
+              // 陀螺仪步骤：计算角速度均值
+              const buf = gyroSamplesRef.current;
+              if (buf.length > 0) {
+                setGyroBiasMean({
+                  x: buf.reduce((s, v) => s + v.x, 0) / buf.length,
+                  y: buf.reduce((s, v) => s + v.y, 0) / buf.length,
+                  z: buf.reduce((s, v) => s + v.z, 0) / buf.length,
+                });
+              }
+            } else if (currentAccelStep) {
+              // 加速度计步骤：计算均值
+              const buf = samplesRef.current;
+              if (buf.length > 0) {
+                const mean: Vector3 = {
+                  x: buf.reduce((s, v) => s + v.x, 0) / buf.length,
+                  y: buf.reduce((s, v) => s + v.y, 0) / buf.length,
+                  z: buf.reduce((s, v) => s + v.z, 0) / buf.length,
+                };
+                setMeans((prev) => ({ ...prev, [currentAccelStep.id]: mean }));
+              }
             }
             setPhase('done');
             setProgress(100);
@@ -136,7 +168,7 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
         }, 50);
       }
     }, 50);
-  }, [currentStep]);
+  }, [stepIndex, currentAccelStep]);
 
   const handleNext = useCallback(() => {
     setPhase('idle');
@@ -194,14 +226,24 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
       if (err > maxError) maxError = err;
     }
 
+    // 陀螺仪零偏（°/s → rad/s）
+    const gyroBias: [number, number, number] = gyroBiasMean
+      ? [
+          (gyroBiasMean.x * Math.PI) / 180,
+          (gyroBiasMean.y * Math.PI) / 180,
+          (gyroBiasMean.z * Math.PI) / 180,
+        ]
+      : [0, 0, 0];
+
     return {
       bias: [bias.x, bias.y, bias.z] as [number, number, number],
       scale: [scale.x, scale.y, scale.z] as [number, number, number],
+      gyroBias,
       qualityError: maxError,
     };
-  }, [means]);
+  }, [means, gyroBiasMean]);
 
-  const result = stepIndex === STEPS.length ? computeCalibration() : null;
+  const result = stepIndex === RESULT_STEP_INDEX ? computeCalibration() : null;
 
   // 完成标定：应用 + 持久化
   const handleFinish = useCallback(async () => {
@@ -216,6 +258,7 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
           calibration: {
             ...config.calibration,
             accel_bias: { x: result.bias[0], y: result.bias[1], z: result.bias[2] },
+            gyro_bias: { x: result.gyroBias[0], y: result.gyroBias[1], z: result.gyroBias[2] },
             accel_matrix: [
               [result.scale[0], 0, 0],
               [0, result.scale[1], 0],
@@ -232,7 +275,7 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
       if (!calibrationKey) {
         throw new Error('设备地址为空，无法保存标定');
       }
-      const savePrimary = await imuApi.saveDeviceCalibration(calibrationKey, result.bias, result.scale, result.qualityError);
+      const savePrimary = await imuApi.saveDeviceCalibration(calibrationKey, result.bias, result.scale, result.gyroBias, result.qualityError);
       if (!savePrimary.success) {
         throw new Error(savePrimary.message || `保存标定失败，key=${calibrationKey}`);
       }
@@ -252,15 +295,26 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
     setNeedsCalibration(false);
   }, [setNeedsCalibration]);
 
-  const stepItems = STEPS.map((s, i) => ({
-    title: s.label,
-    status:
-      i < stepIndex
-        ? ('finish' as const)
-        : i === stepIndex
-          ? ('process' as const)
-          : ('wait' as const),
-  }));
+  const stepItems = [
+    ...ACCEL_STEPS.map((s, i) => ({
+      title: s.label,
+      status:
+        i < stepIndex
+          ? ('finish' as const)
+          : i === stepIndex
+            ? ('process' as const)
+            : ('wait' as const),
+    })),
+    {
+      title: '陀螺仪静态标定',
+      status:
+        GYRO_STEP_INDEX < stepIndex
+          ? ('finish' as const)
+          : GYRO_STEP_INDEX === stepIndex
+            ? ('process' as const)
+            : ('wait' as const),
+    },
+  ];
 
   return (
     <div
@@ -288,19 +342,29 @@ export const CalibrationWizard = ({ deviceAddress }: Props) => {
         </Paragraph>
 
         <Steps
-          current={Math.min(stepIndex, STEPS.length - 1)}
+          current={Math.min(stepIndex, GYRO_STEP_INDEX)}
           items={stepItems}
           size="small"
           style={{ marginBottom: 32 }}
         />
 
-        {stepIndex < STEPS.length ? (
+        {stepIndex < ACCEL_STEPS.length ? (
           <CollectionStep
-            step={currentStep}
+            step={currentAccelStep!}
             liveAccel={liveAccel}
             phase={phase}
             progress={progress}
-            stepMean={means[currentStep.id]}
+            stepMean={means[currentAccelStep!.id]}
+            onStart={startCollection}
+            onNext={handleNext}
+            onRetry={handleRetry}
+          />
+        ) : stepIndex === GYRO_STEP_INDEX ? (
+          <GyroCollectionStep
+            liveGyro={liveGyro}
+            phase={phase}
+            progress={progress}
+            gyroBiasMean={gyroBiasMean}
             onStart={startCollection}
             onNext={handleNext}
             onRetry={handleRetry}
@@ -434,11 +498,121 @@ const CollectionStep = ({
   );
 };
 
+// 陀螺仪采集步骤子组件
+
+interface GyroCollectionStepProps {
+  liveGyro: Vector3 | null;
+  phase: CollectionPhase;
+  progress: number;
+  gyroBiasMean: Vector3 | null;
+  onStart: () => void;
+  onNext: () => void;
+  onRetry: () => void;
+}
+
+const GyroCollectionStep = ({
+  liveGyro,
+  phase,
+  progress,
+  gyroBiasMean,
+  onStart,
+  onNext,
+  onRetry,
+}: GyroCollectionStepProps) => {
+  const phaseLabel =
+    phase === 'idle'
+      ? '等待开始'
+      : phase === 'countdown'
+        ? '保持静止，准备采集…'
+        : phase === 'collecting'
+          ? '正在采集陀螺仪数据…'
+          : '采集完成';
+
+  return (
+    <Space orientation="vertical" style={{ width: '100%' }} size="large">
+      <Alert
+        title="陀螺仪零偏标定"
+        description="将设备静止放置在任意稳定表面上，保持不动。"
+        type="info"
+        showIcon
+      />
+
+      <Row gutter={16}>
+        <Col span={8}>
+          <Statistic
+            title="角速度 X（°/s）"
+            value={liveGyro?.x.toFixed(4) ?? '—'}
+          />
+        </Col>
+        <Col span={8}>
+          <Statistic
+            title="角速度 Y（°/s）"
+            value={liveGyro?.y.toFixed(4) ?? '—'}
+          />
+        </Col>
+        <Col span={8}>
+          <Statistic
+            title="角速度 Z（°/s）"
+            value={liveGyro?.z.toFixed(4) ?? '—'}
+          />
+        </Col>
+      </Row>
+
+      <div>
+        <Text type="secondary">{phaseLabel}</Text>
+        <Progress
+          percent={Math.round(progress)}
+          status={
+            phase === 'countdown'
+              ? 'normal'
+              : phase === 'collecting'
+                ? 'active'
+                : phase === 'done'
+                  ? 'success'
+                  : 'normal'
+          }
+          style={{ marginTop: 8 }}
+        />
+      </div>
+
+      {phase === 'done' && gyroBiasMean && (
+        <Descriptions size="small" bordered title="陀螺仪零偏（°/s）">
+          <Descriptions.Item label="X">{gyroBiasMean.x.toFixed(5)}</Descriptions.Item>
+          <Descriptions.Item label="Y">{gyroBiasMean.y.toFixed(5)}</Descriptions.Item>
+          <Descriptions.Item label="Z">{gyroBiasMean.z.toFixed(5)}</Descriptions.Item>
+        </Descriptions>
+      )}
+
+      <div style={{ textAlign: 'center' }}>
+        {phase === 'idle' && (
+          <Button type="primary" size="large" onClick={onStart}>
+            开始采集
+          </Button>
+        )}
+        {(phase === 'countdown' || phase === 'collecting') && (
+          <Button size="large" disabled>
+            采集中…
+          </Button>
+        )}
+        {phase === 'done' && (
+          <Space>
+            <Button onClick={onRetry}>重新采集</Button>
+            <Button type="primary" onClick={onNext}>
+              下一步
+            </Button>
+          </Space>
+        )}
+      </div>
+    </Space>
+  );
+};
+
 // 结果步骤子组件
 
 interface CalibrationResult {
   bias: [number, number, number];
   scale: [number, number, number];
+  gyroBias: [number, number, number];
   qualityError: number;
 }
 
@@ -464,7 +638,7 @@ const ResultStep = ({ result, saving, onFinish }: ResultStepProps) => {
         showIcon
       />
 
-      <Row gutter={16}>
+      <Row gutter={[16, 16]}>
         <Col span={12}>
           <Descriptions title="加速度计偏置（m/s²）" size="small" bordered>
             <Descriptions.Item label="X">{result.bias[0].toFixed(5)}</Descriptions.Item>
@@ -477,6 +651,13 @@ const ResultStep = ({ result, saving, onFinish }: ResultStepProps) => {
             <Descriptions.Item label="X">{result.scale[0].toFixed(5)}</Descriptions.Item>
             <Descriptions.Item label="Y">{result.scale[1].toFixed(5)}</Descriptions.Item>
             <Descriptions.Item label="Z">{result.scale[2].toFixed(5)}</Descriptions.Item>
+          </Descriptions>
+        </Col>
+        <Col span={12}>
+          <Descriptions title="陀螺仪零偏（rad/s）" size="small" bordered>
+            <Descriptions.Item label="X">{result.gyroBias[0].toFixed(6)}</Descriptions.Item>
+            <Descriptions.Item label="Y">{result.gyroBias[1].toFixed(6)}</Descriptions.Item>
+            <Descriptions.Item label="Z">{result.gyroBias[2].toFixed(6)}</Descriptions.Item>
           </Descriptions>
         </Col>
       </Row>

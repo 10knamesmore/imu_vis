@@ -13,6 +13,7 @@ impl OutputBuilder {
             timestamp_ms: frame.raw.timestamp_ms,
             accel: frame.raw.accel_no_g,
             accel_with_g: frame.raw.accel_with_g,
+            gyro: frame.raw.gyro,
             attitude: frame.nav.attitude,
             velocity: frame.nav.velocity,
             position: frame.nav.position,

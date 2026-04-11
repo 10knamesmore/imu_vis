@@ -161,7 +161,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
       }
       console.info('[Calibration] hit key:', calibrationKey);
       // 有历史标定 → 自动应用到 pipeline
-      const { accel_bias, accel_scale } = calibrationData;
+      const { accel_bias, accel_scale, gyro_bias } = calibrationData;
       const configRes = await imuApi.getPipelineConfig();
       if (configRes.success && configRes.data) {
         const config = configRes.data;
@@ -170,6 +170,7 @@ const useBluetoothInternal = (): BluetoothContextValue => {
           calibration: {
             ...config.calibration,
             accel_bias: { x: accel_bias[0], y: accel_bias[1], z: accel_bias[2] },
+            gyro_bias: { x: gyro_bias[0], y: gyro_bias[1], z: gyro_bias[2] },
             accel_matrix: [
               [accel_scale[0], 0, 0],
               [0, accel_scale[1], 0],

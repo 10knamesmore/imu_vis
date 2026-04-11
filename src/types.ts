@@ -18,6 +18,7 @@ export interface ResponseData {
   timestamp_ms: number;    // 时间戳（毫秒）
   accel: Vector3;          // 去重力加速度（m/s²）
   accel_with_g: Vector3;   // 含重力加速度（m/s²，用于标定）
+  gyro: Vector3;           // 角速度（°/s，用于陀螺零偏标定）
   attitude: Quaternion;    // 姿态四元数（计算值）
   velocity: Vector3;       // 速度（m/s，计算值）
   position: Vector3;       // 位置（m，计算值）
@@ -98,6 +99,8 @@ export interface DeviceCalibrationData {
   accel_bias: [number, number, number];
   /** 加速度计比例因子 [s_x, s_y, s_z] */
   accel_scale: [number, number, number];
+  /** 陀螺仪零偏 [b_x, b_y, b_z]（rad/s） */
+  gyro_bias: [number, number, number];
   /** 标定质量误差（max |‖a_cal‖ - g|）*/
   quality_error: number;
   /** 标定时间戳（ms）*/

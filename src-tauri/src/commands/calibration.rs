@@ -17,6 +17,8 @@ pub struct DeviceCalibrationData {
     pub accel_bias: [f64; 3],
     /// 加速度计比例因子 [x, y, z]。
     pub accel_scale: [f64; 3],
+    /// 陀螺仪零偏 [x, y, z]（rad/s）。
+    pub gyro_bias: [f64; 3],
     /// 标定质量误差（m/s²）。
     pub quality_error: f64,
     /// 标定时间戳（ms）。
@@ -30,6 +32,7 @@ pub async fn save_device_calibration(
     device_id: String,
     accel_bias: [f64; 3],
     accel_scale: [f64; 3],
+    gyro_bias: [f64; 3],
     quality_error: f64,
 ) -> Response<()> {
     let result: anyhow::Result<()> = async {
@@ -49,8 +52,9 @@ pub async fn save_device_calibration(
             "INSERT OR REPLACE INTO device_calibrations
                 (device_id, accel_bias_x, accel_bias_y, accel_bias_z,
                  accel_scale_x, accel_scale_y, accel_scale_z,
+                 gyro_bias_x, gyro_bias_y, gyro_bias_z,
                  quality_error, created_at_ms)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [
                 device_id.into(),
                 accel_bias[0].into(),
@@ -59,6 +63,9 @@ pub async fn save_device_calibration(
                 accel_scale[0].into(),
                 accel_scale[1].into(),
                 accel_scale[2].into(),
+                gyro_bias[0].into(),
+                gyro_bias[1].into(),
+                gyro_bias[2].into(),
                 quality_error.into(),
                 now_ms.into(),
             ],
@@ -101,6 +108,7 @@ pub async fn get_device_calibration(
             device_id: m.device_id,
             accel_bias: [m.accel_bias_x, m.accel_bias_y, m.accel_bias_z],
             accel_scale: [m.accel_scale_x, m.accel_scale_y, m.accel_scale_z],
+            gyro_bias: [m.gyro_bias_x, m.gyro_bias_y, m.gyro_bias_z],
             quality_error: m.quality_error,
             created_at_ms: m.created_at_ms,
         }))

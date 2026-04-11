@@ -485,6 +485,7 @@ fn sample_to_response_data(sample: models::imu_samples::Model) -> ResponseData {
             sample.accel_with_g_y,
             sample.accel_with_g_z,
         ),
+        gyro: DVec3::new(sample.gyro_x, sample.gyro_y, sample.gyro_z),
         attitude: DQuat::from_xyzw(
             sample.calc_attitude_x,
             sample.calc_attitude_y,

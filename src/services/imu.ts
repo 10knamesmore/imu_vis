@@ -66,12 +66,14 @@ export const imuApi = {
     deviceId: string,
     accelBias: [number, number, number],
     accelScale: [number, number, number],
+    gyroBias: [number, number, number],
     qualityError: number,
   ) =>
     invoke<imuApiResponse<void>>("save_device_calibration", {
       deviceId,
       accelBias,
       accelScale,
+      gyroBias,
       qualityError,
     }),
 

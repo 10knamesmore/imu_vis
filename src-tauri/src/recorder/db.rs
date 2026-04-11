@@ -88,12 +88,28 @@ pub async fn ensure_schema(conn: &DatabaseConnection) -> anyhow::Result<()> {
             accel_scale_x REAL NOT NULL DEFAULT 1.0,
             accel_scale_y REAL NOT NULL DEFAULT 1.0,
             accel_scale_z REAL NOT NULL DEFAULT 1.0,
+            gyro_bias_x   REAL NOT NULL DEFAULT 0.0,
+            gyro_bias_y   REAL NOT NULL DEFAULT 0.0,
+            gyro_bias_z   REAL NOT NULL DEFAULT 0.0,
             quality_error REAL NOT NULL DEFAULT 0.0,
             created_at_ms INTEGER NOT NULL DEFAULT 0
         );",
     ))
     .await
     .context("create device_calibrations table")?;
+
+    // 兼容旧表：添加 gyro_bias 列（已存在则忽略）
+    for col in ["gyro_bias_x", "gyro_bias_y", "gyro_bias_z"] {
+        let _ = conn
+            .execute(Statement::from_string(
+                db_backend,
+                format!(
+                    "ALTER TABLE device_calibrations ADD COLUMN {} REAL NOT NULL DEFAULT 0.0;",
+                    col
+                ),
+            ))
+            .await;
+    }
 
     Ok(())
 }

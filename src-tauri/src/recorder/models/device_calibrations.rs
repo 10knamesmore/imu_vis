@@ -21,6 +21,12 @@ pub struct Model {
     pub accel_scale_y: f64,
     /// 加速度计 Z 轴比例因子。
     pub accel_scale_z: f64,
+    /// 陀螺仪 X 轴零偏（rad/s）。
+    pub gyro_bias_x: f64,
+    /// 陀螺仪 Y 轴零偏（rad/s）。
+    pub gyro_bias_y: f64,
+    /// 陀螺仪 Z 轴零偏（rad/s）。
+    pub gyro_bias_z: f64,
     /// 标定质量误差（max |‖a_cal‖ - g|）。
     pub quality_error: f64,
     /// 标定时间戳（ms）。
