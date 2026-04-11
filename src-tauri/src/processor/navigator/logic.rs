@@ -1,339 +1,94 @@
-//! 导航融合实现。
+//! 导航融合器包装层（enum dispatch）。
+//!
+//! 根据 [`NavigatorImplType`] 配置在运行时选择导航器实现：
+//! - [`Legacy`](LegacyNavigator)：传统积分 + ZUPT 修正
+//! - [`Eskf`](EskfNavigator)：15-state 误差状态卡尔曼滤波
+//!
+//! 使用 enum dispatch 而非 trait object，零运行时开销。
 
 use math_f64::{DQuat, DVec3};
 
 use crate::processor::{
     filter::ImuSampleFiltered,
-    navigator::types::{IntegratorImpl, NavState, NavigatorConfig, ZuptImpl},
+    navigator::{
+        eskf::EskfNavigator,
+        legacy::LegacyNavigator,
+        types::{NavState, NavigatorConfig, NavigatorImplType},
+    },
 };
+
+/// 导航器内部实现枚举。
+enum NavigatorInner {
+    /// 传统积分 + ZUPT 修正。
+    Legacy(LegacyNavigator),
+    /// 15-state 误差状态卡尔曼滤波。
+    Eskf(EskfNavigator),
+}
 
 /// 导航融合器。
 ///
-/// 单模块维护同一份导航状态，按固定顺序执行：
-/// 1) 预测（轨迹积分）
-/// 2) 约束（ZUPT 静止修正）
-/// 3) 提交（写回内部状态）
+/// 对外提供统一接口，内部根据配置 `navigator_impl` 分发到
+/// [`LegacyNavigator`] 或 [`EskfNavigator`]。
+///
+/// # 配置切换
+///
+/// 在 `processor.toml` 中设置：
+/// ```toml
+/// navigator_impl = "legacy"   # 或 "eskf"
+/// ```
 pub struct Navigator {
-    config: NavigatorConfig,
-    nav_state: NavState,
-    gravity_ref: DVec3,
-    last_timestamp_ms: Option<u64>,
-    current_dt_s: f64,
-    last_accel_lin: Option<DVec3>,
-    last_is_static: Option<bool>,
-    static_enter_count: u32,
-    static_exit_count: u32,
-    static_position: Option<DVec3>,
+    inner: NavigatorInner,
 }
 
 impl Navigator {
-    /// 创建导航融合器。
+    /// 创建导航融合器。根据 `config.navigator_impl` 选择实现。
     pub fn new(config: NavigatorConfig) -> Self {
-        let gravity = config.gravity;
-        Self {
-            config,
-            nav_state: NavState {
-                timestamp_ms: 0,
-                position: DVec3::ZERO,
-                velocity: DVec3::ZERO,
-                attitude: DQuat::IDENTITY,
-            },
-            gravity_ref: DVec3::new(0.0, 0.0, gravity),
-            last_timestamp_ms: None,
-            current_dt_s: 0.0,
-            last_accel_lin: None,
-            last_is_static: None,
-            static_enter_count: 0,
-            static_exit_count: 0,
-            static_position: None,
-        }
-    }
-
-    /// 设置姿态零位校准后的重力参考向量。
-    ///
-    /// `quat_offset` 为姿态零位校准使用的左乘四元数，导航中应使用同一参考系
-    /// 下的重力向量，避免静止时出现伪线加速度积分。
-    pub fn set_gravity_reference(&mut self, quat_offset: DQuat) {
-        let gravity_world = DVec3::new(0.0, 0.0, self.config.gravity);
-        self.gravity_ref = quat_offset.rotate_vec3(gravity_world);
-        tracing::info!(
-            "重力参考更新 | g_ref=[{:.3}, {:.3}, {:.3}]",
-            self.gravity_ref.x,
-            self.gravity_ref.y,
-            self.gravity_ref.z
-        );
+        let inner = match config.navigator_impl {
+            NavigatorImplType::Legacy => NavigatorInner::Legacy(LegacyNavigator::new(config)),
+            NavigatorImplType::Eskf => NavigatorInner::Eskf(EskfNavigator::new(config)),
+        };
+        Self { inner }
     }
 
     /// 更新一帧导航状态。
     pub fn update(&mut self, attitude: DQuat, sample: &ImuSampleFiltered) -> NavState {
-        self.predict(attitude, sample);
-        self.apply_zupt(sample);
-        self.nav_state
+        match &mut self.inner {
+            NavigatorInner::Legacy(n) => n.update(attitude, sample),
+            NavigatorInner::Eskf(n) => n.update(attitude, sample),
+        }
+    }
+
+    /// 返回当前是否处于 ZUPT 静止状态。
+    pub fn is_static(&self) -> bool {
+        match &self.inner {
+            NavigatorInner::Legacy(n) => n.is_static(),
+            NavigatorInner::Eskf(n) => n.is_static(),
+        }
+    }
+
+    /// 设置姿态零位校准后的重力参考向量。
+    pub fn set_gravity_reference(&mut self, quat_offset: DQuat) {
+        match &mut self.inner {
+            NavigatorInner::Legacy(n) => n.set_gravity_reference(quat_offset),
+            NavigatorInner::Eskf(n) => n.set_gravity_reference(quat_offset),
+        }
     }
 
     /// 手动设置位置（用于校正）。
     pub fn set_position(&mut self, position: DVec3) {
-        tracing::info!(
-            "位置手动校正 | old=[{:.3}, {:.3}, {:.3}] | new=[{:.3}, {:.3}, {:.3}]",
-            self.nav_state.position.x,
-            self.nav_state.position.y,
-            self.nav_state.position.z,
-            position.x,
-            position.y,
-            position.z
-        );
-        self.nav_state.position = position;
-        // 坐标校正后清零速度，避免残余速度导致下一帧继续积分偏移。
-        self.nav_state.velocity = DVec3::ZERO;
-        // 若当前处于静止锁定，需同步锁定点，否则会被旧锁定点覆盖回去。
-        if self.last_is_static == Some(true) {
-            self.static_position = Some(position);
+        match &mut self.inner {
+            NavigatorInner::Legacy(n) => n.set_position(position),
+            NavigatorInner::Eskf(n) => n.set_position(position),
         }
     }
 
     /// 重置内部状态。
     pub fn reset(&mut self) {
-        self.nav_state = NavState {
-            timestamp_ms: 0,
-            position: DVec3::ZERO,
-            velocity: DVec3::ZERO,
-            attitude: DQuat::IDENTITY,
-        };
-        self.gravity_ref = DVec3::new(0.0, 0.0, self.config.gravity);
-        self.last_timestamp_ms = None;
-        self.current_dt_s = 0.0;
-        self.last_accel_lin = None;
-        self.last_is_static = None;
-        self.static_enter_count = 0;
-        self.static_exit_count = 0;
-        self.static_position = None;
-    }
-
-    fn predict(&mut self, attitude: DQuat, sample: &ImuSampleFiltered) {
-        self.nav_state.attitude = attitude;
-        self.nav_state.timestamp_ms = sample.timestamp_ms;
-
-        if self.config.trajectory.passby {
-            return;
-        }
-
-        let dt = self
-            .last_timestamp_ms
-            .map(|ts| clamp_dt_s(sample.timestamp_ms.saturating_sub(ts), self.config.trajectory.dt_min_ms, self.config.trajectory.dt_max_ms))
-            .unwrap_or(0.0);
-        self.current_dt_s = dt;
-        self.last_timestamp_ms = Some(sample.timestamp_ms);
-
-        let a_world = attitude.rotate_vec3(sample.accel_lp);
-        let a_lin = a_world - self.gravity_ref;
-
-        if dt <= 0.0 {
-            self.last_accel_lin = Some(a_lin);
-            return;
-        }
-
-        match self.config.trajectory.integrator {
-            IntegratorImpl::LegacyEuler => {
-                self.nav_state.velocity += a_lin * dt;
-                self.nav_state.position += self.nav_state.velocity * dt;
-            }
-            IntegratorImpl::Trapezoid => {
-                let v_prev = self.nav_state.velocity;
-                let a_prev = self.last_accel_lin.unwrap_or(a_lin);
-                let v_next = v_prev + (a_prev + a_lin) * (0.5 * dt);
-                self.nav_state.velocity = v_next;
-                self.nav_state.position += (v_prev + v_next) * (0.5 * dt);
-            }
-            IntegratorImpl::Rk4 => {
-                // 对状态 x=[p,v] 做 RK4：
-                //   dp/dt = v
-                //   dv/dt = a(t)
-                // 其中 a(t) 由 a_prev -> a_lin 做线性插值，避免退化为仅对 v 的梯形更新。
-                let v_prev = self.nav_state.velocity;
-                let a_prev = self.last_accel_lin.unwrap_or(a_lin);
-                let accel_at = |alpha: f64| a_prev + (a_lin - a_prev) * alpha;
-
-                let p0 = self.nav_state.position;
-                let v0 = v_prev;
-
-                let k1_p = v0;
-                let k1_v = accel_at(0.0);
-
-                let v2 = v0 + k1_v * (0.5 * dt);
-                let k2_p = v2;
-                let k2_v = accel_at(0.5);
-
-                let v3 = v0 + k2_v * (0.5 * dt);
-                let k3_p = v3;
-                let k3_v = accel_at(0.5);
-
-                let v4 = v0 + k3_v * dt;
-                let k4_p = v4;
-                let k4_v = accel_at(1.0);
-
-                self.nav_state.position = p0 + (k1_p + k2_p * 2.0 + k3_p * 2.0 + k4_p) * (dt / 6.0);
-                self.nav_state.velocity = v0 + (k1_v + k2_v * 2.0 + k3_v * 2.0 + k4_v) * (dt / 6.0);
-            }
-        }
-        self.last_accel_lin = Some(a_lin);
-    }
-
-    fn apply_zupt(&mut self, sample: &ImuSampleFiltered) {
-        if self.config.zupt.passby {
-            return;
-        }
-
-        let gyro_norm = sample.gyro_lp.length();
-        let accel_world = self.nav_state.attitude.rotate_vec3(sample.accel_lp);
-        let accel_lin = accel_world - self.gravity_ref;
-        let accel_norm = accel_lin.length();
-        let dt = self.current_dt_s;
-
-        match self.config.zupt.impl_type {
-            ZuptImpl::LegacyHardLock => {
-                let is_static =
-                    gyro_norm < self.config.zupt.gyro_thresh && accel_norm < self.config.zupt.accel_thresh;
-                self.apply_static_transition(is_static, gyro_norm, accel_norm);
-                if is_static {
-                    self.apply_hard_lock(accel_lin, sample.timestamp_ms);
-                }
-            }
-            ZuptImpl::SmoothHysteresis => {
-                let entering = gyro_norm < self.config.zupt.gyro_enter_thresh
-                    && accel_norm < self.config.zupt.accel_enter_thresh;
-                let exiting = gyro_norm > self.config.zupt.gyro_exit_thresh
-                    || accel_norm > self.config.zupt.accel_exit_thresh;
-
-                let prev_is_static = self.last_is_static.unwrap_or(false);
-                let mut is_static = prev_is_static;
-                if prev_is_static {
-                    if exiting {
-                        self.static_exit_count = self.static_exit_count.saturating_add(1);
-                    } else {
-                        self.static_exit_count = 0;
-                    }
-                    if self.static_exit_count >= self.config.zupt.exit_frames.max(1) {
-                        is_static = false;
-                        self.static_exit_count = 0;
-                    }
-                } else {
-                    if entering {
-                        self.static_enter_count = self.static_enter_count.saturating_add(1);
-                    } else {
-                        self.static_enter_count = 0;
-                    }
-                    if self.static_enter_count >= self.config.zupt.enter_frames.max(1) {
-                        is_static = true;
-                        self.static_enter_count = 0;
-                    }
-                }
-
-                self.apply_static_transition(is_static, gyro_norm, accel_norm);
-                if is_static {
-                    self.apply_smooth_static(dt, accel_lin, sample.timestamp_ms);
-                }
-            }
+        match &mut self.inner {
+            NavigatorInner::Legacy(n) => n.reset(),
+            NavigatorInner::Eskf(n) => n.reset(),
         }
     }
-
-    fn apply_static_transition(&mut self, is_static: bool, gyro_norm: f64, accel_norm: f64) {
-        if self.last_is_static == Some(is_static) {
-            return;
-        }
-
-        if is_static {
-            self.static_position = Some(self.nav_state.position);
-            tracing::info!(
-                "ZUPT: 进入静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s² | vel=[{:.3}, {:.3}, {:.3}]",
-                gyro_norm,
-                accel_norm,
-                self.nav_state.velocity.x,
-                self.nav_state.velocity.y,
-                self.nav_state.velocity.z
-            );
-        } else {
-            self.static_position = None;
-            tracing::info!(
-                "ZUPT: 退出静止状态 | gyro={:.4} rad/s | accel_lin={:.4} m/s²",
-                gyro_norm,
-                accel_norm
-            );
-        }
-        self.last_is_static = Some(is_static);
-    }
-
-    fn apply_hard_lock(&mut self, accel_lin: DVec3, timestamp_ms: u64) {
-        let vel_before = self.nav_state.velocity;
-        let pos_before = self.nav_state.position;
-        self.nav_state.velocity = DVec3::ZERO;
-        if let Some(static_position) = self.static_position {
-            self.nav_state.position = static_position;
-        }
-
-        if timestamp_ms % 1000 < 4 {
-            tracing::info!(
-                "ZUPT 硬修正 | vel_before=[{:.3}, {:.3}, {:.3}] → [0, 0, 0] | pos_before=[{:.3}, {:.3}, {:.3}] | pos_locked=[{:.3}, {:.3}, {:.3}] | a_lin=[{:.3}, {:.3}, {:.3}]",
-                vel_before.x,
-                vel_before.y,
-                vel_before.z,
-                pos_before.x,
-                pos_before.y,
-                pos_before.z,
-                self.nav_state.position.x,
-                self.nav_state.position.y,
-                self.nav_state.position.z,
-                accel_lin.x,
-                accel_lin.y,
-                accel_lin.z
-            );
-        }
-    }
-
-    fn apply_smooth_static(&mut self, dt: f64, accel_lin: DVec3, timestamp_ms: u64) {
-        let vel_before = self.nav_state.velocity;
-        let pos_before = self.nav_state.position;
-
-        let tau_v_s = (self.config.zupt.vel_decay_tau_ms.max(1.0)) / 1000.0;
-        let alpha_v = 1.0 - f64::exp(-dt / tau_v_s);
-        self.nav_state.velocity *= 1.0 - alpha_v;
-        if self.nav_state.velocity.length() < self.config.zupt.vel_zero_eps {
-            self.nav_state.velocity = DVec3::ZERO;
-        }
-
-        if let Some(static_position) = self.static_position {
-            let tau_p_s = (self.config.zupt.pos_lock_tau_ms.max(1.0)) / 1000.0;
-            let alpha_p = 1.0 - f64::exp(-dt / tau_p_s);
-            self.nav_state.position += (static_position - self.nav_state.position) * alpha_p;
-        }
-
-        if timestamp_ms % 1000 < 4 {
-            tracing::info!(
-                "ZUPT 平滑修正 | vel_before=[{:.3}, {:.3}, {:.3}] | vel_after=[{:.3}, {:.3}, {:.3}] | pos_before=[{:.3}, {:.3}, {:.3}] | pos_after=[{:.3}, {:.3}, {:.3}] | a_lin=[{:.3}, {:.3}, {:.3}]",
-                vel_before.x,
-                vel_before.y,
-                vel_before.z,
-                self.nav_state.velocity.x,
-                self.nav_state.velocity.y,
-                self.nav_state.velocity.z,
-                pos_before.x,
-                pos_before.y,
-                pos_before.z,
-                self.nav_state.position.x,
-                self.nav_state.position.y,
-                self.nav_state.position.z,
-                accel_lin.x,
-                accel_lin.y,
-                accel_lin.z
-            );
-        }
-    }
-}
-
-fn clamp_dt_s(delta_ms: u64, dt_min_ms: u64, dt_max_ms: u64) -> f64 {
-    let lower = dt_min_ms.max(1);
-    let upper = dt_max_ms.max(lower);
-    let clamped = delta_ms.clamp(lower, upper);
-    clamped as f64 / 1000.0
 }
 
 #[cfg(test)]
@@ -348,11 +103,21 @@ mod tests {
         },
     };
 
+    /// 构造默认配置的辅助函数（Legacy 模式）。
+    fn default_config(gravity: f64) -> NavigatorConfig {
+        NavigatorConfig {
+            gravity,
+            trajectory: TrajectoryConfig::default(),
+            zupt: ZuptConfig::default(),
+            navigator_impl: Default::default(),
+            eskf: Default::default(),
+        }
+    }
+
     #[test]
     fn static_state_keeps_position_stable_even_with_small_noise() {
         let gravity = 9.80665;
         let mut navigator = Navigator::new(NavigatorConfig {
-            gravity,
             trajectory: TrajectoryConfig {
                 passby: false,
                 dt_max_ms: 1000,
@@ -365,6 +130,7 @@ mod tests {
                 impl_type: ZuptImpl::LegacyHardLock,
                 ..ZuptConfig::default()
             },
+            ..default_config(gravity)
         });
 
         let attitude = DQuat::IDENTITY;
@@ -405,7 +171,6 @@ mod tests {
     fn set_position_updates_static_lock_point_when_stationary() {
         let gravity = 9.80665;
         let mut navigator = Navigator::new(NavigatorConfig {
-            gravity,
             trajectory: TrajectoryConfig {
                 passby: false,
                 dt_max_ms: 1000,
@@ -418,6 +183,7 @@ mod tests {
                 impl_type: ZuptImpl::LegacyHardLock,
                 ..ZuptConfig::default()
             },
+            ..default_config(gravity)
         });
 
         let attitude = DQuat::IDENTITY;
@@ -452,7 +218,6 @@ mod tests {
     fn gravity_reference_keeps_static_velocity_zero_after_axis_alignment() {
         let gravity = 9.80665;
         let mut navigator = Navigator::new(NavigatorConfig {
-            gravity,
             trajectory: TrajectoryConfig {
                 passby: false,
                 dt_max_ms: 1000,
@@ -464,9 +229,9 @@ mod tests {
                 accel_thresh: 0.2,
                 ..ZuptConfig::default()
             },
+            ..default_config(gravity)
         });
 
-        // 姿态零位：绕 X 轴 90°，用于模拟“校准时设备未水平放置”。
         let q_raw_ref = DQuat {
             w: std::f64::consts::FRAC_1_SQRT_2,
             x: std::f64::consts::FRAC_1_SQRT_2,
@@ -476,9 +241,7 @@ mod tests {
         let q_offset = q_raw_ref.inverse();
         navigator.set_gravity_reference(q_offset);
 
-        // 校准后姿态应为单位四元数。
         let attitude = DQuat::IDENTITY;
-        // 静止时加速度（含重力）在校准参考系下应与 gravity_ref 一致。
         let accel_static = q_offset.rotate_vec3(DVec3::new(0.0, 0.0, gravity));
 
         let sample_0 = ImuSampleFiltered {
@@ -503,34 +266,35 @@ mod tests {
     fn rk4_position_differs_from_trapezoid_under_varying_accel() {
         let gravity = 9.80665;
         let mut nav_trapezoid = Navigator::new(NavigatorConfig {
-            gravity,
             trajectory: TrajectoryConfig {
                 passby: false,
                 dt_min_ms: 1000,
                 dt_max_ms: 1000,
                 integrator: IntegratorImpl::Trapezoid,
+                ..TrajectoryConfig::default()
             },
             zupt: ZuptConfig {
                 passby: true,
                 ..ZuptConfig::default()
             },
+            ..default_config(gravity)
         });
         let mut nav_rk4 = Navigator::new(NavigatorConfig {
-            gravity,
             trajectory: TrajectoryConfig {
                 passby: false,
                 dt_min_ms: 1000,
                 dt_max_ms: 1000,
                 integrator: IntegratorImpl::Rk4,
+                ..TrajectoryConfig::default()
             },
             zupt: ZuptConfig {
                 passby: true,
                 ..ZuptConfig::default()
             },
+            ..default_config(gravity)
         });
 
         let attitude = DQuat::IDENTITY;
-        // 第 1 帧: a=0；第 2 帧: a=1m/s²（世界系 z 轴），构造变加速度步进。
         let s0 = ImuSampleFiltered {
             timestamp_ms: 0,
             accel_lp: DVec3::new(0.0, 0.0, gravity),
@@ -548,8 +312,6 @@ mod tests {
         let out_trapezoid = nav_trapezoid.update(attitude, &s1);
         let out_rk4 = nav_rk4.update(attitude, &s1);
 
-        // 两者速度相同（线性插值加速度下都为 0.5 m/s），位置应不同：
-        // 梯形: 0.25m，RK4: 1/6m。
         assert!((out_trapezoid.velocity.z - 0.5).abs() < 1e-12);
         assert!((out_rk4.velocity.z - 0.5).abs() < 1e-12);
         assert!((out_trapezoid.position.z - 0.25).abs() < 1e-12);

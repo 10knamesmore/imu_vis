@@ -89,6 +89,21 @@ export interface ProcessorPipelineConfig {
     vel_decay_tau_ms: number;
     pos_lock_tau_ms: number;
     vel_zero_eps: number;
+    backward_correction: boolean;
+  };
+  navigator_impl: 'legacy' | 'eskf';
+  eskf: {
+    gyro_noise: number;
+    accel_noise: number;
+    pos_noise: number;
+    gyro_bias_walk: number;
+    accel_bias_walk: number;
+    zupt_velocity_noise: number;
+    init_sigma_attitude: number;
+    init_sigma_velocity: number;
+    init_sigma_position: number;
+    init_sigma_gyro_bias: number;
+    init_sigma_accel_bias: number;
   };
 }
 

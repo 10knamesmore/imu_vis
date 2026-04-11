@@ -41,6 +41,21 @@ const DEFAULT_CONFIG: ProcessorPipelineConfig = {
     vel_decay_tau_ms: 70,
     pos_lock_tau_ms: 110,
     vel_zero_eps: 0.03,
+    backward_correction: false,
+  },
+  navigator_impl: 'legacy',
+  eskf: {
+    gyro_noise: 0.005,
+    accel_noise: 0.05,
+    pos_noise: 0.000001,
+    gyro_bias_walk: 0.00001,
+    accel_bias_walk: 0.0001,
+    zupt_velocity_noise: 0.01,
+    init_sigma_attitude: 0.01,
+    init_sigma_velocity: 0.01,
+    init_sigma_position: 0.001,
+    init_sigma_gyro_bias: 0.01,
+    init_sigma_accel_bias: 0.1,
   },
 };
 
@@ -241,6 +256,8 @@ export const SettingsPanel = () => {
           filter: formValues.filter ?? baseConfig.filter,
           trajectory: formValues.trajectory ?? baseConfig.trajectory,
           zupt: formValues.zupt ?? baseConfig.zupt,
+          navigator_impl: formValues.navigator_impl ?? baseConfig.navigator_impl,
+          eskf: formValues.eskf ?? baseConfig.eskf,
         };
         console.info('[SettingsPanel] apply pipeline config:', JSON.stringify(config, null, 2));
         const updated = await updatePipelineConfig(config);

@@ -44,6 +44,8 @@ impl ProcessorPipeline {
             filter,
             trajectory,
             zupt,
+            navigator_impl,
+            eskf,
         } = config;
         Self {
             axis_calibration: AxisCalibration::new(),
@@ -53,6 +55,8 @@ impl ProcessorPipeline {
                 trajectory,
                 zupt,
                 gravity: global.gravity,
+                navigator_impl,
+                eskf,
             }),
             latest_raw: None,
         }
@@ -94,6 +98,13 @@ impl ProcessorPipeline {
         let filtered = self.filter.apply(&calibrated);
 
         let nav = self.navigator.update(raw.quat, &filtered);
+
+        // 在线陀螺零偏估计：静止时用标定后的角速度更新零偏
+        if self.navigator.is_static() {
+            self.calibration
+                .update_gyro_bias_online(calibrated.gyro);
+        }
+
         Some(OutputFrame { raw, nav })
     }
 

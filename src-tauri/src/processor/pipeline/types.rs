@@ -5,7 +5,7 @@ use tokio::sync::oneshot;
 
 use crate::processor::calibration::ImuCalibrationConfig;
 use crate::processor::filter::LowPassFilterConfig;
-use crate::processor::navigator::{TrajectoryConfig, ZuptConfig};
+use crate::processor::navigator::{EskfConfig, NavigatorImplType, TrajectoryConfig, ZuptConfig};
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 /// 全局配置参数。
@@ -33,6 +33,12 @@ pub struct ProcessorPipelineConfig {
     pub trajectory: TrajectoryConfig,
     /// ZUPT 配置。
     pub zupt: ZuptConfig,
+    /// 导航器实现类型。
+    #[serde(default)]
+    pub navigator_impl: NavigatorImplType,
+    /// ESKF 参数配置。
+    #[serde(default)]
+    pub eskf: EskfConfig,
 }
 
 /// Pipeline 运行时配置请求。

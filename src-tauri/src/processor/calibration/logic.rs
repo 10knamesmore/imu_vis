@@ -74,6 +74,19 @@ impl Calibration {
             self.config.accel_bias
         }
     }
+
+    /// 在线更新陀螺仪零偏估计。
+    ///
+    /// 当 ZUPT 检测到静止状态时调用，使用 EMA 平滑更新陀螺零偏。
+    /// `gyro_raw_rad` 为标定后的角速度（rad/s），静止时应接近零偏。
+    pub fn update_gyro_bias_online(&mut self, gyro_raw_rad: DVec3) {
+        if self.config.passby {
+            return;
+        }
+        // EMA 平滑因子：0.01 意味着约 100 帧（~400ms@250Hz）收敛到新值
+        const ALPHA: f64 = 0.01;
+        self.state.bias_g = self.state.bias_g * (1.0 - ALPHA) + gyro_raw_rad * ALPHA;
+    }
 }
 
 impl AxisCalibration {
