@@ -55,37 +55,50 @@ struct ActiveSession {
 }
 
 /// 启动录制任务。
+///
+/// 使用独立的 OS 线程 + 专属单线程 tokio runtime，与 Tauri IPC runtime 完全隔离。
+/// 这样可以避免 IPC 负载（序列化、前端推送）占用 runtime worker，导致录制消费
+/// 延迟进而反压 pipeline 线程的 `record_tx.send()`。
 pub fn spawn_recorder(data_rx: Receiver<OutputFrame>, control_rx: Receiver<RecorderCommand>) {
-    tauri::async_runtime::spawn(async move {
-        let mut active: Option<ActiveSession> = None;
-        loop {
-            tokio::select! {
-                biased;
-                command = control_rx.recv_async() => {
-                    match command {
-                        Ok(command) => handle_command(command, &mut active).await,
-                        Err(_) => {
-                            if active.is_none() {
-                                break;
-                            }
-                        }
-                    }
-                }
-                data = data_rx.recv_async() => {
-                    match data {
-                        Ok(data) => {
-                            if let Some(session) = active.as_mut() {
-                                if let Err(error) = insert_sample(session, &data).await {
-                                    tracing::error!("Recorder insert failed: {error:#}");
+    std::thread::Builder::new()
+        .name("imu-recorder".into())
+        .spawn(move || {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .expect("recorder runtime build failed");
+            rt.block_on(async move {
+                let mut active: Option<ActiveSession> = None;
+                loop {
+                    tokio::select! {
+                        biased;
+                        command = control_rx.recv_async() => {
+                            match command {
+                                Ok(command) => handle_command(command, &mut active).await,
+                                Err(_) => {
+                                    if active.is_none() {
+                                        break;
+                                    }
                                 }
                             }
                         }
-                        Err(_) => break,
+                        data = data_rx.recv_async() => {
+                            match data {
+                                Ok(data) => {
+                                    if let Some(session) = active.as_mut() {
+                                        if let Err(error) = insert_sample(session, &data).await {
+                                            tracing::error!("Recorder insert failed: {error:#}");
+                                        }
+                                    }
+                                }
+                                Err(_) => break,
+                            }
+                        }
                     }
                 }
-            }
-        }
-    });
+            });
+        })
+        .expect("failed to spawn recorder thread");
 }
 
 /// 通过录制通道启动录制。
