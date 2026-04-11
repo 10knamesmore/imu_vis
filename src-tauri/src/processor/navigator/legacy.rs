@@ -33,6 +33,16 @@ pub struct LegacyNavigator {
     swing_start_time: Option<u64>,
     /// 运动段起始位置（用于 backward correction）。
     swing_start_position: Option<DVec3>,
+    /// gravity_ref 是否已被首帧 bootstrap 过。
+    gravity_initialized: bool,
+    /// gravity_ref 是否已经锁定（结束初始化窗口）。
+    gravity_locked: bool,
+    /// 初始化窗口内累计的帧数。
+    gravity_init_total_frames: u32,
+    /// 初始化窗口内低 gyro 帧的 `R(q)*a` 累加。
+    gravity_init_sum: DVec3,
+    /// 初始化窗口内低 gyro 帧数。
+    gravity_init_static_frames: u32,
 
     // —— 诊断用字段（仅用于读取，不影响导航逻辑）——
     /// 最近一帧 ZUPT 检测的陀螺仪范数 (rad/s)。
@@ -69,6 +79,11 @@ impl LegacyNavigator {
             static_position: None,
             swing_start_time: None,
             swing_start_position: None,
+            gravity_initialized: false,
+            gravity_locked: false,
+            gravity_init_total_frames: 0,
+            gravity_init_sum: DVec3::ZERO,
+            gravity_init_static_frames: 0,
             diag_gyro_norm: 0.0,
             diag_accel_norm: 0.0,
             diag_linear_accel: DVec3::ZERO,
@@ -89,6 +104,9 @@ impl LegacyNavigator {
     pub fn set_gravity_reference(&mut self, quat_offset: DQuat) {
         let gravity_world = DVec3::new(0.0, 0.0, self.config.gravity);
         self.gravity_ref = quat_offset.rotate_vec3(gravity_world);
+        // 手动校准立即锁定 gravity_ref，绕过初始化窗口的自动 refine。
+        self.gravity_initialized = true;
+        self.gravity_locked = true;
         tracing::info!(
             "重力参考更新 | g_ref=[{:.3}, {:.3}, {:.3}]",
             self.gravity_ref.x,
@@ -102,6 +120,51 @@ impl LegacyNavigator {
         // 每帧重置事件标记
         self.diag_backward_triggered = false;
         self.diag_backward_correction_mag = 0.0;
+
+        // gravity_ref 三种初始化策略，逻辑与 EskfNavigator 一致。
+        // 见 eskf/mod.rs 的详细注释。
+        if !self.gravity_locked {
+            let g_now = attitude.rotate_vec3(sample.accel_lp);
+            let g_mag_err = (g_now.length() - self.config.gravity).abs();
+            let gyro_norm_init = sample.gyro_lp.length();
+            const CLEAN_G_MAG_THRESH: f64 = 0.15;
+            const CLEAN_GYRO_THRESH: f64 = 0.15;
+            const INIT_WINDOW_FRAMES: u32 = 100;
+            let is_clean = g_mag_err < CLEAN_G_MAG_THRESH && gyro_norm_init < CLEAN_GYRO_THRESH;
+
+            if !self.gravity_initialized {
+                self.gravity_ref = g_now;
+                self.gravity_initialized = true;
+                if is_clean {
+                    self.gravity_locked = true;
+                    tracing::info!(
+                        "Legacy gravity_ref 首帧干净，立即锁定 | g=[{:.3},{:.3},{:.3}] |g|={:.3}",
+                        g_now.x, g_now.y, g_now.z, g_now.length()
+                    );
+                }
+            } else {
+                if is_clean {
+                    self.gravity_init_sum += g_now;
+                    self.gravity_init_static_frames += 1;
+                }
+                self.gravity_init_total_frames += 1;
+                if self.gravity_init_total_frames >= INIT_WINDOW_FRAMES {
+                    if self.gravity_init_static_frames >= 10 {
+                        let refined = self.gravity_init_sum
+                            / self.gravity_init_static_frames as f64;
+                        tracing::info!(
+                            "Legacy gravity_ref refined | bootstrap=[{:.3},{:.3},{:.3}] → refined=[{:.3},{:.3},{:.3}] ({}干净/{}总帧)",
+                            self.gravity_ref.x, self.gravity_ref.y, self.gravity_ref.z,
+                            refined.x, refined.y, refined.z,
+                            self.gravity_init_static_frames,
+                            self.gravity_init_total_frames,
+                        );
+                        self.gravity_ref = refined;
+                    }
+                    self.gravity_locked = true;
+                }
+            }
+        }
 
         self.predict(attitude, sample);
         self.apply_zupt(sample);
@@ -179,6 +242,11 @@ impl LegacyNavigator {
             attitude: DQuat::IDENTITY,
         };
         self.gravity_ref = DVec3::new(0.0, 0.0, self.config.gravity);
+        self.gravity_initialized = false;
+        self.gravity_locked = false;
+        self.gravity_init_total_frames = 0;
+        self.gravity_init_sum = DVec3::ZERO;
+        self.gravity_init_static_frames = 0;
         self.last_timestamp_ms = None;
         self.current_dt_s = 0.0;
         self.last_accel_lin = None;

@@ -1,3 +1,5 @@
+navigator_impl = "eskf"
+
 [global]
 gravity = 9.848
 
@@ -49,26 +51,41 @@ y = 0.0
 z = 0.0
 
 [filter]
-passby = true
-alpha = 0.9
+passby = false
+alpha = 0.3
 
 [trajectory]
 passby = false
 integrator = "trapezoid"
 dt_min_ms = 1
 dt_max_ms = 50
+accel_clamp_ms2 = 150.0
 
 [zupt]
 passby = false
 impl_type = "smooth_hysteresis"
 gyro_thresh = 0.15
-accel_thresh = 0.6
-gyro_enter_thresh = 0.1
-accel_enter_thresh = 0.15
-gyro_exit_thresh = 0.2
-accel_exit_thresh = 0.3
-enter_frames = 12
-exit_frames = 5
-vel_decay_tau_ms = 35.0
-pos_lock_tau_ms = 110.0
-vel_zero_eps = 0.1
+accel_thresh = 1.0
+gyro_enter_thresh = 0.18
+accel_enter_thresh = 0.60
+gyro_exit_thresh = 0.35
+accel_exit_thresh = 1.00
+enter_frames = 15
+exit_frames = 3
+vel_decay_tau_ms = 25.0
+pos_lock_tau_ms = 80.0
+vel_zero_eps = 0.05
+backward_correction = true
+
+[eskf]
+gyro_noise = 0.005
+accel_noise = 0.05
+pos_noise = 0.000001
+gyro_bias_walk = 0.00001
+accel_bias_walk = 0.0001
+zupt_velocity_noise = 0.01
+init_sigma_attitude = 0.01
+init_sigma_velocity = 0.01
+init_sigma_position = 0.001
+init_sigma_gyro_bias = 0.01
+init_sigma_accel_bias = 0.1

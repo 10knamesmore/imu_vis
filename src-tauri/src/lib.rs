@@ -8,9 +8,16 @@ mod app_state;
 mod commands;
 mod imu;
 mod logger;
-mod processor;
-mod recorder;
-mod types;
+/// 数据处理管线（离线 replay 二进制会复用本模块）。
+pub mod processor;
+/// 录制数据库访问层（离线 replay 二进制会复用本模块）。
+///
+/// 子模块里的 SeaORM 实体结构未逐字段补文档，故本模块整体放宽 `missing_docs`。
+#[allow(missing_docs)]
+pub mod recorder;
+/// 前后端共享的数据结构。
+#[allow(missing_docs)]
+pub mod types;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 /// 启动 Tauri 应用并注册后端能力。

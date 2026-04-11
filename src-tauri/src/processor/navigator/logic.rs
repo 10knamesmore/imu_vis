@@ -232,6 +232,9 @@ mod tests {
         });
 
         let attitude = DQuat::IDENTITY;
+        // 显式设置 gravity_ref 为 [0,0,g]，避免首帧懒初始化把 "moving" 的 accel
+        // 当成重力参考（那会让所有后续帧看起来都处于静止）。
+        navigator.set_gravity_reference(DQuat::IDENTITY);
         let moving_0 = ImuSampleFiltered {
             timestamp_ms: 0,
             accel_lp: DVec3::new(0.0, 0.0, gravity + 1.0),
@@ -285,6 +288,7 @@ mod tests {
         });
 
         let attitude = DQuat::IDENTITY;
+        navigator.set_gravity_reference(DQuat::IDENTITY);
         let static_0 = ImuSampleFiltered {
             timestamp_ms: 0,
             accel_lp: DVec3::new(0.0, 0.0, gravity + 0.01),
@@ -393,6 +397,8 @@ mod tests {
         });
 
         let attitude = DQuat::IDENTITY;
+        nav_trapezoid.set_gravity_reference(DQuat::IDENTITY);
+        nav_rk4.set_gravity_reference(DQuat::IDENTITY);
         let s0 = ImuSampleFiltered {
             timestamp_ms: 0,
             accel_lp: DVec3::new(0.0, 0.0, gravity),

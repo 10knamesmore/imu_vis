@@ -98,6 +98,18 @@ pub struct EskfNavigator {
     static_exit_count: u32,
     /// 上一帧世界坐标系线性加速度（用于梯形积分）。
     last_accel_lin: Option<DVec3>,
+    /// gravity_ref 是否已被首帧 bootstrap 过。
+    gravity_initialized: bool,
+    /// gravity_ref 是否已经锁定（结束初始化窗口）。锁定后不再 refine。
+    ///
+    /// 用户手动校准或初始化窗口结束会置为 `true`。
+    gravity_locked: bool,
+    /// 初始化窗口内累计的帧数（所有帧，不限 gyro）。
+    gravity_init_total_frames: u32,
+    /// 初始化窗口内低 gyro 帧（"近似静止"）的 `R(q)*a` 累加。
+    gravity_init_sum: DVec3,
+    /// 初始化窗口内低 gyro 帧数。
+    gravity_init_static_frames: u32,
 
     // —— 诊断用字段 ——
     /// 最近一帧 ZUPT 检测的陀螺仪范数 (rad/s)。
@@ -152,6 +164,11 @@ impl EskfNavigator {
             static_enter_count: 0,
             static_exit_count: 0,
             last_accel_lin: None,
+            gravity_initialized: false,
+            gravity_locked: false,
+            gravity_init_total_frames: 0,
+            gravity_init_sum: DVec3::ZERO,
+            gravity_init_static_frames: 0,
             diag_gyro_norm: 0.0,
             diag_accel_norm: 0.0,
             diag_linear_accel: DVec3::ZERO,
@@ -171,6 +188,65 @@ impl EskfNavigator {
     pub fn update(&mut self, attitude: DQuat, sample: &ImuSampleFiltered) -> NavState {
         self.nav_state.attitude = attitude;
         self.nav_state.timestamp_ms = sample.timestamp_ms;
+
+        // gravity_ref 三种初始化策略（按优先级）：
+        //
+        // 1. 首帧就是"干净静止"（|R*a| 已接近 g）→ 立即锁定
+        // 2. 首帧被污染（|R*a| 偏离 g）→ 进入 refine 模式，累积后续"干净"帧的均值
+        // 3. refine 窗口内找不到干净帧 → 保留 bootstrap 值
+        //
+        // "干净帧"定义：|R*a - g| < CLEAN_THRESH（加速度模长接近 g）且 gyro 低。
+        // 用 R*a 的模长而非方向判断，因为真正静止时 R*a 必须严格等于 g（模长）。
+        if !self.gravity_locked {
+            let g_now = attitude.rotate_vec3(sample.accel_lp);
+            let g_mag_err = (g_now.length() - self.config.gravity).abs();
+            let gyro_norm_init = sample.gyro_lp.length();
+            const CLEAN_G_MAG_THRESH: f64 = 0.15; // m/s² — |R*a| 距真 g 的容差
+            const CLEAN_GYRO_THRESH: f64 = 0.15; // rad/s
+            const INIT_WINDOW_FRAMES: u32 = 100; // ~400 ms @ 250 Hz
+            let is_clean = g_mag_err < CLEAN_G_MAG_THRESH && gyro_norm_init < CLEAN_GYRO_THRESH;
+
+            if !self.gravity_initialized {
+                // 首帧 bootstrap
+                self.gravity_ref = g_now;
+                self.gravity_initialized = true;
+                if is_clean {
+                    // 首帧就干净，直接锁定，不走 refine
+                    self.gravity_locked = true;
+                    tracing::info!(
+                        "ESKF gravity_ref 首帧干净，立即锁定 | g=[{:.3},{:.3},{:.3}] |g|={:.3}",
+                        g_now.x, g_now.y, g_now.z, g_now.length()
+                    );
+                }
+            } else {
+                // Refine 模式：累积后续的干净帧
+                if is_clean {
+                    self.gravity_init_sum += g_now;
+                    self.gravity_init_static_frames += 1;
+                }
+                self.gravity_init_total_frames += 1;
+                if self.gravity_init_total_frames >= INIT_WINDOW_FRAMES {
+                    if self.gravity_init_static_frames >= 10 {
+                        let refined = self.gravity_init_sum
+                            / self.gravity_init_static_frames as f64;
+                        tracing::info!(
+                            "ESKF gravity_ref refined | bootstrap=[{:.3},{:.3},{:.3}] → refined=[{:.3},{:.3},{:.3}] ({}干净/{}总帧)",
+                            self.gravity_ref.x, self.gravity_ref.y, self.gravity_ref.z,
+                            refined.x, refined.y, refined.z,
+                            self.gravity_init_static_frames,
+                            self.gravity_init_total_frames,
+                        );
+                        self.gravity_ref = refined;
+                    } else {
+                        tracing::info!(
+                            "ESKF gravity_ref 初始化窗口内无足够干净帧（{}），保留 bootstrap 值",
+                            self.gravity_init_static_frames
+                        );
+                    }
+                    self.gravity_locked = true;
+                }
+            }
+        }
 
         if self.config.trajectory.passby {
             self.last_timestamp_ms = Some(sample.timestamp_ms);
@@ -342,6 +418,9 @@ impl EskfNavigator {
     pub fn set_gravity_reference(&mut self, quat_offset: DQuat) {
         let gravity_world = DVec3::new(0.0, 0.0, self.config.gravity);
         self.gravity_ref = quat_offset.rotate_vec3(gravity_world);
+        // 手动校准立即锁定 gravity_ref，绕过初始化窗口的自动 refine。
+        self.gravity_initialized = true;
+        self.gravity_locked = true;
         tracing::info!(
             "ESKF 重力参考更新 | g_ref=[{:.3}, {:.3}, {:.3}]",
             self.gravity_ref.x,
@@ -388,6 +467,11 @@ impl EskfNavigator {
             attitude: DQuat::IDENTITY,
         };
         self.gravity_ref = DVec3::new(0.0, 0.0, self.config.gravity);
+        self.gravity_initialized = false;
+        self.gravity_locked = false;
+        self.gravity_init_total_frames = 0;
+        self.gravity_init_sum = DVec3::ZERO;
+        self.gravity_init_static_frames = 0;
         self.bias_gyro = DVec3::ZERO;
         self.bias_accel = DVec3::ZERO;
         self.covariance = Mat15::from_diagonal(&init_diag);

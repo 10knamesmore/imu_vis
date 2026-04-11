@@ -84,11 +84,14 @@ pub enum CorrectionRequest {
     /// 以最新原始姿态作为零位。
     /// response tells the caller the result
     SetAxis {
+        /// 完成回调通道。
         respond_to: oneshot::Sender<Result<(), &'static str>>,
     },
     /// 强制设置位置。
     SetPosition {
+        /// 目标位置 (m)。
         position: DVec3,
+        /// 完成回调通道。
         respond_to: oneshot::Sender<Result<(), &'static str>>,
     },
 }

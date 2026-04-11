@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "A Tauri App"
 authors = ["wanger"]
 edition = "2021"
+default-run = "imu-vis"
 
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
@@ -29,7 +30,7 @@ serde_json          = "1"
 tauri               = { version = "2",    features = [] }
 tauri-plugin-opener = "2"
 thiserror           = "2.0"
-tokio               = { version = "1.47", features = ["time"] }
+tokio               = { version = "1.47", features = ["time", "rt-multi-thread", "macros"] }
 toml                = "0.8"
 tracing             = "0.1"
 tracing-appender    = "0.2"
@@ -37,6 +38,10 @@ tracing-subscriber  = { version = "0.3", features = ["env-filter", "fmt", "json"
 sea-orm             = { version = "0.12", features = ["macros", "runtime-tokio-rustls", "sqlx-sqlite"] }
 
 math_f64            = { path = "crates/math_f64" }
+
+[[bin]]
+name = "replay"
+path = "src/bin/replay.rs"
 
 [profile.dev]
 opt-level = 3

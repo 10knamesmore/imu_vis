@@ -46,7 +46,9 @@ pub struct Processor {
 
 /// 原始 IMU 数据包枚举。
 pub enum RawImuData {
+    /// 蓝牙原始数据帧。
     Packet(Vec<u8>),
+    /// 管线重置信号。
     Reset,
 }
 
@@ -161,8 +163,18 @@ impl Processor {
                         PipelineEvent::Packet(data) => {
                             if let Some(frame) = pipeline.process_packet(&data) {
                                 let response_data = OutputBuilder::build(&frame);
-                                if let Err(e) = downstream_tx.send(response_data) {
-                                    tracing::error!("下游发送数据时失败: {:?}", e);
+                                // 可视化路径用 try_send：通道满就丢帧，不反压到 BLE reader。
+                                // 原因：前端可视化 60 Hz 就够，若 IPC/Canvas 偶尔跟不上也不应
+                                // 让 BLE 读线程和 pipeline 线程被拖累。录制路径下方仍用同步 send
+                                // 保证完整性。
+                                match downstream_tx.try_send(response_data) {
+                                    Ok(_) => {}
+                                    Err(flume::TrySendError::Full(_)) => {
+                                        // 可视化帧丢弃，不是 error。静默即可。
+                                    }
+                                    Err(flume::TrySendError::Disconnected(_)) => {
+                                        tracing::error!("下游通道已断开");
+                                    }
                                 }
                                 if let Err(e) = record_tx.send(frame) {
                                     tracing::error!("记录数据失败: {:?}", e);

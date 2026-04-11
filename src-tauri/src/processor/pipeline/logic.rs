@@ -105,20 +105,28 @@ impl ProcessorPipeline {
 
     /// 处理单个原始数据包并输出帧。
     pub fn process_packet(&mut self, packet: &[u8]) -> Option<OutputFrame> {
-        let diag_enabled = self.diagnostics_flag.load(Ordering::Relaxed);
-        let t_start = if diag_enabled {
-            Some(Instant::now())
-        } else {
-            None
-        };
-
         // 解析原始蓝牙包
-        let mut raw = match ImuParser::parse(packet) {
+        let raw = match ImuParser::parse(packet) {
             Ok(sample) => sample,
             Err(e) => {
                 tracing::warn!("IMU 数据解析失败: {:?}", e);
                 return None;
             }
+        };
+        self.process_sample_raw(raw)
+    }
+
+    /// 处理已解析的原始样本并输出帧。
+    ///
+    /// 与 [`process_packet`](Self::process_packet) 共享全部后续流水线，
+    /// 但跳过蓝牙字节解析。供离线 replay CLI 使用，以便从 SQLite 中读取
+    /// 已存储的 [`ImuSampleRaw`] 重跑管线。
+    pub fn process_sample_raw(&mut self, mut raw: ImuSampleRaw) -> Option<OutputFrame> {
+        let diag_enabled = self.diagnostics_flag.load(Ordering::Relaxed);
+        let t_start = if diag_enabled {
+            Some(Instant::now())
+        } else {
+            None
         };
 
         self.latest_raw = Some(raw);

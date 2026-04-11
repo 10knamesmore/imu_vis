@@ -24,6 +24,8 @@ IMU CSV 格式（由应用"导出 CSV"按钮生成）：
 
 import argparse
 import sys
+import matplotlib
+matplotlib.use('Agg')  # 非交互后端，保存图片后不阻塞
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -32,8 +34,9 @@ import matplotlib.gridspec as gridspec
 from matplotlib import rcParams
 
 # 配置中文字体，避免 CJK 字形缺失警告
-rcParams['font.sans-serif'] = ['Noto Sans CJK JP', 'Noto Serif CJK JP', 'sans-serif']
-rcParams['font.monospace'] = ['Noto Sans CJK JP', 'DejaVu Sans Mono', 'monospace']
+rcParams['font.sans-serif'] = ['PingFang SC', 'Heiti SC', 'STHeiti', 'Arial Unicode MS',
+                               'Noto Sans CJK JP', 'DejaVu Sans', 'sans-serif']
+rcParams['font.monospace'] = ['Menlo', 'DejaVu Sans Mono', 'monospace']
 rcParams['axes.unicode_minus'] = False  # 正常显示负号
 
 
@@ -181,8 +184,8 @@ def plot_imu_only(imu: pd.DataFrame, out_path: Path, title: str = "IMU 轨迹"):
 
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
+    plt.close()
     print(f"图表已保存到 {out_path}")
-    plt.show()
 
 
 def plot_comparison(
@@ -191,7 +194,15 @@ def plot_comparison(
     imu_proj: np.ndarray,
     metrics: dict,
     out_path: Path,
+    plane: str = "xz",
 ):
+    plane_cols = {
+        "xz": ("calc_position_x", "calc_position_z", "X (m)", "Z (m)"),
+        "xy": ("calc_position_x", "calc_position_y", "X (m)", "Y (m)"),
+        "yz": ("calc_position_y", "calc_position_z", "Y (m)", "Z (m)"),
+    }
+    col_a, col_b, xlabel, ylabel = plane_cols[plane]
+
     fig = plt.figure(figsize=(16, 7))
     gs = gridspec.GridSpec(1, 3, figure=fig, width_ratios=[2, 2, 1.2])
     fig.suptitle("IMU 轨迹 vs 视频真值投影对比")
@@ -199,19 +210,19 @@ def plot_comparison(
     # 轨迹叠加
     ax0 = fig.add_subplot(gs[0])
     ax0.plot(
-        imu["calc_position_x"], imu["calc_position_z"],
-        color="steelblue", linewidth=1.5, label="IMU 轨迹（XZ）"
+        imu[col_a], imu[col_b],
+        color="steelblue", linewidth=1.5, label=f"IMU 轨迹（{plane.upper()}）"
     )
     ax0.plot(
         video["x_m"], video["y_m"],
         color="crimson", linewidth=1.5, linestyle="--", label="视频真值"
     )
     ax0.scatter(
-        [imu["calc_position_x"].iloc[0]], [imu["calc_position_z"].iloc[0]],
+        [imu[col_a].iloc[0]], [imu[col_b].iloc[0]],
         color="green", s=80, zorder=5
     )
-    ax0.set_xlabel("水平位移 (m)")
-    ax0.set_ylabel("垂直位移 (m)")
+    ax0.set_xlabel(xlabel)
+    ax0.set_ylabel(ylabel)
     ax0.set_title("轨迹投影叠加")
     ax0.axis("equal")
     ax0.legend(fontsize=8)
@@ -244,14 +255,14 @@ def plot_comparison(
         transform=ax2.transAxes,
         fontsize=11,
         verticalalignment="top",
-        fontfamily="monospace",
+        fontfamily="sans-serif",
         bbox={"boxstyle": "round", "facecolor": "#f0f4ff", "alpha": 0.8},
     )
 
     plt.tight_layout()
     plt.savefig(out_path, dpi=150)
+    plt.close()
     print(f"图表已保存到 {out_path}")
-    plt.show()
 
 
 # ─────────────────────────────────────────────
@@ -336,7 +347,7 @@ def main():
     print(f"{'═'*40}\n")
 
     out = imu_path.with_suffix(".png")
-    plot_comparison(imu, video, imu_proj, metrics, out)
+    plot_comparison(imu, video, imu_proj, metrics, out, plane=plane)
 
 
 if __name__ == "__main__":
