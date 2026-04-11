@@ -80,46 +80,48 @@ def load_video(path: str) -> pd.DataFrame:
     return df
 
 
-def align_time(imu: pd.DataFrame, video: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+def nearest_point_distances(pts_a: np.ndarray, pts_b: np.ndarray, chunk: int = 512) -> np.ndarray:
     """
-    时间对齐：两条轨迹各自的时间轴归零（从 t=0 开始）。
-    如需基于冲击峰对齐，请手动在 CSV 中裁剪到冲击帧后的数据。
+    对 A 中的每个点，计算到 B 中最近点的欧氏距离。
+
+    用分块广播避免 (N, M) 巨矩阵 OOM：每个 chunk 的峰值内存约 chunk × M × 16 bytes。
+    chunk=512, M=3000 时约 24 MB/chunk，14917 × 3000 全量 < 1 秒。
+
+    参数:
+      pts_a: (N, 2) IMU 轨迹点（已投影到选定平面）
+      pts_b: (M, 2) 参考轨迹点
+    返回:
+      (N,) 每个 IMU 点到参考轨迹上最近点的欧氏距离
     """
-    imu = imu.copy()
-    video = video.copy()
-    imu["t"] = imu["timestamp_ms"] - imu["timestamp_ms"].iloc[0]
-    video["t"] = video["time_ms"] - video["time_ms"].iloc[0]
-    return imu, video
+    n = pts_a.shape[0]
+    out = np.empty(n, dtype=np.float64)
+    for i in range(0, n, chunk):
+        diff = pts_a[i:i + chunk, None, :] - pts_b[None, :, :]   # (chunk, M, 2)
+        d2 = (diff * diff).sum(axis=-1)                          # (chunk, M)
+        out[i:i + chunk] = np.sqrt(d2.min(axis=-1))
+    return out
 
 
-def origin_shift(imu: pd.DataFrame, video: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """将两条轨迹的起点平移到原点。"""
-    imu = imu.copy()
-    video = video.copy()
-    imu["calc_position_x"] -= imu["calc_position_x"].iloc[0]
-    imu["calc_position_y"] -= imu["calc_position_y"].iloc[0]
-    imu["calc_position_z"] -= imu["calc_position_z"].iloc[0]
-    video["x_m"] -= video["x_m"].iloc[0]
-    video["y_m"] -= video["y_m"].iloc[0]
-    return imu, video
+def compute_metrics(imu_pts: np.ndarray, ref_pts: np.ndarray) -> dict:
+    """
+    用 NPD（Nearest-Point Distance）族计算 IMU 相对参考的形状精度。
 
+    **时间无关**：只看形状贴合度，不受节奏差异影响。因为参考轨迹是由
+    `gen_reference_trajectory.py` 生成的理想路径（人造时间戳），
+    和手绘的实际节奏做时间对齐会放大误差，所以用 NPD 而非 temporal RMSE。
 
-def interp_imu_to_video(imu: pd.DataFrame, video: pd.DataFrame) -> np.ndarray:
-    """将 IMU 轨迹插值到视频帧时间点，返回 (N, 2) 数组。"""
-    xi = np.interp(video["t"].values, imu["t"].values, imu["calc_position_x"].values)
-    # 默认用 XZ 平面（水平面）对应视频正视图 x, y
-    zi = np.interp(video["t"].values, imu["t"].values, imu["calc_position_z"].values)
-    return np.column_stack([xi, zi])
-
-
-def compute_metrics(imu_proj: np.ndarray, video_pts: np.ndarray) -> dict:
-    """计算误差指标。"""
-    diff = imu_proj - video_pts
-    dist = np.linalg.norm(diff, axis=1)
+    参数:
+      imu_pts: (N, 2) IMU 在投影平面的点
+      ref_pts: (M, 2) 参考点
+    返回:
+      dict 含: mean_npd_m, rmse_npd_m, max_npd_m, npd_series (N,)
+    """
+    npd = nearest_point_distances(imu_pts, ref_pts)
     return {
-        "rmse_m": float(np.sqrt(np.mean(dist ** 2))),
-        "max_dev_m": float(np.max(dist)),
-        "mean_dev_m": float(np.mean(dist)),
+        "mean_npd_m": float(npd.mean()),
+        "rmse_npd_m": float(np.sqrt((npd ** 2).mean())),
+        "max_npd_m": float(npd.max()),
+        "npd_series": npd,
     }
 
 
@@ -196,6 +198,14 @@ def plot_comparison(
     out_path: Path,
     plane: str = "xz",
 ):
+    """
+    绘制 IMU 轨迹 vs 参考轨迹的形状对比图。
+
+    布局:
+      左子图 : 两条轨迹叠加（俯视），起点绿点
+      中子图 : NPD 时序（每帧到参考最近点的距离），mean 虚线
+      右子图 : 形状精度文字摘要框（3 行 NPD 指标）
+    """
     plane_cols = {
         "xz": ("calc_position_x", "calc_position_z", "X (m)", "Z (m)"),
         "xy": ("calc_position_x", "calc_position_y", "X (m)", "Y (m)"),
@@ -205,9 +215,9 @@ def plot_comparison(
 
     fig = plt.figure(figsize=(16, 7))
     gs = gridspec.GridSpec(1, 3, figure=fig, width_ratios=[2, 2, 1.2])
-    fig.suptitle("IMU 轨迹 vs 视频真值投影对比")
+    fig.suptitle("IMU 轨迹 vs 参考轨迹形状对比")
 
-    # 轨迹叠加
+    # —— 左: 轨迹叠加 ——
     ax0 = fig.add_subplot(gs[0])
     ax0.plot(
         imu[col_a], imu[col_b],
@@ -215,7 +225,7 @@ def plot_comparison(
     )
     ax0.plot(
         video["x_m"], video["y_m"],
-        color="crimson", linewidth=1.5, linestyle="--", label="视频真值"
+        color="crimson", linewidth=1.5, linestyle="--", label="参考轨迹"
     )
     ax0.scatter(
         [imu[col_a].iloc[0]], [imu[col_b].iloc[0]],
@@ -228,27 +238,34 @@ def plot_comparison(
     ax0.legend(fontsize=8)
     ax0.grid(True, alpha=0.4)
 
-    # 逐点误差随时间变化
+    # —— 中: NPD 时序 ——
+    # 每个 IMU 点到参考轨迹最近点的距离，随时间变化。时间无关指标在时序上的可视化。
     ax1 = fig.add_subplot(gs[1])
-    t_vid = video["t"].values / 1000.0
-    diff = np.linalg.norm(imu_proj - np.column_stack([video["x_m"], video["y_m"]]), axis=1)
-    ax1.plot(t_vid, diff, color="purple")
-    ax1.axhline(metrics["rmse_m"], color="darkorange", linestyle="--", label=f'RMSE={metrics["rmse_m"]*100:.1f} cm')
+    t_imu = (imu["timestamp_ms"].values - imu["timestamp_ms"].iloc[0]) / 1000.0
+    npd = metrics["npd_series"]
+    ax1.plot(t_imu, npd, color="forestgreen", linewidth=1.2, label="NPD")
+    ax1.axhline(
+        metrics["mean_npd_m"],
+        color="darkorange",
+        linestyle="--",
+        linewidth=1,
+        label=f'Mean={metrics["mean_npd_m"] * 100:.1f} cm',
+    )
     ax1.set_xlabel("时间 (s)")
-    ax1.set_ylabel("偏差 (m)")
-    ax1.set_title("逐帧偏差")
+    ax1.set_ylabel("NPD (m)")
+    ax1.set_title("Nearest-Point Distance 时序")
     ax1.legend(fontsize=8)
     ax1.grid(True, alpha=0.4)
 
-    # 误差摘要文字框
+    # —— 右: 形状精度摘要 ——
     ax2 = fig.add_subplot(gs[2])
     ax2.axis("off")
     summary = (
-        f"误差摘要\n"
-        f"{'─'*22}\n"
-        f"RMSE:     {metrics['rmse_m']*100:6.2f} cm\n"
-        f"最大偏差: {metrics['max_dev_m']*100:6.2f} cm\n"
-        f"平均偏差: {metrics['mean_dev_m']*100:6.2f} cm\n"
+        f"形状精度 (NPD)\n"
+        f"{'─' * 22}\n"
+        f"Mean NPD:  {metrics['mean_npd_m'] * 100:6.2f} cm\n"
+        f"RMSE NPD:  {metrics['rmse_npd_m'] * 100:6.2f} cm\n"
+        f"Max NPD:   {metrics['max_npd_m'] * 100:6.2f} cm\n"
     )
     ax2.text(
         0.1, 0.6, summary,
@@ -312,42 +329,42 @@ def main():
         return
 
     video = load_video(args.video)
-    imu, video = align_time(imu, video)
-    # 重新归零（align_time 不改变位置，只加时间列）
+    # 参考轨迹起点归零，与 IMU 起点对齐到同一原点
     video["x_m"] -= video["x_m"].iloc[0]
     video["y_m"] -= video["y_m"].iloc[0]
 
-    # 根据投影平面选择 IMU 的两个轴
+    # 根据投影平面选取 IMU 的两个坐标轴，**不做时间插值**
+    # NPD 指标时间无关：直接用 IMU 原始点云和参考点云计算最近点距离
     plane = args.plane
     if plane == "xz":
-        imu_proj = np.column_stack([
-            np.interp(video["t"].values, imu["t"].values, imu["calc_position_x"].values),
-            np.interp(video["t"].values, imu["t"].values, imu["calc_position_z"].values),
+        imu_pts = np.column_stack([
+            imu["calc_position_x"].values,
+            imu["calc_position_z"].values,
         ])
     elif plane == "xy":
-        imu_proj = np.column_stack([
-            np.interp(video["t"].values, imu["t"].values, imu["calc_position_x"].values),
-            np.interp(video["t"].values, imu["t"].values, imu["calc_position_y"].values),
+        imu_pts = np.column_stack([
+            imu["calc_position_x"].values,
+            imu["calc_position_y"].values,
         ])
     else:  # yz
-        imu_proj = np.column_stack([
-            np.interp(video["t"].values, imu["t"].values, imu["calc_position_y"].values),
-            np.interp(video["t"].values, imu["t"].values, imu["calc_position_z"].values),
+        imu_pts = np.column_stack([
+            imu["calc_position_y"].values,
+            imu["calc_position_z"].values,
         ])
 
-    video_pts = np.column_stack([video["x_m"].values, video["y_m"].values])
-    metrics = compute_metrics(imu_proj, video_pts)
+    ref_pts = np.column_stack([video["x_m"].values, video["y_m"].values])
+    metrics = compute_metrics(imu_pts, ref_pts)
 
-    print(f"{'═'*40}")
-    print(f"对比误差摘要（IMU {plane.upper()} 平面 vs 视频）")
-    print(f"{'─'*40}")
-    print(f"RMSE:     {metrics['rmse_m']*100:.2f} cm")
-    print(f"最大偏差: {metrics['max_dev_m']*100:.2f} cm")
-    print(f"平均偏差: {metrics['mean_dev_m']*100:.2f} cm")
-    print(f"{'═'*40}\n")
+    print(f"{'═' * 40}")
+    print(f"形状精度（NPD vs 参考，IMU {plane.upper()} 平面）")
+    print(f"{'─' * 40}")
+    print(f"Mean NPD:  {metrics['mean_npd_m'] * 100:.2f} cm")
+    print(f"RMSE NPD:  {metrics['rmse_npd_m'] * 100:.2f} cm")
+    print(f"Max NPD:   {metrics['max_npd_m'] * 100:.2f} cm")
+    print(f"{'═' * 40}\n")
 
     out = imu_path.with_suffix(".png")
-    plot_comparison(imu, video, imu_proj, metrics, out, plane=plane)
+    plot_comparison(imu, video, imu_pts, metrics, out, plane=plane)
 
 
 if __name__ == "__main__":

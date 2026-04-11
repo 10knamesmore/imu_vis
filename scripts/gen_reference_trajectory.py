@@ -81,8 +81,10 @@ def gen_linear(distance: float, duration: float, pause: float) -> pd.DataFrame:
 def gen_rect(width: float, height: float, duration: float, pause: float) -> pd.DataFrame:
     """
     矩形折线：按四条边顺序行走，每个角落停顿 pause 秒。
-    边顺序：右 → 上 → 左 → 下（顺时针）。
     坐标：x_m 横向，y_m 纵向。
+
+    width / height 支持**负值**：负值表示对应方向翻转。例如 width=-0.5 则路径起
+    点仍在 (0,0)，但先向 -x 方向移动（适用于和实际录制方向匹配的场景）。
     """
     # 四条边的起点和终点
     corners = [
@@ -93,9 +95,9 @@ def gen_rect(width: float, height: float, duration: float, pause: float) -> pd.D
         (0.0,    0.0),   # 闭合回起点
     ]
 
-    # 各边长度
-    perimeter = 2 * (width + height)
-    side_lengths = [width, height, width, height]
+    # 各边长度（取绝对值，避免负 width/height 导致周长为负）
+    perimeter = 2 * (abs(width) + abs(height))
+    side_lengths = [abs(width), abs(height), abs(width), abs(height)]
 
     # 计算各边运动时间（按边长比例分配，总时间减去四次停顿）
     n_pauses = 4  # 四个角落各停一次（回到起点后的停顿已含在 duration 内）
@@ -126,21 +128,44 @@ def gen_rect(width: float, height: float, duration: float, pause: float) -> pd.D
     return pd.DataFrame({"time_ms": t_ms, "x_m": x, "y_m": y})
 
 
-def gen_circle(radius: float, duration: float) -> pd.DataFrame:
+def gen_circle(
+    radius: float,
+    duration: float,
+    center_angle_deg: float = 180.0,
+    clockwise: bool = False,
+) -> pd.DataFrame:
     """
-    圆形轨迹：x = R·cos(2π·t/T)，y = R·sin(2π·t/T)。
-    起点 (R, 0)，逆时针方向。
+    圆形轨迹：起点恒在原点 (0,0)，圆上一点。
+
+    参数:
+      radius: 圆半径（米）
+      duration: 完整绕一圈的时长（秒）
+      center_angle_deg: 圆心相对于起点的方向角度（度，+x 为 0°，逆时针为正）
+        - 180°（默认）表示圆心在起点左侧，轨迹从右侧切线方向出发
+        - 0° 表示圆心在起点右侧
+        - 90° 表示圆心在起点上方
+      clockwise: 是否顺时针行走（默认 False = 逆时针）
+
+    返回的 DataFrame 的第一行必为 (x=0, y=0)。
     """
     n = int(duration * SAMPLE_RATE_HZ)
     t_ms = np.arange(n) * DT_MS
     t_s = t_ms / 1000.0
-    theta = 2 * math.pi * t_s / duration
-    x = radius * np.cos(theta)
-    y = radius * np.sin(theta)
-    # 平移起点到原点: x -= R, y -= 0
-    x = x - radius
-    y = y
-    # 重新以起点为 (0,0)
+
+    # 圆心位置（以原点为参考）
+    ca = math.radians(center_angle_deg)
+    cx = radius * math.cos(ca)
+    cy = radius * math.sin(ca)
+
+    # 起点 (0,0) 相对圆心的角度 = 圆心方向 + 180°
+    start_theta = ca + math.pi
+    # 角度推进方向：逆时针为 +，顺时针为 -
+    direction = -1.0 if clockwise else 1.0
+    theta = start_theta + direction * 2 * math.pi * t_s / duration
+
+    x = cx + radius * np.cos(theta)
+    y = cy + radius * np.sin(theta)
+    # 强制首点归零，消除浮点误差
     x = x - x[0]
     y = y - y[0]
     return pd.DataFrame({"time_ms": t_ms, "x_m": x, "y_m": y})
@@ -213,6 +238,10 @@ def main():
     parser.add_argument("--width", type=float, default=1.0, help="[rect] 矩形宽度（米），默认 1.0")
     parser.add_argument("--height", type=float, default=0.5, help="[rect] 矩形高度（米），默认 0.5")
     parser.add_argument("--radius", type=float, default=0.5, help="[circle/figure8] 半径（米），默认 0.5")
+    parser.add_argument("--center-angle-deg", type=float, default=180.0,
+                        help="[circle] 圆心相对起点的方向角度（度，+x=0°, 逆时针为正），默认 180")
+    parser.add_argument("--clockwise", action="store_true",
+                        help="[circle] 顺时针行走（默认逆时针）")
     parser.add_argument("--output", type=str, default=None, help="输出文件路径（默认 reference_<experiment>.csv）")
     args = parser.parse_args()
 
@@ -233,8 +262,17 @@ def main():
               f"尺寸 {args.width}m×{args.height}m，停顿 {args.pause}s")
 
     elif exp == "circle":
-        df = gen_circle(radius=args.radius, duration=args.duration)
-        print(f"生成圆形参考轨迹：{len(df)} 点，时长 {args.duration:.0f}s，半径 {args.radius}m")
+        df = gen_circle(
+            radius=args.radius,
+            duration=args.duration,
+            center_angle_deg=args.center_angle_deg,
+            clockwise=args.clockwise,
+        )
+        direction_label = "顺时针" if args.clockwise else "逆时针"
+        print(
+            f"生成圆形参考轨迹：{len(df)} 点，时长 {args.duration:.0f}s，"
+            f"半径 {args.radius}m，圆心方向 {args.center_angle_deg}°，{direction_label}"
+        )
 
     elif exp == "figure8":
         df = gen_figure8(radius=args.radius, duration=args.duration, pause=args.pause)
