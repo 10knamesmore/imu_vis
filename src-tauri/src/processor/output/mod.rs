@@ -11,5 +11,9 @@ pub mod types;
 
 /// 输出构建器。
 pub use logic::OutputBuilder;
+/// 饱和检测阈值常量。
+pub use logic::ACCEL_SATURATION_THRESHOLD_MS2;
+/// 饱和检测 helper。
+pub use logic::is_accel_saturated;
 /// 输出帧类型导出。
 pub use types::OutputFrame;

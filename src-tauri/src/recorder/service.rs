@@ -7,7 +7,7 @@ use flume::{Receiver, Sender};
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, QueryOrder, Set};
 
 use crate::{
-    processor::output::OutputFrame,
+    processor::output::{is_accel_saturated, OutputFrame},
     recorder::{db, models},
     types::{
         outputs::ResponseData,
@@ -486,6 +486,11 @@ fn parse_tags(tags_json: Option<String>) -> Vec<String> {
 fn sample_to_response_data(sample: models::imu_samples::Model) -> ResponseData {
     use math_f64::{DQuat, DVec3};
 
+    let accel_with_g = DVec3::new(
+        sample.accel_with_g_x,
+        sample.accel_with_g_y,
+        sample.accel_with_g_z,
+    );
     ResponseData {
         timestamp_ms: sample.timestamp_ms as u64,
         accel: DVec3::new(
@@ -493,11 +498,7 @@ fn sample_to_response_data(sample: models::imu_samples::Model) -> ResponseData {
             sample.accel_no_g_y,
             sample.accel_no_g_z,
         ),
-        accel_with_g: DVec3::new(
-            sample.accel_with_g_x,
-            sample.accel_with_g_y,
-            sample.accel_with_g_z,
-        ),
+        accel_with_g,
         gyro: DVec3::new(sample.gyro_x, sample.gyro_y, sample.gyro_z),
         attitude: DQuat::from_xyzw(
             sample.calc_attitude_x,
@@ -515,6 +516,8 @@ fn sample_to_response_data(sample: models::imu_samples::Model) -> ResponseData {
             sample.calc_position_y,
             sample.calc_position_z,
         ),
+        // 回放场景也标记饱和段：用与实时路径相同的阈值 helper
+        accel_saturated: is_accel_saturated(accel_with_g),
     }
 }
 

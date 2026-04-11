@@ -20,4 +20,9 @@ pub struct ResponseData {
     pub velocity: DVec3,
     /// 位置（m，计算值）
     pub position: DVec3,
+    /// 本帧加速度计是否触发饱和（任一轴 |accel_with_g| > 152 m/s²）。
+    ///
+    /// 用于前端在 3D 轨迹和 chart 上标红提醒。详见
+    /// `docs/imu_saturation_research.md`。
+    pub accel_saturated: bool,
 }

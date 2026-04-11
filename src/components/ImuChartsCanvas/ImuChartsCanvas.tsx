@@ -481,6 +481,33 @@ const drawChart = (
   ctx.textAlign = "center";
   ctx.fillText("时间 (s)", padding.left + plotWidth / 2, height - 16);
 
+  // —— 饱和背景条 ——
+  // 若 window 带 accelSaturated 布尔缓冲（ImuHistoryWindow 和 DiagnosticsHistoryWindow 都有），
+  // 把饱和连续段画成半透明红色背景条，提醒用户该区段加速度被硬截断。
+  const satBuf = (window as { accelSaturated?: Uint8Array }).accelSaturated;
+  if (satBuf) {
+    ctx.fillStyle = "rgba(255, 64, 64, 0.2)";
+    const halfGap = Math.max(1, plotWidth / Math.max(2, window.count) / 2);
+    let segStart: number | null = null;
+    for (let i = 0; i <= window.count; i += 1) {
+      const isSat = i < window.count && window.getValue(satBuf, i) > 0;
+      if (isSat && segStart === null) {
+        segStart = i;
+      } else if (!isSat && segStart !== null) {
+        const tStart = window.getTime(segStart);
+        const tEnd = window.getTime(i - 1);
+        const xStart = padding.left + ((tStart - windowStartTime) / timeSpan) * plotWidth - halfGap;
+        const xEnd = padding.left + ((tEnd - windowStartTime) / timeSpan) * plotWidth + halfGap;
+        const clippedStart = Math.max(padding.left, xStart);
+        const clippedEnd = Math.min(padding.left + plotWidth, xEnd);
+        if (clippedEnd > clippedStart) {
+          ctx.fillRect(clippedStart, padding.top, clippedEnd - clippedStart, plotHeight);
+        }
+        segStart = null;
+      }
+    }
+  }
+
   for (const s of series) {
     ctx.strokeStyle = s.color;
     ctx.lineWidth = 1.4;

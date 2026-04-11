@@ -35,6 +35,15 @@ const getAxisPalette = (scheme: "dark" | "light") => {
   };
 };
 
+/** 轨迹线饱和段颜色（明亮红，两种主题下都醒目）。 */
+const TRAIL_SATURATED_COLOR = { r: 1.0, g: 0.15, b: 0.15 };
+
+/** 轨迹线常规段颜色，按主题区分。 */
+const getTrailNormalColor = (scheme: "dark" | "light") =>
+  scheme === "dark"
+    ? { r: 1.0, g: 1.0, b: 1.0 }
+    : { r: 0.184, g: 0.204, b: 0.227 };
+
 const applyAxesHelperColors = (axes: THREE.AxesHelper, colors: { x: number; y: number; z: number }) => {
   const colorAttr = axes.geometry.getAttribute("color") as THREE.BufferAttribute | undefined;
   if (!colorAttr) return;
@@ -84,50 +93,73 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   const centerTrailRef = useRef<THREE.Line | null>(null);
   const centerTrailGeometryRef = useRef<THREE.BufferGeometry | null>(null);
   const centerTrailPositionsRef = useRef<Float32Array | null>(null);
+  /** 轨迹点颜色缓冲（RGB per vertex），用于按饱和状态分段上色。 */
+  const centerTrailColorsRef = useRef<Float32Array | null>(null);
+  /** 每个轨迹点的饱和标记，与 positions/colors 同步 shift，主题切换时据此重算颜色。 */
+  const centerTrailSatRef = useRef<Uint8Array | null>(null);
   const maxTrailPointsRef = useRef(3000);
   const centerTrailStateRef = useRef<{ count: number }>({ count: 0 });
 
   // 渲染临时变量
   const tmpVec = new THREE.Vector3();
 
+  const { colorScheme } = useColorScheme();
+  const colorSchemeRef = useRef(colorScheme);
+  useEffect(() => { colorSchemeRef.current = colorScheme; }, [colorScheme]);
+
   /**
    * 渲染循环回调
-   * 1: 读取最新位置数据
-   * 2: 写入中心轨迹缓冲并更新绘制范围
+   * 1: 读取最新位置数据（含 accel_saturated）
+   * 2: 写入中心轨迹缓冲、对应颜色缓冲和饱和标记，更新绘制范围
    */
   const onRender = () => {
     const latest = sourceRef.current.latestRef.current;
     if (latest && showTrajectoryRef.current && trajectoryOptionRef.current.center) {
       const positions = centerTrailPositionsRef.current;
+      const colors = centerTrailColorsRef.current;
+      const sats = centerTrailSatRef.current;
       const geometry = centerTrailGeometryRef.current;
-      if (positions && geometry) {
+      if (positions && colors && sats && geometry) {
         const state = centerTrailStateRef.current;
         const maxPoints = maxTrailPointsRef.current;
 
         // 获取当前中心位置
         tmpVec.set(latest.position.x, latest.position.y, latest.position.z);
+        const isSat = latest.accel_saturated ? 1 : 0;
+        const col = isSat
+          ? TRAIL_SATURATED_COLOR
+          : getTrailNormalColor(colorSchemeRef.current);
 
         if (state.count < maxPoints) {
           const i = state.count;
           positions[i * 3] = tmpVec.x;
           positions[i * 3 + 1] = tmpVec.y;
           positions[i * 3 + 2] = tmpVec.z;
+          colors[i * 3] = col.r;
+          colors[i * 3 + 1] = col.g;
+          colors[i * 3 + 2] = col.b;
+          sats[i] = isSat;
           state.count += 1;
         } else {
           // 保持轨迹顺序，避免首尾相连的闭合线段
           positions.copyWithin(0, 3);
+          colors.copyWithin(0, 3);
+          sats.copyWithin(0, 1);
           const i = maxPoints - 1;
           positions[i * 3] = tmpVec.x;
           positions[i * 3 + 1] = tmpVec.y;
           positions[i * 3 + 2] = tmpVec.z;
+          colors[i * 3] = col.r;
+          colors[i * 3 + 1] = col.g;
+          colors[i * 3 + 2] = col.b;
+          sats[i] = isSat;
         }
         geometry.setDrawRange(0, state.count);
         (geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+        (geometry.attributes.color as THREE.BufferAttribute).needsUpdate = true;
       }
     }
   };
-
-  const { colorScheme } = useColorScheme();
 
   /**
    * 使用基础 Three.js Hook 创建场景
@@ -152,11 +184,15 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     // Center Trail
     const maxPoints = maxTrailPointsRef.current;
     const centerTrailPositions = new Float32Array(maxPoints * 3);
+    const centerTrailColors = new Float32Array(maxPoints * 3);
+    const centerTrailSats = new Uint8Array(maxPoints);
     const centerTrailGeometry = new THREE.BufferGeometry();
     centerTrailGeometry.setAttribute("position", new THREE.BufferAttribute(centerTrailPositions, 3));
+    centerTrailGeometry.setAttribute("color", new THREE.BufferAttribute(centerTrailColors, 3));
     centerTrailGeometry.setDrawRange(0, 0);
+    // vertexColors=true 让材质按顶点颜色渲染，饱和段画红色，非饱和段画当前主题色。
     const centerTrailMaterial = new THREE.LineBasicMaterial({
-      color: colorScheme === "dark" ? 0xffffff : 0x2f343a,
+      vertexColors: true,
     });
     const centerTrailLine = new THREE.Line(centerTrailGeometry, centerTrailMaterial);
     centerTrailLine.visible = false;
@@ -166,6 +202,8 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     centerTrailRef.current = centerTrailLine;
     centerTrailGeometryRef.current = centerTrailGeometry;
     centerTrailPositionsRef.current = centerTrailPositions;
+    centerTrailColorsRef.current = centerTrailColors;
+    centerTrailSatRef.current = centerTrailSats;
     centerTrailMaterialRef.current = centerTrailMaterial;
 
     return () => {
@@ -214,10 +252,15 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
   useEffect(() => {
     const geometry = centerTrailGeometryRef.current;
     const positions = centerTrailPositionsRef.current;
-    if (geometry && positions) {
+    const colors = centerTrailColorsRef.current;
+    const sats = centerTrailSatRef.current;
+    if (geometry && positions && colors && sats) {
       positions.fill(0);
+      colors.fill(0);
+      sats.fill(0);
       geometry.setDrawRange(0, 0);
       (geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+      (geometry.attributes.color as THREE.BufferAttribute).needsUpdate = true;
       centerTrailStateRef.current = { count: 0 };
     }
   }, [trailResetToken]);
@@ -248,11 +291,25 @@ export const ImuTrajectoryView: React.FC<ImuTrajectoryViewProps> = ({
     displayGroup.add(grid);
     gridRef.current = grid;
 
-    // 2. 更新轨迹线颜色
-    if (centerTrailMaterialRef.current) {
-      centerTrailMaterialRef.current.color.setHex(
-        colorScheme === 'dark' ? 0xffffff : 0x2f343a
-      );
+    // 2. 更新已有轨迹点的顶点颜色：饱和帧保持红色，其余按新主题色
+    const geometry = centerTrailGeometryRef.current;
+    const colorsBuf = centerTrailColorsRef.current;
+    const satsBuf = centerTrailSatRef.current;
+    if (geometry && colorsBuf && satsBuf) {
+      const normal = getTrailNormalColor(colorScheme);
+      const count = centerTrailStateRef.current.count;
+      for (let i = 0; i < count; i += 1) {
+        if (satsBuf[i]) {
+          colorsBuf[i * 3] = TRAIL_SATURATED_COLOR.r;
+          colorsBuf[i * 3 + 1] = TRAIL_SATURATED_COLOR.g;
+          colorsBuf[i * 3 + 2] = TRAIL_SATURATED_COLOR.b;
+        } else {
+          colorsBuf[i * 3] = normal.r;
+          colorsBuf[i * 3 + 1] = normal.g;
+          colorsBuf[i * 3 + 2] = normal.b;
+        }
+      }
+      (geometry.attributes.color as THREE.BufferAttribute).needsUpdate = true;
     }
 
     // 3. 重建轴标签 Sprite

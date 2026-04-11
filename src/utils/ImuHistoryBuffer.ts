@@ -5,7 +5,7 @@ export type ImuHistoryWindow = {
   latestTime: number;
   getIndex: (viewIndex: number) => number;
   getTime: (viewIndex: number) => number;
-  getValue: (buffer: Float32Array | Float64Array, viewIndex: number) => number;
+  getValue: (buffer: Float32Array | Float64Array | Uint8Array, viewIndex: number) => number;
   timeMs: Float64Array;
   accelX: Float32Array;
   accelY: Float32Array;
@@ -23,6 +23,8 @@ export type ImuHistoryWindow = {
   positionX: Float32Array;
   positionY: Float32Array;
   positionZ: Float32Array;
+  /** 每样本的饱和标记（0/1），用于 chart 背景条和 3D 轨迹分段上色。 */
+  accelSaturated: Uint8Array;
 };
 
 const radToDeg = (rad: number) => (rad * 180) / Math.PI;
@@ -73,6 +75,7 @@ export class ImuHistoryBuffer {
   private positionX: Float32Array;
   private positionY: Float32Array;
   private positionZ: Float32Array;
+  private accelSaturated: Uint8Array;
 
   constructor(capacity: number) {
     this.capacity = capacity;
@@ -95,6 +98,7 @@ export class ImuHistoryBuffer {
     this.positionX = new Float32Array(capacity);
     this.positionY = new Float32Array(capacity);
     this.positionZ = new Float32Array(capacity);
+    this.accelSaturated = new Uint8Array(capacity);
   }
 
   clear() {
@@ -123,6 +127,7 @@ export class ImuHistoryBuffer {
     this.positionX[i] = msg.position.x;
     this.positionY[i] = msg.position.y;
     this.positionZ[i] = msg.position.z;
+    this.accelSaturated[i] = msg.accel_saturated ? 1 : 0;
 
     this.writeIndex = (i + 1) % this.capacity;
     this.count = Math.min(this.count + 1, this.capacity);
@@ -138,7 +143,7 @@ export class ImuHistoryBuffer {
    * @returns 时间窗口视图，包含索引映射、窗口内数量以及原始缓冲区引用。
    */
   getWindow(durationMs: number, offsetMs: number): ImuHistoryWindow {
-    const makeWindow = (count: number, latestTime: number, getIndex: (v: number) => number, getTime: (v: number) => number, getValue: (buf: Float32Array | Float64Array, v: number) => number): ImuHistoryWindow => ({
+    const makeWindow = (count: number, latestTime: number, getIndex: (v: number) => number, getTime: (v: number) => number, getValue: (buf: Float32Array | Float64Array | Uint8Array, v: number) => number): ImuHistoryWindow => ({
       count,
       latestTime,
       getIndex,
@@ -161,6 +166,7 @@ export class ImuHistoryBuffer {
       positionX: this.positionX,
       positionY: this.positionY,
       positionZ: this.positionZ,
+      accelSaturated: this.accelSaturated,
     });
 
     if (this.count === 0) {
@@ -216,7 +222,7 @@ export class ImuHistoryBuffer {
     const startIndex = (baseIndex + startLogical) % this.capacity;
     const getIndex = (viewIndex: number) => (startIndex + viewIndex) % this.capacity;
     const getTime = (viewIndex: number) => this.timeMs[getIndex(viewIndex)];
-    const getValue = (buffer: Float32Array | Float64Array, viewIndex: number) =>
+    const getValue = (buffer: Float32Array | Float64Array | Uint8Array, viewIndex: number) =>
       buffer[getIndex(viewIndex)];
 
     return makeWindow(count, latestTime, getIndex, getTime, getValue);

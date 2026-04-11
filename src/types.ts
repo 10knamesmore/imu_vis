@@ -22,6 +22,7 @@ export interface ResponseData {
   attitude: Quaternion;    // 姿态四元数（计算值）
   velocity: Vector3;       // 速度（m/s，计算值）
   position: Vector3;       // 位置（m，计算值）
+  accel_saturated: boolean; // 加速度计是否触发饱和（IM948 ±16g 量程硬截断）
 }
 
 // 录制状态
