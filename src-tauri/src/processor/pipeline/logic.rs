@@ -174,6 +174,13 @@ impl ProcessorPipeline {
                 // 导航阶段
                 nav_dt: self.navigator.current_dt(),
                 nav_linear_accel: self.navigator.last_linear_accel(),
+                // 饱和检测：IM948 量程 ±16g，16.0×9.81=156.96 m/s²，留 0.5g 余量
+                accel_saturated: {
+                    const SAT_THRESHOLD_MS2: f64 = 152.0;
+                    raw.accel_with_g.x.abs() > SAT_THRESHOLD_MS2
+                        || raw.accel_with_g.y.abs() > SAT_THRESHOLD_MS2
+                        || raw.accel_with_g.z.abs() > SAT_THRESHOLD_MS2
+                },
                 // ESKF 专属
                 eskf_cov_diag: self.navigator.eskf_cov_diag(),
                 eskf_bias_gyro: self.navigator.eskf_bias_gyro(),

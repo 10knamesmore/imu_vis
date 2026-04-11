@@ -42,6 +42,8 @@ struct Args {
     diag_out: Option<PathBuf>,
     no_report: bool,
     db_path: Option<PathBuf>,
+    /// 把管线产出的 calc_* 字段写回 SQLite，覆盖录制时存储的值。破坏性操作。
+    write_back: bool,
 }
 
 fn parse_args() -> Result<Args> {
@@ -51,6 +53,7 @@ fn parse_args() -> Result<Args> {
     let mut diag_out: Option<PathBuf> = None;
     let mut db_path: Option<PathBuf> = None;
     let mut no_report = false;
+    let mut write_back = false;
 
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -61,6 +64,7 @@ fn parse_args() -> Result<Args> {
             "--diag-out" => diag_out = Some(PathBuf::from(it.next().context("--diag-out 缺少值")?)),
             "--db" => db_path = Some(PathBuf::from(it.next().context("--db 缺少值")?)),
             "--no-report" => no_report = true,
+            "--write-back" => write_back = true,
             "-h" | "--help" => {
                 print_help();
                 std::process::exit(0);
@@ -77,6 +81,7 @@ fn parse_args() -> Result<Args> {
         diag_out,
         no_report,
         db_path,
+        write_back,
     })
 }
 
@@ -94,6 +99,7 @@ fn print_help() {
   --diag-out <path>           诊断 CSV 输出路径（默认 exports/replay_<session>_diag.csv）
   --db <path>                 SQLite 路径（默认 imu_recordings.sqlite）
   --no-report                 只落盘 CSV，不调 scripts/report.py
+  --write-back                破坏性：用新算法产出的 calc_* 字段覆盖 SQLite 原值
   -h, --help                  显示帮助"
     );
 }
@@ -154,6 +160,8 @@ async fn main() -> Result<()> {
     // —— 5. 跑管线，收集输出帧和诊断 ——
     let mut frames: Vec<TrajectoryRow> = Vec::with_capacity(rows.len());
     let mut diags: Vec<PipelineDiagnostics> = Vec::with_capacity(rows.len());
+    // 用于 write-back 模式：保留每个输出 frame 对应的原始行 id，便于按主键回写。
+    let mut frame_row_ids: Vec<i64> = Vec::with_capacity(rows.len());
     for row in &rows {
         let raw = row_to_raw(row);
         if let Some(frame) = pipeline.process_sample_raw(raw) {
@@ -163,6 +171,7 @@ async fn main() -> Result<()> {
                 vel: frame.nav.velocity,
                 att: frame.nav.attitude,
             });
+            frame_row_ids.push(row.id);
         }
         while let Ok(diag) = diag_rx.try_recv() {
             diags.push(diag);
@@ -192,6 +201,24 @@ async fn main() -> Result<()> {
     write_diagnostics_csv(&diag_path, &diags).context("写 diag.csv 失败")?;
     eprintln!("[replay] 写入: {}", traj_path.display());
     eprintln!("[replay] 写入: {}", diag_path.display());
+
+    // —— 6.5 可选：把 calc_* 字段写回 SQLite ——
+    if args.write_back {
+        if frames.len() != frame_row_ids.len() {
+            return Err(anyhow!(
+                "write-back: 帧数 ({}) 与原始行 id 数 ({}) 不一致",
+                frames.len(),
+                frame_row_ids.len()
+            ));
+        }
+        eprintln!(
+            "[replay] ⚠ write-back: 用新算法产出覆盖 session {} 的 {} 行 calc_* 字段",
+            session_id,
+            frames.len()
+        );
+        write_back_calc_columns(&conn, &frame_row_ids, &frames).await?;
+        eprintln!("[replay] ✓ 已写回 {} 行", frames.len());
+    }
 
     // —— 7. 调用报告脚本 ——
     if args.no_report {
@@ -283,6 +310,55 @@ async fn locate_session(
     }
 }
 
+/// 把 frame 产出的 calc_* 字段按主键写回 imu_samples 表。
+///
+/// 破坏性操作：覆盖原有 calc_attitude_*、calc_velocity_*、calc_position_*、calc_timestamp_ms。
+/// 用单个事务保证原子性；出错时回滚。
+async fn write_back_calc_columns(
+    conn: &sea_orm::DatabaseConnection,
+    row_ids: &[i64],
+    frames: &[TrajectoryRow],
+) -> Result<()> {
+    use sea_orm::{ConnectionTrait, Statement, TransactionTrait};
+
+    let txn = conn.begin().await.context("开启写回事务失败")?;
+
+    // 用参数化 SQL 更新，避免逐行构造 ActiveModel 的开销。
+    const UPDATE_SQL: &str = "UPDATE imu_samples SET \
+        calc_attitude_w = ?, calc_attitude_x = ?, calc_attitude_y = ?, calc_attitude_z = ?, \
+        calc_velocity_x = ?, calc_velocity_y = ?, calc_velocity_z = ?, \
+        calc_position_x = ?, calc_position_y = ?, calc_position_z = ?, \
+        calc_timestamp_ms = ? \
+        WHERE id = ?";
+
+    for (row_id, frame) in row_ids.iter().zip(frames.iter()) {
+        let stmt = Statement::from_sql_and_values(
+            sea_orm::DatabaseBackend::Sqlite,
+            UPDATE_SQL,
+            [
+                frame.att.w.into(),
+                frame.att.x.into(),
+                frame.att.y.into(),
+                frame.att.z.into(),
+                frame.vel.x.into(),
+                frame.vel.y.into(),
+                frame.vel.z.into(),
+                frame.pos.x.into(),
+                frame.pos.y.into(),
+                frame.pos.z.into(),
+                (frame.timestamp_ms as i64).into(),
+                (*row_id).into(),
+            ],
+        );
+        txn.execute(stmt).await.with_context(|| {
+            format!("UPDATE imu_samples id={row_id} 失败（事务已中止）")
+        })?;
+    }
+
+    txn.commit().await.context("提交写回事务失败")?;
+    Ok(())
+}
+
 fn row_to_raw(r: &models::imu_samples::Model) -> ImuSampleRaw {
     ImuSampleRaw {
         timestamp_ms: r.timestamp_ms as u64,
@@ -347,6 +423,7 @@ fn write_diagnostics_csv(path: &Path, diags: &[PipelineDiagnostics]) -> Result<(
          eskf_cov_att_max,eskf_cov_vel_max,eskf_cov_pos_max,eskf_cov_bg_max,eskf_cov_ba_max,\
          eskf_innovation_norm,\
          backward_triggered,backward_correction_mag,\
+         accel_saturated,\
          perf_process_us,perf_ble_interval_ms,\
          perf_upstream_len,perf_downstream_len,perf_record_len"
     )?;
@@ -359,7 +436,7 @@ fn write_diagnostics_csv(path: &Path, diags: &[PipelineDiagnostics]) -> Result<(
         let innov_norm = d.eskf_innovation.map(|v| v.length()).unwrap_or(f64::NAN);
         writeln!(
             f,
-            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
+            "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}",
             d.timestamp_ms,
             d.zupt_is_static as u8,
             d.zupt_gyro_norm,
@@ -390,6 +467,7 @@ fn write_diagnostics_csv(path: &Path, diags: &[PipelineDiagnostics]) -> Result<(
             innov_norm,
             d.backward_triggered as u8,
             d.backward_correction_mag,
+            d.accel_saturated as u8,
             d.perf_process_us,
             d.perf_ble_interval_ms,
             d.perf_upstream_queue_len,

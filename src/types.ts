@@ -146,6 +146,8 @@ export interface PipelineDiagnostics {
   // 导航阶段
   nav_dt: number;
   nav_linear_accel: Vector3;
+  // 饱和检测：本帧加速度计是否触发饱和（IM948 ±16g）
+  accel_saturated: boolean;
   // ESKF 专属
   eskf_cov_diag: number[] | null;
   eskf_bias_gyro: Vector3 | null;

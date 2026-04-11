@@ -55,6 +55,8 @@ export type DiagnosticsHistoryWindow = {
   navLinAccelX: Float32Array;
   navLinAccelY: Float32Array;
   navLinAccelZ: Float32Array;
+  // 饱和检测
+  accelSaturated: Uint8Array;
   // ESKF (速度不确定度 = cov_diag[3..6])
   eskfCovVelX: Float32Array;
   eskfCovVelY: Float32Array;
@@ -127,6 +129,8 @@ export class DiagnosticsHistoryBuffer {
   private navLinAccelX: Float32Array;
   private navLinAccelY: Float32Array;
   private navLinAccelZ: Float32Array;
+  // 饱和检测
+  private accelSaturated: Uint8Array;
   // ESKF
   private eskfCovVelX: Float32Array;
   private eskfCovVelY: Float32Array;
@@ -163,6 +167,7 @@ export class DiagnosticsHistoryBuffer {
     this.zuptEnterCount = f32(capacity); this.zuptExitCount = f32(capacity);
     this.navDt = f32(capacity);
     this.navLinAccelX = f32(capacity); this.navLinAccelY = f32(capacity); this.navLinAccelZ = f32(capacity);
+    this.accelSaturated = new Uint8Array(capacity);
     this.eskfCovVelX = f32(capacity); this.eskfCovVelY = f32(capacity); this.eskfCovVelZ = f32(capacity);
     this.eskfBiasGyroX = f32(capacity); this.eskfBiasGyroY = f32(capacity); this.eskfBiasGyroZ = f32(capacity);
     this.eskfBiasAccelX = f32(capacity); this.eskfBiasAccelY = f32(capacity); this.eskfBiasAccelZ = f32(capacity);
@@ -198,6 +203,8 @@ export class DiagnosticsHistoryBuffer {
     // 导航
     this.navDt[i] = msg.nav_dt;
     this.navLinAccelX[i] = msg.nav_linear_accel.x; this.navLinAccelY[i] = msg.nav_linear_accel.y; this.navLinAccelZ[i] = msg.nav_linear_accel.z;
+    // 饱和检测
+    this.accelSaturated[i] = msg.accel_saturated ? 1 : 0;
     // ESKF
     const cov = msg.eskf_cov_diag;
     this.eskfCovVelX[i] = cov ? cov[3] : 0; this.eskfCovVelY[i] = cov ? cov[4] : 0; this.eskfCovVelZ[i] = cov ? cov[5] : 0;
@@ -238,6 +245,7 @@ export class DiagnosticsHistoryBuffer {
       zuptIsStatic: self.zuptIsStatic, zuptGyroNorm: self.zuptGyroNorm, zuptAccelNorm: self.zuptAccelNorm,
       zuptEnterCount: self.zuptEnterCount, zuptExitCount: self.zuptExitCount,
       navDt: self.navDt, navLinAccelX: self.navLinAccelX, navLinAccelY: self.navLinAccelY, navLinAccelZ: self.navLinAccelZ,
+      accelSaturated: self.accelSaturated,
       eskfCovVelX: self.eskfCovVelX, eskfCovVelY: self.eskfCovVelY, eskfCovVelZ: self.eskfCovVelZ,
       eskfBiasGyroX: self.eskfBiasGyroX, eskfBiasGyroY: self.eskfBiasGyroY, eskfBiasGyroZ: self.eskfBiasGyroZ,
       eskfBiasAccelX: self.eskfBiasAccelX, eskfBiasAccelY: self.eskfBiasAccelY, eskfBiasAccelZ: self.eskfBiasAccelZ,

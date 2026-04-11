@@ -41,6 +41,8 @@ type SmoothedMetrics = {
   recordQ: number;
   gyroNorm: number;
   accelNorm: number;
+  /** 饱和帧占比 EMA，取值 [0, 1]。 */
+  saturatedRate: number;
 };
 
 const EMA_ALPHA = 0.05; // ~20 帧收敛
@@ -71,6 +73,7 @@ const StatusDashboard = ({ latestRef }: { latestRef: React.RefObject<PipelineDia
             recordQ: latest.perf_record_queue_len,
             gyroNorm: latest.zupt_gyro_norm,
             accelNorm: latest.zupt_accel_norm,
+            saturatedRate: latest.accel_saturated ? 1 : 0,
           };
         } else {
           const s = smoothRef.current;
@@ -81,6 +84,7 @@ const StatusDashboard = ({ latestRef }: { latestRef: React.RefObject<PipelineDia
           s.recordQ = ema(s.recordQ, latest.perf_record_queue_len);
           s.gyroNorm = ema(s.gyroNorm, latest.zupt_gyro_norm);
           s.accelNorm = ema(s.accelNorm, latest.zupt_accel_norm);
+          s.saturatedRate = ema(s.saturatedRate, latest.accel_saturated ? 1 : 0);
         }
         // 200ms 刷新一次 UI
         if (now - lastRenderRef.current > 200) {
@@ -131,6 +135,13 @@ const StatusDashboard = ({ latestRef }: { latestRef: React.RefObject<PipelineDia
       <div className={styles.statusCard}>
         <span className={styles.statusLabel}>ZUPT 计数</span>
         <span className={styles.statusMono}>in:{snap.zupt_enter_count} out:{snap.zupt_exit_count}</span>
+      </div>
+      <div className={styles.statusCard}>
+        <span className={(snap.accel_saturated || smooth.saturatedRate > 0.01) ? styles.ledRed : styles.ledGreen} />
+        <span className={styles.statusLabel}>加速度饱和</span>
+        <span className={styles.statusMono}>
+          {snap.accel_saturated ? "★ 当前帧" : `${(smooth.saturatedRate * 100).toFixed(1)}%`}
+        </span>
       </div>
     </div>
   );

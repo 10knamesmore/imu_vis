@@ -70,6 +70,14 @@ pub struct PipelineDiagnostics {
     /// 世界系线性加速度 (m/s²)，去重力后。
     pub nav_linear_accel: DVec3,
 
+    // —— 饱和检测 ——
+    /// 本帧加速度计是否触发饱和（任一轴 |accel_with_g| > 152 m/s²）。
+    ///
+    /// IM948 加速度计 16-bit 量化上限 ±156.78 m/s²（±16g）。一旦饱和，被截断的
+    /// 真实加速度无法恢复，后续位置/速度积分会发散。详见
+    /// `docs/imu_saturation_research.md`。
+    pub accel_saturated: bool,
+
     // —— ESKF 专属（Legacy 模式下为 None）——
     /// 协方差对角线（15 个值：att\[3\], vel\[3\], pos\[3\], bg\[3\], ba\[3\]）。
     pub eskf_cov_diag: Option<[f64; 15]>,
