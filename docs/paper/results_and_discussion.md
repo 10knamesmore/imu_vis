@@ -12,7 +12,7 @@
 
 针对训练场景连续使用时间较长的特点，界面默认采用低亮度深色主题，关键信息以高对比色标注，以降低长时间使用的视觉疲劳。主要操作按钮位于顶部工具栏与底部时序图表区之间，避免与三维视图区发生交互冲突。
 
-> **图 4** 系统主界面整体布局（`docs/figures/` 待补或沿用原稿截图）
+> **图 4** 系统主界面整体布局（`figures/` 待补或沿用原稿截图）
 
 ### 3.1.2 设备接入与传感器校准
 
@@ -72,7 +72,7 @@
 
 将 IMU 设备静置于水平面上，连续采集 60.3 s 数据，用于评估系统的零偏稳定性与背景噪声水平。重建结果如图 7 所示。静止状态下重建轨迹与零位移基准的对比显示，Mean NPD 为 0.05 cm，RMSE NPD 为 0.05 cm，Max NPD 为 0.07 cm；60 秒内终点相对起点的总漂移为 0.07 cm，漂移速率约为 0.001 cm/s。ZUPT 判据在全程 99.9% 的时间内保持触发状态，速度始终被约束在零附近。该结果表明，系统在静止条件下的长期稳定性显著优于运动状态下的典型误差水平，背景噪声已被校准与滤波链路有效抑制。
 
-> **图 7** 静止场景轨迹重建结果（`docs/figures/trajectory_static.png`）
+> **图 7** 静止场景轨迹重建结果（`figures/trajectory_static.png`）
 > 左：XZ 平面上的轨迹叠加（蓝色为 IMU 重建，红色虚线为参考）。
 > 中：NPD 随时间变化曲线。
 > 右：形状精度摘要。
@@ -83,7 +83,7 @@
 
 进一步分析发现，直线场景中误差的主要成分来自**非运动方向的横向漂移**。参考直线限定 y 坐标为零，而实测轨迹在往返过程中 y 分量最大偏离约 0.8 m，z 分量亦有小幅波动。这种侧向漂移一方面源自运动过程中手部持握的微小横向抖动，另一方面源自 ESKF 在长时间持续运动段内对加速度计偏置估计的发散。该场景的闭环误差与 Mean NPD 数值接近，说明"端点漂移"可以较好地代表"整体偏离程度"，两类指标在一维线性运动场景下的一致性较高。
 
-> **图 8** 直线往返场景轨迹重建结果（`docs/figures/trajectory_line.png`）
+> **图 8** 直线往返场景轨迹重建结果（`figures/trajectory_line.png`）
 
 ### 3.2.5 正方形路径场景（两种节奏）
 
@@ -97,8 +97,8 @@
 
 从 NPD 时序（图 9 和图 10 中间子图）可进一步观察到，两组实验的误差峰值均集中在转角附近，基线段的 NPD 通常低于 2 cm，这表明算法对平滑直线段的跟踪能力较强，主要误差来自转角处姿态解算与加速度计响应的延迟。
 
-> **图 9** 正方形路径（快节奏，12 s）轨迹重建结果（`docs/figures/trajectory_square_01.png`）
-> **图 10** 正方形路径（慢节奏，18 s）轨迹重建结果（`docs/figures/trajectory_square_02.png`）
+> **图 9** 正方形路径（快节奏，12 s）轨迹重建结果（`figures/trajectory_square_01.png`）
+> **图 10** 正方形路径（慢节奏，18 s）轨迹重建结果（`figures/trajectory_square_02.png`）
 
 ### 3.2.6 圆形路径场景
 
@@ -108,7 +108,7 @@
 
 需要指出的是，圆形场景的大误差**并非算法缺陷**，而是**纯惯性传感器在连续曲线运动下的固有物理局限**。从图 11 的轨迹叠加可以看到，实测轨迹仍呈现出明显的圆周特征，仅在某些段落出现偏离；但由于持续运动时长超出了 ZUPT 可有效介入的窗口，误差的累积速率远高于其他三类场景。该结果也提示了本算法的适用边界——**对持续时长显著超过挥拍动作时长的运动场景不适用**。在目标应用场景（单次羽毛球挥拍）下，动作持续时间通常小于 1 s，且拍前拍后有自然的准备与还原期，ZUPT 可以在动作两端有效发挥作用，误差累积可控。
 
-> **图 11** 圆形路径场景轨迹重建结果（`docs/figures/trajectory_circle.png`）
+> **图 11** 圆形路径场景轨迹重建结果（`figures/trajectory_circle.png`）
 
 ### 3.2.7 综合对比与讨论
 
@@ -188,10 +188,10 @@ IM948 模块的加速度计默认量程为 ±16g，采用 16 位有符号整数�
 
 ## 附注
 
-- 表 1–3 与图 4–11 的配套数据与图片分别存放于 `docs/figures/` 与本研究的数据库 `imu_recordings.sqlite` 中，可通过 `scripts/iterate.sh` 与 `scripts/validate_trajectory.py` 完整复现
+- 表 1–3 与图 4–11 的配套数据与图片分别存放于 `figures/` 与本研究的数据库 `imu_recordings.sqlite` 中，可通过 `scripts/iterate.sh` 与 `scripts/validate_trajectory.py` 完整复现
 - 图 4–6 为系统界面截图（沿用原稿截图或补录）
-- 图 7：`docs/figures/trajectory_static.png`
-- 图 8：`docs/figures/trajectory_line.png`
-- 图 9：`docs/figures/trajectory_square_01.png`
-- 图 10：`docs/figures/trajectory_square_02.png`
-- 图 11：`docs/figures/trajectory_circle.png`
+- 图 7：`figures/trajectory_static.png`
+- 图 8：`figures/trajectory_line.png`
+- 图 9：`figures/trajectory_square_01.png`
+- 图 10：`figures/trajectory_square_02.png`
+- 图 11：`figures/trajectory_circle.png`
